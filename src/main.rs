@@ -1,5 +1,5 @@
-pub mod layout;
-pub mod matching;
+use comrade::layout;
+use comrade::matching;
 
 fn main() {
     println!("Hello, world!");
