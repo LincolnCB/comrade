@@ -1,9 +1,8 @@
-use comrade::layout;
-use comrade::matching;
-
 fn main() {
     println!("Hello, world!");
 
-    layout::do_layout();
-    matching::do_matching();
+    comrade::parse_cli_args();
+
+    comrade::do_layout();
+    comrade::do_matching();
 }
