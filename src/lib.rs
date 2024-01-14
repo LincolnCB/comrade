@@ -1,24 +1,33 @@
 pub mod layout;
 pub mod matching;
+pub mod args;
 
-/// Struct to hold the parsed command line arguments.
-/// Stores a `bool` for whether to run each of the layout process and matching process.
-/// For each, stores `Option` containing the respective argument struct (`layout::LayoutArgs` or `matching::MatchingArgs`).
-/// Used by `parse_cli_args` to return the parsed arguments.
-/// Used by `main` to run `do_layout` and/or `do_matching`
-pub struct RunArgs {
-    pub run_layout: bool,
-    pub layout_args: Option<layout::LayoutArgs>,
-    pub run_matching: bool,
-    pub matching_args: Option<matching::MatchingArgs>,
-}
+use args::{
+    ComradeArgs,
+    RunStage,
+    };
+use clap::Parser;
 
 /// Parse the command line arguments for the comrade binary.
 /// Uses the `clap` crate.
 /// Returns a `Result` with a `comrade::RunArgs` struct or an `Error`.
 pub fn parse_cli_args() {
-    println!("");
-    println!("Dummy parse_cli_args");
+    let cli_args : ComradeArgs = ComradeArgs::parse();
+
+    match cli_args.sub_command {
+        RunStage::Layout(layout_args) => {  
+            println!("Layout only");
+            println!("{:?}", layout_args);
+        },
+        RunStage::Matching(matching_args) => {
+            println!("Matching only");
+            println!("{:?}", matching_args);
+        },
+        RunStage::Full(full_args) => {
+            println!("Full process");
+            println!("{:?}", full_args);
+        },
+    }
 }
 
 /// Run the layout process with the given arguments.
