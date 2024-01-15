@@ -9,7 +9,7 @@ use crate::matching;
 
 /// Parser for the command line arguments for the comrade binary using clap.
 #[derive(Debug, Parser)]
-pub struct ComradeArgs{
+pub struct ComradeCli {
     #[clap(subcommand)]
     pub sub_command: RunStage,
 }
@@ -49,8 +49,11 @@ pub struct SharedArgs {
 /// Compiled arguments for the layout command. Compiled with clap.
 #[derive(Debug, Args)]
 pub struct LayoutCli{
+    #[arg(value_enum)]
+    style: layout::LayoutStyleCliEnum,
+
     #[command(flatten)]
-    layout_args: layout::LayoutOnlyCli,
+    layout_args: layout::LayoutArgs,
 
     #[command(flatten)]
     shared_args: SharedArgs,
@@ -60,7 +63,7 @@ pub struct LayoutCli{
 #[derive(Debug, Args)]
 pub struct MatchingCli{
     #[command(flatten)]
-    matching_args: matching::MatchingOnlyCli,
+    matching_args: matching::MatchingArgs,
 
     #[command(flatten)]
     shared_args: SharedArgs,
@@ -70,13 +73,11 @@ pub struct MatchingCli{
 #[derive(Debug, Args)]
 pub struct FullCli{
     #[command(flatten)]
-    layout_args: layout::LayoutOnlyCli,
+    layout_args: layout::LayoutArgs,
 
     #[command(flatten)]
-    matching_args: matching::MatchingOnlyCli,
+    matching_args: matching::MatchingArgs,
 
     #[command(flatten)]
     shared_args: SharedArgs,
 }
-
-

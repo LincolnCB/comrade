@@ -8,7 +8,7 @@ pub fn load_coil_params() {
 }
 
 #[derive(Debug, Args)]
-pub struct MatchingOnlyCli {
+pub struct MatchingArgs {
 
     // TODO: Add options, add parsing to options
     #[arg(short, long)]

@@ -1,0 +1,79 @@
+/*!
+ * This is the layout styles module.
+ * Adding new styles should be done here.
+ * 
+ * New styles need to be added to the CLI and to layout system (`do_layout` etc.) handling.
+ * 
+ * # Adding to CLI:
+ * - Add a new enum variant to `LayoutStyleCliEnum`
+ * - Add the constructor handling in the match case of the `construct_layout_style` 
+ * 
+ * # Adding to layout system:
+ * - Add a new enum variant to `LayoutStyleEnum`
+ * - Implement the trait `LayoutStyle` for the new style
+ * 
+ */
+
+mod iterative_circle;
+
+use enum_dispatch::enum_dispatch;
+use clap::ValueEnum;
+
+use crate::layout;
+
+/// Layout styles CLI enum.
+/// Add a new style here to add it to the CLI.
+#[derive(Debug, Clone, ValueEnum)]
+#[clap(rename_all = "kebab_case")]
+pub enum LayoutStyleCliEnum {
+    /// Basic circular layout, based on Monika Sliwak's MATLAB prototype.
+    IterativeCircle,
+}
+
+/// Layout style constructor.
+/// Converts between CLI enum arguments and the functional layout style enum (used in the rest of the code).
+impl LayoutStyleCliEnum {
+    /// Construct a layout style from the CLI enum.
+    /// Takes a `LayoutStyleCliEnum` and returns a `Result` with the `LayoutStyleEnum` or an `Error`.
+    pub fn construct_layout_style(&self, layout_args: layout::LayoutArgs) -> Result<LayoutStyleEnum, String> {
+        match self {
+            // Match the CLI enum variant and construct the corresponding layout style.
+            LayoutStyleCliEnum::IterativeCircle => {
+                let style = iterative_circle::Style::new(layout_args)?;
+                Ok(LayoutStyleEnum::IterativeCircle(style))
+            },
+        }
+    }
+}
+
+
+
+/// Layout styles enum.
+/// To add a new style:
+/// implement the `LayoutStyle` trait for it,
+/// include it here and the `LayoutStyleCliEnum` enum,
+/// and add handling for its constructor.
+#[enum_dispatch]
+pub enum LayoutStyleEnum {
+    /// Basic circular layout, based on Monika Sliwak's MATLAB prototype.
+    IterativeCircle(iterative_circle::Style),
+}
+
+/// Layout style trait.
+/// This trait defines the functions that all layout styles must implement.
+/// To add a new style:
+/// implement this trait for it,
+/// include it in the `LayoutStyleEnum` and `LayoutStyleCliEnum` enums,
+/// and add handling for its constructor.
+#[enum_dispatch(LayoutStyleEnum)]
+pub trait LayoutStyle {
+    /// Run the layout process with the given arguments.
+    /// Uses the `layout` module.
+    /// Takes parsed arguments (from `parse_layout_args` or future GUI).
+    /// Returns a `Result` with the `layout::Layout` or an `Error`.
+    fn do_layout(&self) -> Result<layout::Layout, String>;
+
+    /// Get the name of the layout style.
+    fn get_style_name(&self) -> String;
+}
+

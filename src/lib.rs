@@ -3,16 +3,16 @@ pub mod matching;
 pub mod args;
 
 use args::{
-    ComradeArgs,
+    ComradeCli,
     RunStage,
-    };
+};
 use clap::Parser;
 
 /// Parse the command line arguments for the comrade binary.
 /// Uses the `clap` crate.
 /// Returns a `Result` with a `comrade::RunArgs` struct or an `Error`.
 pub fn parse_cli_args() {
-    let cli_args : ComradeArgs = ComradeArgs::parse();
+    let cli_args : ComradeCli = ComradeCli::parse();
 
     match cli_args.sub_command {
         RunStage::Layout(layout_args) => {  
