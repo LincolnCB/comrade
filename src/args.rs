@@ -7,7 +7,7 @@ use clap::{
 use crate::layout;
 use crate::matching;
 
-/// Parser for the command line arguments for the comrade binary using clap.
+/// Constrained Optimization for Magnetic Resonance Array Design tool.
 #[derive(Debug, Parser)]
 pub struct ComradeCli {
     #[clap(subcommand)]

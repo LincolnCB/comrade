@@ -36,7 +36,7 @@ pub fn parse_cli_args() {
 /// Returns a `Result` with an `Option` containing the `layout::Layout` or an `Error`.
 /// If the `Option` is `None`, the layout was saved to an output file (may have been saved AND returned)
 pub fn do_layout() {
-    println!("");
+    println!();
     println!("Dummy layout");
     layout::load_stl();
 }
@@ -47,7 +47,7 @@ pub fn do_layout() {
 /// Returns a `Result` with an `Option` containing the `matching::Matching` or an `Error`.
 /// If the `Option` is `None`, the matching was saved to an output file (may have been saved AND returned)
 pub fn do_matching() {
-    println!("");
+    println!();
     println!("Dummy matching");
     matching::load_coil_params();
 }
