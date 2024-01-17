@@ -11,17 +11,17 @@ pub struct Style {
 
 impl Style {
     /// Create a new Iterative Circle layout style.
-    /// Takes the `layout::LayoutArgs` and returns a `Result` with the `Style` or an `Error`.
+    /// Takes the `layout::LayoutArgs` and returns a `Result` with the `Style` or an `Err`.
     pub fn new(layout_args: layout::LayoutArgs) -> Result<Style, String> {
         Ok(Style{layout_args})
     }
 }
 
-impl styles::LayoutStyle for Style {
+impl styles::LayoutStyleTrait for Style {
     /// Run the layout process with the given arguments.
     /// Uses the `layout` module.
     /// Takes parsed arguments (from `parse_layout_args` or future GUI).
-    /// Returns a `Result` with the `layout::Layout` or an `Error`.
+    /// Returns a `Result` with the `layout::Layout` or an `Err`.
     fn do_layout(&self) -> Result<layout::Layout, String> {
         println!("Dummy DO ITERATIVE CIRCLE LAYOUT");
         Ok(layout::Layout{})

@@ -59,6 +59,13 @@ pub struct LayoutCli{
     shared_args: SharedArgs,
 }
 
+impl LayoutCli{
+    /// Construct the layout style from the CLI enum.
+    pub fn reconstruct(self) -> Result<(layout::LayoutStyle, SharedArgs), String>{
+        Ok((self.style.construct(self.layout_args)?, self.shared_args))
+    }
+}
+
 /// Compiled arguments for the matching command. Compiled with clap.
 #[derive(Debug, Args)]
 pub struct MatchingCli{
