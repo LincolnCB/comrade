@@ -4,6 +4,7 @@ use crate::layout::styles;
 /// Iterative Circle Style struct.
 /// This struct contains all the parameters for the Iterative Circle layout style.
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct Style {
     /// Arguments for the layout process.
     layout_args: layout::LayoutArgs,
@@ -13,7 +14,7 @@ pub struct Style {
 impl Style {
     /// Create a new Iterative Circle layout style.
     /// Takes the `layout::LayoutArgs` and returns a `Result` with the `Style` or an `Err`.
-    pub fn new(layout_args: layout::LayoutArgs) -> Result<Style, String> {
+    pub fn new(layout_args: layout::LayoutArgs) -> crate::Result<Style> {
         Ok(Style{layout_args})
     }
 }
@@ -23,7 +24,7 @@ impl styles::IsStyle for Style {
     /// Uses the `layout` module.
     /// Takes parsed arguments (from `parse_layout_args` or future GUI).
     /// Returns a `Result` with the `layout::Layout` or an `Err`.
-    fn do_layout(&self) -> Result<layout::Layout, String> {
+    fn do_layout(&self) -> crate::Result<layout::Layout> {
         println!("Dummy DO ITERATIVE CIRCLE LAYOUT");
         Ok(layout::Layout{})
     }

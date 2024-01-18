@@ -4,8 +4,10 @@ use clap::{
     Subcommand,
 };
 
-use crate::layout;
-use crate::matching;
+use crate::{
+    layout,
+    matching,
+};
 
 use std::ffi::OsString;
 
@@ -77,7 +79,7 @@ pub struct LayoutCli{
 
 impl LayoutCli{
     /// Construct the layout style from the CLI enum.
-    pub fn reconstruct(self) -> Result<(layout::LayoutStyle, SharedArgs), String>{
+    pub fn reconstruct(self) -> crate::Result<(layout::LayoutStyle, SharedArgs)>{
         Ok((self.style.construct(self.layout_args)?, self.shared_args))
     }
 }

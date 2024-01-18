@@ -33,7 +33,7 @@ pub enum LayoutStyleCliEnum {
 impl LayoutStyleCliEnum {
     /// Construct a layout style from the CLI enum.
     /// Takes a `LayoutStyleCliEnum` and returns a `Result` with the `LayoutStyle` or an `Err`.
-    pub fn construct(&self, layout_args: layout::LayoutArgs) -> Result<LayoutStyle, String> {
+    pub fn construct(&self, layout_args: layout::LayoutArgs) -> crate::Result<LayoutStyle> {
         match self {
             // Match the CLI enum variant and construct the corresponding layout style.
             LayoutStyleCliEnum::IterativeCircle => {
@@ -68,7 +68,7 @@ pub trait IsStyle {
     /// Uses the `layout` module.
     /// Takes parsed arguments (from `parse_layout_args` or future GUI).
     /// Returns a `Result` with the `layout::Layout` or an `Err`.
-    fn do_layout(&self) -> Result<layout::Layout, String>;
+    fn do_layout(&self) -> crate::Result<layout::Layout>;
 
     /// Get the name of the layout style.
     fn get_style_name(&self) -> String;

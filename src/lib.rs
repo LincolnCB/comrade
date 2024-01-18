@@ -2,6 +2,9 @@ pub mod layout;
 pub mod matching;
 pub mod args;
 
+use std::io;
+use clap;
+
 /// Targets struct.
 /// This struct contains the layout and matching targets to do.
 pub struct Targets{
@@ -10,11 +13,46 @@ pub struct Targets{
     pub shared_args: args::SharedArgs,
 }
 
+/// Result type for the `comrade` crate.
+type Result<T> = std::result::Result<T, ComradeError>;
+
+/// Error-type enum for the `comrade` crate.
+/// Can handle errors from the `clap` crate and the `stl_io` crate.
+/// Will handle other errors in the future.
+#[derive(Debug)]
+pub enum ComradeError {
+    IOError(io::Error),
+    ClapError(clap::Error),
+    Default(String),
+}
+impl From<io::Error> for ComradeError {
+    fn from(error: io::Error) -> Self {
+        ComradeError::IOError(error)
+    }
+}
+impl From<clap::Error> for ComradeError {
+    fn from(error: clap::Error) -> Self {
+        ComradeError::ClapError(error)
+    }
+}
+impl From<String> for ComradeError {
+    fn from(error: String) -> Self {
+        ComradeError::Default(error)
+    }
+}
+
+/// Create a `Result` with an `Err` from a string.
+/// Shorthand to avoid writing `Err(crate::ComradeError::Default(error_str))`.
+pub fn err_string<T>(error_str: String) -> crate::Result<T> {
+    Err(ComradeError::Default(error_str))
+}
+    
+
 /// [Stage 1.] TODO UNFINISHED FUNCTION
 /// Parse the command line arguments for the comrade binary.
 /// Uses the `clap` crate.
 /// Returns a `Result` with a `comrade::RunArgs` struct or an `Err`.
-pub fn handle_cli_args(cli_args : args::ComradeCli) -> Result<Targets, String>{
+pub fn handle_cli_args(cli_args : args::ComradeCli) -> crate::Result<Targets>{
 
     // 1.1 Handle the different subcommands
     match cli_args.sub_command {
@@ -36,7 +74,7 @@ pub fn handle_cli_args(cli_args : args::ComradeCli) -> Result<Targets, String>{
 
             // Parse matching style
 
-            Err("Matching not implemented yet".to_string())
+            crate::err_string("Matching not implemented yet".to_string())
         },
         args::RunStage::Full(full_args) => { // Full command
             println!("Full process");
@@ -44,7 +82,7 @@ pub fn handle_cli_args(cli_args : args::ComradeCli) -> Result<Targets, String>{
 
             // Parse both styles
 
-            Err("Full process not implemented yet".to_string())
+            crate::err_string("Full process not implemented yet".to_string())
         },
     }
 }
@@ -52,7 +90,7 @@ pub fn handle_cli_args(cli_args : args::ComradeCli) -> Result<Targets, String>{
 /// [Stage 2.] TODO UNFINISHED FUNCTION
 /// Run the process on the targets (layout, matching, or both).
 /// Returns a `Result` with `()` or an `Err`.
-pub fn run_process(targets: Targets) -> Result<(), String> {
+pub fn run_process(targets: Targets) -> crate::Result<()> {
 
     // 2.1 Run the layout process
     if let Some(layout_style) = targets.layout_target {
@@ -68,6 +106,7 @@ pub fn run_process(targets: Targets) -> Result<(), String> {
     // TODO: Figure out MARIE interface
 
     // 2.3 Run the matching process
+    #[allow(unused_variables)]
     if let Some(matching_network) = targets.matching_target {
         println!("###################");
         println!("Running matching...");
