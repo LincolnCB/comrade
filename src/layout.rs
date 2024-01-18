@@ -12,6 +12,7 @@ pub use styles::{
 
 /// The substrate surface.
 /// Contains a list of points.
+#[derive(Debug)]
 pub struct Surface {
     pub points: Vec<Point>,
 }
@@ -20,6 +21,7 @@ pub struct Surface {
 /// Contains the coordinates and a list of adjacent points.
 /// The adjacent points are stored as indices in the `Surface` struct.
 /// Adjacent points are found from the triangles in the STL file.
+#[derive(Debug)]
 pub struct Point {
     pub x: f32,
     pub y: f32,
@@ -57,7 +59,7 @@ pub struct LayoutArgs {
 /// Returns a `Result` with the `Layout` or an `Err`.
 #[allow(unused_variables)]
 pub fn do_layout(layout_style: &LayoutStyle, shared_args: &crate::args::SharedArgs) -> crate::Result<Layout> {
-    let surface = stl::load_stl()?;
+    let surface = stl::load_stl(&shared_args.input_path)?;
     layout_style.do_layout()
 }
 
