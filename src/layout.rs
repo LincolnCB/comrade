@@ -1,19 +1,14 @@
 mod styles;
+mod stl;
 
 use clap::Args;
 
-// Re-export the styles and CLI enum
+// Re-export things from styles module
 pub use styles::{
     LayoutStyleCliEnum,
     LayoutStyle,
+    IsStyle,
 };
-
-/// Load a STL file from the inut path.
-/// Uses the `stl_io` crate.
-/// Returns a `Result` with the `Mesh` or an `Err`
-pub fn load_stl() {
-    println!("Dummy load_stl");
-}
 
 /// Arguments for the layout process.
 /// Uses clap-derive.
@@ -37,4 +32,24 @@ pub struct LayoutArgs {
 #[derive(Debug)]
 pub struct Layout {
 
+}
+
+/// Run the layout process.
+/// Returns a `Result` with the `Layout` or an `Err`.
+pub fn do_layout(layout_style: &LayoutStyle, shared_args: &crate::args::SharedArgs) -> Result<Layout, String> {
+    load_stl();
+    layout_style.do_layout()
+}
+
+/// Load a STL file from the inut path.
+/// Uses the `stl_io` crate.
+/// Returns a `Result` with the `Mesh` or an `Err`
+fn load_stl() {
+    println!("Dummy load_stl");
+}
+
+/// Mesh the layout to output it to MARIE.
+pub fn mesh_layout(layout_out: &Layout, shared_args: &crate::args::SharedArgs) -> Result<(), String>{
+    println!("Dummy mesh_layout");
+    Err("Meshing not implemented yet".to_string())
 }

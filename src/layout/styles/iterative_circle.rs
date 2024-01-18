@@ -3,6 +3,7 @@ use crate::layout::styles;
 
 /// Iterative Circle Style struct.
 /// This struct contains all the parameters for the Iterative Circle layout style.
+#[derive(Debug)]
 pub struct Style {
     /// Arguments for the layout process.
     layout_args: layout::LayoutArgs,
@@ -17,7 +18,7 @@ impl Style {
     }
 }
 
-impl styles::LayoutStyleTrait for Style {
+impl styles::IsStyle for Style {
     /// Run the layout process with the given arguments.
     /// Uses the `layout` module.
     /// Takes parsed arguments (from `parse_layout_args` or future GUI).

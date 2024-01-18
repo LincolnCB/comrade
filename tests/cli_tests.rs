@@ -6,7 +6,7 @@ fn check_cargo_test() {
 }
 
 #[test]
-fn test_subcommands(){
+fn test_subcommand_options(){
     let mut cmd = Command::cargo_bin("comrade").unwrap();
 
     let expected_stderr = concat!(

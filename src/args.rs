@@ -7,6 +7,22 @@ use clap::{
 use crate::layout;
 use crate::matching;
 
+use std::ffi::OsString;
+
+/// Re-export clap CLI parse method.
+pub fn parse_cli_args() -> ComradeCli {
+    ComradeCli::parse()
+}
+
+// Re-export clap CLI parse_from method
+pub fn parse_cli_from<I, T>(itr: I) -> ComradeCli 
+where
+    I: IntoIterator<Item = T>,
+    T: Into<OsString> + Clone,
+{
+    ComradeCli::parse_from(itr)
+}
+
 /// Constrained Optimization for Magnetic Resonance Array Design tool.
 #[derive(Debug, Parser)]
 pub struct ComradeCli {

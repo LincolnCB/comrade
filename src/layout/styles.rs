@@ -10,7 +10,7 @@
  * 
  * # Adding to layout system:
  * - Add a new enum variant to `LayoutStyle`
- * - Implement the trait `LayoutStyle` for the new style
+ * - Implement the trait `IsStyle` for the new style
  * 
  */
 
@@ -30,8 +30,6 @@ pub enum LayoutStyleCliEnum {
     IterativeCircle,
 }
 
-/// Layout style constructor.
-/// Converts between CLI enum arguments and the functional layout style enum (used in the rest of the code).
 impl LayoutStyleCliEnum {
     /// Construct a layout style from the CLI enum.
     /// Takes a `LayoutStyleCliEnum` and returns a `Result` with the `LayoutStyle` or an `Err`.
@@ -46,14 +44,13 @@ impl LayoutStyleCliEnum {
     }
 }
 
-
-
 /// Layout styles enum.
 /// To add a new style:
-/// implement the `LayoutStyle` trait for it,
+/// implement the `IsStyle` trait for it,
 /// include it here and the `LayoutStyleCliEnum` enum,
 /// and add handling for its constructor.
-#[enum_dispatch]
+#[derive(Debug)]
+#[enum_dispatch(IsStyle)]
 pub enum LayoutStyle {
     /// Basic circular layout, based on Monika Sliwak's MATLAB prototype.
     IterativeCircle(iterative_circle::Style),
@@ -65,8 +62,8 @@ pub enum LayoutStyle {
 /// implement this trait for it,
 /// include it in the `LayoutStyle` and `LayoutStyleCliEnum` enums,
 /// and add handling for its constructor.
-#[enum_dispatch(LayoutStyle)]
-pub trait LayoutStyleTrait {
+#[enum_dispatch]
+pub trait IsStyle {
     /// Run the layout process with the given arguments.
     /// Uses the `layout` module.
     /// Takes parsed arguments (from `parse_layout_args` or future GUI).
@@ -76,4 +73,3 @@ pub trait LayoutStyleTrait {
     /// Get the name of the layout style.
     fn get_style_name(&self) -> String;
 }
-
