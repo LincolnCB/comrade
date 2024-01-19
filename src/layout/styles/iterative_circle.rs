@@ -20,17 +20,25 @@ impl Style {
 }
 
 impl styles::IsStyle for Style {
+    /// Get the name of the layout style.
+    fn get_style_name(&self) -> String {
+        "Iterative Circle".to_string()
+    }
+
     /// Run the layout process with the given arguments.
     /// Uses the `layout` module.
     /// Takes parsed arguments (from `parse_layout_args` or future GUI).
     /// Returns a `Result` with the `layout::Layout` or an `Err`.
-    fn do_layout(&self) -> crate::Result<layout::Layout> {
+    fn do_layout(&self, surface: &layout::Surface) -> crate::Result<layout::Layout> {
         println!("Dummy DO ITERATIVE CIRCLE LAYOUT");
-        Ok(layout::Layout{})
-    }
+        let mut layout_out = layout::Layout::new();
 
-    /// Get the name of the layout style.
-    fn get_style_name(&self) -> String {
-        "Iterative Circle".to_string()
+        for _ in 0..self.layout_args.coil_count {
+            let mut points = Vec::new();
+            let coil = layout::Coil::new_from_vec(points)?;
+            layout_out.coils.push(coil);
+        }
+
+        Ok(layout_out)
     }
 }

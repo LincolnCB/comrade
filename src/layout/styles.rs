@@ -64,12 +64,12 @@ pub enum LayoutStyle {
 /// and add handling for its constructor.
 #[enum_dispatch]
 pub trait IsStyle {
-    /// Run the layout process with the given arguments.
-    /// Uses the `layout` module.
-    /// Takes parsed arguments (from `parse_layout_args` or future GUI).
-    /// Returns a `Result` with the `layout::Layout` or an `Err`.
-    fn do_layout(&self) -> crate::Result<layout::Layout>;
-
     /// Get the name of the layout style.
     fn get_style_name(&self) -> String;
+
+    /// Run the layout process with the given arguments.
+    /// Uses the `layout` module.
+    /// Takes parsed arguments (from `parse_layout_args` or future GUI) and a loaded `Surface`.
+    /// Returns a `Result` with the `layout::Layout` or an `Err`.
+    fn do_layout(&self, surface: &crate::layout::Surface) -> crate::Result<layout::Layout>;
 }
