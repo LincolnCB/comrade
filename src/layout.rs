@@ -15,6 +15,7 @@ pub use styles::{
 #[derive(Debug)]
 pub struct Surface {
     pub points: Vec<Point>,
+    pub area: f32,
 }
 
 /// A point in 3D space.
@@ -28,6 +29,22 @@ pub struct Point {
     pub z: f32,
     pub adj: Vec<usize>,
     // TODO: Maybe include averaged normal vector? Maybe one point per triangle?
+}
+
+impl Point {
+    /// Create a new point.
+    pub fn new(x: f32, y: f32, z: f32) -> Self {
+        Point{x, y, z, adj: Vec::new()}
+    }
+
+    /// Get the distance between two points.
+    pub fn distance(&self, other: &Point) -> f32 {
+        let dx = self.x - other.x;
+        let dy = self.y - other.y;
+        let dz = self.z - other.z;
+
+        (dx*dx + dy*dy + dz*dz).sqrt()
+    }
 }
 
 /// A coil.

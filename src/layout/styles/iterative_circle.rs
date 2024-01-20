@@ -29,9 +29,19 @@ impl styles::IsStyle for Style {
     /// Uses the `layout` module.
     /// Takes parsed arguments (from `parse_layout_args` or future GUI).
     /// Returns a `Result` with the `layout::Layout` or an `Err`.
+    #[allow(unused_variables)]
+    #[allow(unused_mut)]
+    #[allow(unused_assignments)]
+    #[allow(dead_code)]
     fn do_layout(&self, surface: &layout::Surface) -> crate::Result<layout::Layout> {
         println!("Dummy DO ITERATIVE CIRCLE LAYOUT");
         let mut layout_out = layout::Layout::new();
+
+        // Temporary coil size estimate
+        let coil_area = surface.area / self.layout_args.coil_count as f32;
+        let coil_radius = (coil_area / std::f32::consts::PI).sqrt();
+
+        // TEMP CENTER POINT: -1.305, 1.6107, 29.919
 
         for _ in 0..self.layout_args.coil_count {
             let mut points = Vec::new();
