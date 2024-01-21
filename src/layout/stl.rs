@@ -51,7 +51,7 @@ pub fn load_stl(filename: &str) -> crate::Result<Surface>{
         point.adj.dedup();
     }
 
-    Ok(surface)     
+    Ok(surface)
 }
 
 /// Get the area of the triangle.

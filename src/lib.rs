@@ -21,6 +21,7 @@ type Result<T> = std::result::Result<T, ComradeError>;
 /// Will handle other errors in the future.
 #[derive(Debug)]
 pub enum ComradeError {
+    // TODO: Refactor error types
     IOError(io::Error),
     ClapError(clap::Error),
     Default(String),
@@ -57,9 +58,6 @@ pub fn handle_cli_args(cli_args : args::ComradeCli) -> crate::Result<Targets>{
     // 1.1 Handle the different subcommands
     match cli_args.sub_command {
         args::RunStage::Layout(layout_cli) => { // Layout command
-            println!("Layout only");
-            println!("{:?}", layout_cli);
-
             let (layout_style, shared_args) = layout_cli.reconstruct()?;
             Ok(Targets{
                 layout_target: Some(layout_style),

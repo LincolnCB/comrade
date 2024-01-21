@@ -1,5 +1,8 @@
 mod styles;
 mod stl;
+pub mod geo_3d;
+
+use geo_3d::*;
 
 use clap::Args;
 
@@ -9,43 +12,6 @@ pub use styles::{
     LayoutStyle,
     IsStyle,
 };
-
-/// The substrate surface.
-/// Contains a list of points.
-#[derive(Debug)]
-pub struct Surface {
-    pub points: Vec<Point>,
-    pub area: f32,
-}
-
-/// A point in 3D space.
-/// Contains the coordinates and a list of adjacent points.
-/// The adjacent points are stored as indices in the `Surface` struct.
-/// Adjacent points are found from the triangles in the STL file.
-#[derive(Debug)]
-pub struct Point {
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
-    pub adj: Vec<usize>,
-    // TODO: Maybe include averaged normal vector? Maybe one point per triangle?
-}
-
-impl Point {
-    /// Create a new point.
-    pub fn new(x: f32, y: f32, z: f32) -> Self {
-        Point{x, y, z, adj: Vec::new()}
-    }
-
-    /// Get the distance between two points.
-    pub fn distance(&self, other: &Point) -> f32 {
-        let dx = self.x - other.x;
-        let dy = self.y - other.y;
-        let dz = self.z - other.z;
-
-        (dx*dx + dy*dy + dz*dz).sqrt()
-    }
-}
 
 /// A coil.
 /// Contains a list of points.
@@ -58,7 +24,7 @@ pub struct Coil {
 
 impl Coil {
     /// Create a new coil.
-    pub fn new_from_vec(points: Vec<Point>) -> crate::Result<Self>{
+    pub fn new(points: Vec<Point>, center: Point) -> crate::Result<Self>{
 
         // Check if the coil is closed and ordered.
         let mut prev_point_id: usize = points.len() - 1;
@@ -74,19 +40,6 @@ impl Coil {
             }
             prev_point_id = point_id;
         }
-        
-        // Find the center
-        let mut center = Point{x: 0.0, y: 0.0, z: 0.0, adj: Vec::new()};
-
-        for point in points.iter() {
-            center.x += point.x;
-            center.y += point.y;
-            center.z += point.z;
-        }
-
-        center.x /= points.len() as f32;
-        center.y /= points.len() as f32;
-        center.z /= points.len() as f32;
 
         Ok(Coil{points, center})
     }
@@ -127,7 +80,12 @@ pub struct LayoutArgs {
 /// Returns a `Result` with the `Layout` or an `Err`.
 #[allow(unused_variables)]
 pub fn do_layout(layout_style: &LayoutStyle, shared_args: &crate::args::SharedArgs) -> crate::Result<Layout> {
+    // Load the STL file
+    println!("Loading STL file...");
     let surface = stl::load_stl(&shared_args.input_path)?;
+
+    // Run the layout style
+    println!("Running layout style: {}...", layout_style.get_style_name());
     layout_style.do_layout(&surface)
 }
 

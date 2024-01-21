@@ -71,5 +71,5 @@ pub trait IsStyle {
     /// Uses the `layout` module.
     /// Takes parsed arguments (from `parse_layout_args` or future GUI) and a loaded `Surface`.
     /// Returns a `Result` with the `layout::Layout` or an `Err`.
-    fn do_layout(&self, surface: &crate::layout::Surface) -> crate::Result<layout::Layout>;
+    fn do_layout(&self, surface: &crate::layout::geo_3d::Surface) -> crate::Result<layout::Layout>;
 }
