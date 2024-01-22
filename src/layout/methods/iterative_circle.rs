@@ -1,24 +1,81 @@
 use crate::layout;
-use layout::styles;
+use layout::methods;
 use layout::geo_3d::*;
 
 use std::f32::consts::PI;
 
-/// Iterative Circle Style struct.
-/// This struct contains all the parameters for the Iterative Circle layout style.
+/// Iterative Circle Method struct.
+/// This struct contains all the parameters for the Iterative Circle layout method.
 #[derive(Debug)]
 #[allow(dead_code)]
-pub struct Style {
-    /// Arguments for the layout process.
-    layout_args: layout::LayoutArgs,
+pub struct Method {
+    /// Arguments for the Iterative Circle method.
+    method_args: MethodArgs,
 }
 
+/// TODO: Expand, maybe use serde_yaml? Maybe try to write this as an external example?
+#[derive(Debug)]
+struct MethodArgs {
+}
 
-impl Style {
-    /// Create a new Iterative Circle layout style.
-    /// Takes the `layout::LayoutArgs` and returns a `Result` with the `Style` or an `Err`.
-    pub fn new(layout_args: layout::LayoutArgs) -> crate::Result<Style> {
-        Ok(Style{layout_args})
+impl Method {
+    pub fn new() -> crate::Result<Self> {
+        Ok(Method{method_args: MethodArgs{}}) // TODO: Default values
+    }
+}
+
+impl methods::LayoutMethod for Method {
+    /// Get the name of the layout method.
+    fn get_method_name(&self) -> String {
+        "Iterative Circle".to_string()
+    }
+
+    /// Parse the layout method argument file
+    #[allow(unused_variables)]
+    fn parse_method_args(&mut self, arg_file: &str) {
+        // TODO: Expand
+    }
+
+    /// Run the layout process with the given arguments.
+    /// Uses the `layout` module.
+    /// Takes parsed arguments (from `parse_layout_args` or future GUI).
+    /// Returns a `Result` with the `layout::Layout` or an `Err`.
+    fn do_layout(&self, surface: &Surface) -> crate::Result<layout::Layout> {
+        let mut layout_out = layout::Layout::new();
+
+        // TODO: Temporary hardcode coil size estimate
+        let coil_area = surface.area / 4.0;
+        let coil_radius = (coil_area / PI).sqrt();
+        let epsilon : f32 = 0.299433 / 2.0;
+        let section_count = 32;
+
+        // for coil_n in 0..self.layout_args.coil_count {
+        for coil_n in 0..1 {
+            println!("Coil {}...", coil_n);
+
+            let mut points = Vec::new();
+
+            // TODO: Temporary hard code!
+            let center = Point::new(-1.305, 1.6107, 29.919);
+            let normal = GeoVector::new(-0.041038, 0.062606, 0.997194);
+
+            for point in surface.points.iter() {
+                if (point.distance(&center) - coil_radius).abs() < epsilon {
+                    points.push(point.dup());
+                }
+            }
+
+            println!("Uncleaned point count: {}", points.len());
+
+            points = clean_by_angle(points, &center, &normal, section_count)?;
+
+            println!("Cleaned point count: {}", points.len());
+
+            let coil = layout::Coil::new(points, center)?;
+            layout_out.coils.push(coil);
+        }
+
+        Ok(layout_out)
     }
 }
 
@@ -100,63 +157,12 @@ fn clean_by_angle(points: Vec<Point>, center: &Point, normal: &GeoVector, split_
     Ok(out_points)
 }
 
-impl styles::IsStyle for Style {
-    /// Get the name of the layout style.
-    fn get_style_name(&self) -> String {
-        "Iterative Circle".to_string()
-    }
-
-    /// Run the layout process with the given arguments.
-    /// Uses the `layout` module.
-    /// Takes parsed arguments (from `parse_layout_args` or future GUI).
-    /// Returns a `Result` with the `layout::Layout` or an `Err`.
-    #[allow(unused_variables)]
-    #[allow(unused_mut)]
-    #[allow(unused_assignments)]
-    #[allow(dead_code)]
-    fn do_layout(&self, surface: &Surface) -> crate::Result<layout::Layout> {
-        let mut layout_out = layout::Layout::new();
-
-        // TODO: Temporary coil size estimate
-        let coil_area = surface.area / self.layout_args.coil_count as f32;
-        let coil_radius = (coil_area / PI).sqrt();
-        let epsilon : f32 = 0.299433 / 2.0;
-        let section_count = 32;
-
-        // for coil_n in 0..self.layout_args.coil_count {
-        for coil_n in 0..1 {
-            println!("Coil {}...", coil_n);
-
-            let mut points = Vec::new();
-
-            // TODO: Temporary hard code!
-            let center = Point::new(-1.305, 1.6107, 29.919);
-            let normal = GeoVector::new(-0.041038, 0.062606, 0.997194);
-
-            for point in surface.points.iter() {
-                if (point.distance(&center) - coil_radius).abs() < epsilon {
-                    points.push(point.dup());
-                }
-            }
-
-            println!("Uncleaned point count: {}", points.len());
-
-            points = clean_by_angle(points, &center, &normal, section_count)?;
-
-            println!("Cleaned point count: {}", points.len());
-
-            let coil = layout::Coil::new(points, center)?;
-            layout_out.coils.push(coil);
-        }
-
-        Ok(layout_out)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    // Optional print for visualization
+    #[allow(dead_code)]
     pub fn print_bins(bins: &Vec<Option<Point>>) {
         print!("[");
         for bin in bins.iter() {

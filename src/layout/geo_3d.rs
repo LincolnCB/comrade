@@ -22,7 +22,6 @@ pub struct Point {
     pub y: f32,
     pub z: f32,
     pub adj: Vec<usize>,
-    // TODO: Maybe include averaged normal vector? Maybe one point per triangle?
 }
 
 impl Point {

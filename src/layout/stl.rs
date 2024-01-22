@@ -1,7 +1,7 @@
 use std::fs::OpenOptions;
 use stl_io;
 
-use super::{
+use crate::layout::geo_3d::{
     Surface,
     Point,
 };

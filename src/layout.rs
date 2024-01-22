@@ -1,16 +1,13 @@
-mod styles;
+mod methods;
 mod stl;
 pub mod geo_3d;
 
 use geo_3d::*;
 
-use clap::Args;
-
-// Re-export things from styles module
-pub use styles::{
-    LayoutStyleCliEnum,
-    LayoutStyle,
-    IsStyle,
+// Re-export things from methods module
+pub use methods::{
+    LayoutChoice,
+    LayoutMethod,
 };
 
 /// A coil.
@@ -61,32 +58,47 @@ impl Layout {
 }
 
 /// Arguments for the layout process.
-/// Uses clap-derive.
-#[derive(Debug, Args)]
 pub struct LayoutArgs {
+    /// Input path for the STL file.
+    pub input_path: String,
+}
 
-    #[arg(short, long = "count")]
-    /// Coil count for the layout.
-    pub coil_count: u64,
+pub struct LayoutTarget {
+    /// Layout method.
+    pub layout_method: LayoutChoice,
+    /// Layout arguments.
+    pub layout_args: LayoutArgs,
+}
 
-    #[arg(short, long = "mesh")]
-    /// Output a mesh file with the same output name.
-    pub mesh: bool,
+impl LayoutTarget {
+    /// Construct a layout target from a config file.
+    #[allow(unused_variables)]
+    pub fn from_cfg(layout_cfg_file: &str) -> crate::Result<Self> {
+        // TODO: Remove hardcoded shortcircuit
+        let layout_method = LayoutChoice::from_name("iterative_circle")?;
+        let layout_args = LayoutArgs{input_path: "tests/data/tiny_cap_remesh.stl".to_string()};
 
-    // TODO: Inductive decoupling, default 11dB
+        Ok(LayoutTarget{layout_method, layout_args})
+    }
 }
 
 /// Run the layout process.
 /// Returns a `Result` with the `Layout` or an `Err`.
-#[allow(unused_variables)]
-pub fn do_layout(layout_style: &LayoutStyle, shared_args: &crate::args::SharedArgs) -> crate::Result<Layout> {
+pub fn do_layout(layout_target: &LayoutTarget) -> crate::Result<Layout> {
+    
+    // Extract the information from the layout target
+    let layout_method = &layout_target.layout_method;
+    let layout_args = &layout_target.layout_args;
+
+    println!("Layout method: {}", layout_method.get_method_name());
+
     // Load the STL file
     println!("Loading STL file...");
-    let surface = stl::load_stl(&shared_args.input_path)?;
+    let surface = stl::load_stl(&layout_args.input_path)?;
 
-    // Run the layout style
-    println!("Running layout style: {}...", layout_style.get_style_name());
-    layout_style.do_layout(&surface)
+    // Run the layout method
+    println!("Running layout method: {}...", layout_method.get_method_name());
+    layout_method.do_layout(&surface)
 }
 
 /// Mesh the layout to output it to MARIE.
