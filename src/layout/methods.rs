@@ -13,7 +13,10 @@ mod iterative_circle;
 
 use enum_dispatch::enum_dispatch;
 
-use crate::layout;
+use crate::{
+    layout,
+    args,
+};
 
 /// Layout method trait.
 /// This trait defines the functions that all layout methods must implement.
@@ -28,13 +31,13 @@ pub trait LayoutMethod {
 
     /// Parse the layout method argument file (allows different arguments for different methods).
     /// Takes a `&str` with the path to the argument file.
-    fn parse_method_args(&mut self, arg_file: &str);
+    fn parse_method_args(&mut self, arg_file: &str) -> args::Result<()>;
 
     /// Run the layout process with the given arguments.
     /// Uses the `layout` module.
     /// Takes a loaded `Surface`.
     /// Returns a `Result` with the `layout::Layout` or an `Err`.
-    fn do_layout(&self, surface: &crate::layout::geo_3d::Surface) -> crate::Result<layout::Layout>;
+    fn do_layout(&self, surface: &crate::layout::geo_3d::Surface) -> layout::Result<layout::Layout>;
 }
 
 /// Layout methods enum.
@@ -70,13 +73,13 @@ const LAYOUT_TARGET_CONSTRUCTION: &[LayoutConstructor] = &[
 /// Layout constructor struct. Used to construct the layout methods from the name string.
 struct LayoutConstructor {
     name: &'static str,
-    constructor: fn() -> crate::Result<LayoutChoice>,
+    constructor: fn() -> args::Result<LayoutChoice>,
 }
 
 /// Layout target construction
 impl LayoutChoice {
     /// Construct a layout method from a commandline name.
-    pub fn from_name(name: &str) -> crate::Result<Self> {
+    pub fn from_name(name: &str) -> args::Result<Self> {
         for constructor in LAYOUT_TARGET_CONSTRUCTION.iter() {
             if constructor.name == name {
                 return (constructor.constructor)();
@@ -84,12 +87,12 @@ impl LayoutChoice {
         }
 
         // If the name is not found, return an error with the available methods
-        let mut err_str = format!("Layout method not found: {name}\n");
-        err_str.push_str("Available methods: ");
+        let mut error_str = format!("Layout method not found: {name}\n");
+        error_str.push_str("Available methods: ");
         for constructor in LAYOUT_TARGET_CONSTRUCTION.iter() {
-            err_str.push_str(constructor.name);
-            err_str.push_str("\n");
+            error_str.push_str(constructor.name);
+            error_str.push_str("\n");
         }
-        crate::err_string(err_str)
+        args::err_str(&error_str)
     }
 }

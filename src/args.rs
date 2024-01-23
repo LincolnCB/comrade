@@ -5,20 +5,40 @@ use clap::{
 };
 use strum::EnumIter;
 use std::ffi::OsString;
-use std::fmt;
 
-/// Re-export clap CLI parse method.
-pub fn parse_cli_args() -> ComradeCli {
-    ComradeCli::parse()
+/// Argument parsing error type.
+#[derive(Debug)]
+pub enum ArgError {
+    ClapError(clap::Error),
+    IoError(std::io::Error),
+    StringOnly(String),
+}
+impl std::fmt::Display for ArgError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ArgError::ClapError(error) => write!(f, "CLI Error:\n{}", error),
+            ArgError::IoError(error) => write!(f, "IO Error:\n{}", error),
+            ArgError::StringOnly(error) => write!(f, "{}", error),
+        }
+    }
+}
+impl From<clap::Error> for ArgError {
+    fn from(error: clap::Error) -> Self {
+        ArgError::ClapError(error)
+    }
+}
+impl From<std::io::Error> for ArgError {
+    fn from(error: std::io::Error) -> Self {
+        ArgError::IoError(error)
+    }
 }
 
-// Re-export clap CLI parse_from method
-pub fn parse_cli_from<I, T>(itr: I) -> ComradeCli 
-where
-    I: IntoIterator<Item = T>,
-    T: Into<OsString> + Clone,
-{
-    ComradeCli::parse_from(itr)
+/// Result type for the `args` crate.
+pub type Result<T> = std::result::Result<T, ArgError>;
+
+/// Create a `ArgError::StringOnly` from a string.
+pub fn err_str<T>(error_str: &str) -> Result<T> {
+    Err(ArgError::StringOnly(error_str.to_string()))
 }
 
 /// Constrained Optimization for Magnetic Resonance Array Design tool.
@@ -79,8 +99,8 @@ impl RunStage {
     }
 }
 
-impl fmt::Display for RunStage {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl std::fmt::Display for RunStage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             RunStage::Layout => write!(f, "layout"),
             RunStage::Mesh => write!(f, "mesh"),
@@ -96,4 +116,18 @@ pub struct SharedArgs {
     #[arg(short, long = "larmor")]
     /// REQUIRED. Larmor frequency in MHz.
     pub larmor_mhz: f64,
+}
+
+/// Re-export clap CLI parse method.
+pub fn parse_cli_args() -> ComradeCli {
+    ComradeCli::parse()
+}
+
+// Re-export clap CLI parse_from method
+pub fn parse_cli_from<I, T>(itr: I) -> ComradeCli 
+where
+    I: IntoIterator<Item = T>,
+    T: Into<OsString> + Clone,
+{
+    ComradeCli::parse_from(itr)
 }

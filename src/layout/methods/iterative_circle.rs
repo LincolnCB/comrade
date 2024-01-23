@@ -1,4 +1,7 @@
-use crate::layout;
+use crate::{
+    layout,
+    args
+};
 use layout::methods;
 use layout::geo_3d::*;
 
@@ -19,7 +22,7 @@ struct MethodArgs {
 }
 
 impl Method {
-    pub fn new() -> crate::Result<Self> {
+    pub fn new() -> args::Result<Self> {
         Ok(Method{method_args: MethodArgs{}}) // TODO: Default values
     }
 }
@@ -32,15 +35,16 @@ impl methods::LayoutMethod for Method {
 
     /// Parse the layout method argument file
     #[allow(unused_variables)]
-    fn parse_method_args(&mut self, arg_file: &str) {
+    fn parse_method_args(&mut self, arg_file: &str) -> args::Result<()>{
         // TODO: Expand
+        Ok(())
     }
 
     /// Run the layout process with the given arguments.
     /// Uses the `layout` module.
     /// Takes parsed arguments (from `parse_layout_args` or future GUI).
     /// Returns a `Result` with the `layout::Layout` or an `Err`.
-    fn do_layout(&self, surface: &Surface) -> crate::Result<layout::Layout> {
+    fn do_layout(&self, surface: &Surface) -> layout::Result<layout::Layout> {
         let mut layout_out = layout::Layout::new();
 
         // TODO: Temporary hardcode coil size estimate
@@ -79,13 +83,13 @@ impl methods::LayoutMethod for Method {
     }
 }
 
-fn clean_by_angle(points: Vec<Point>, center: &Point, normal: &GeoVector, split_count: u32) -> crate::Result<Vec<Point>> {
+fn clean_by_angle(points: Vec<Point>, center: &Point, normal: &GeoVector, split_count: u32) -> layout::Result<Vec<Point>> {
     
     if split_count < 3 {
-        return crate::err_string("Split count must be at least 3".to_string());
+        layout::err_str("Split count must be at least 3")?;
     }
     if points.len() < 3 {
-        return crate::err_string("Not enough points to clean by angle".to_string());
+        layout::err_str("Not enough points to clean by angle")?;
     }
 
     // Initialize the angle bins
@@ -106,7 +110,7 @@ fn clean_by_angle(points: Vec<Point>, center: &Point, normal: &GeoVector, split_
         center, 
         match points.iter().min_by(|a, b| {angle_to_normal(a).total_cmp(&angle_to_normal(b))}) {
             Some(point) => point,
-            None => return crate::err_string("Math error: clean_by_angle, no minimum point found".to_string()),
+            None => layout::err_str("Math error: clean_by_angle, no minimum point found")?,
         }
     );
 
@@ -125,7 +129,7 @@ fn clean_by_angle(points: Vec<Point>, center: &Point, normal: &GeoVector, split_
         // Bin the point
         let bin_id = (angle / angle_step) as usize;
         if bin_id >= split_count as usize {
-            return crate::err_string("Math error: Angle bin out of range".to_string());
+            layout::err_str("Math error: Angle bin out of range")?;
         }
         let error = (angle - bin_id as Angle * angle_step).abs();
         if error < bin_error[bin_id] {
@@ -139,7 +143,7 @@ fn clean_by_angle(points: Vec<Point>, center: &Point, normal: &GeoVector, split_
 
     // Error if any bins are empty
     if binned_points.iter().any(|p| p.is_none()) {
-        return crate::err_string("Math error: Angle binning failed (no points within some bins)".to_string());
+        layout::err_str("Math error: Angle binning failed (no points within some bins)")?;
     }
 
     // Unwrap the points

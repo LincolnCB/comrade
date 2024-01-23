@@ -2,6 +2,9 @@ mod methods;
 mod stl;
 pub mod geo_3d;
 
+use crate::{
+    args,
+};
 use geo_3d::*;
 
 // Re-export things from methods module
@@ -9,6 +12,42 @@ pub use methods::{
     LayoutChoice,
     LayoutMethod,
 };
+
+/// Layout process error type.
+#[derive(Debug)]
+pub enum LayoutError {
+    /// IO error.
+    IoError(std::io::Error),
+    /// StringOnly error.
+    StringOnly(String),
+}
+impl std::fmt::Display for LayoutError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LayoutError::IoError(error) => write!(f, "IO Error:\n{}", error),
+            LayoutError::StringOnly(error) => write!(f, "{}", error),
+        }
+    }
+}
+impl From<std::io::Error> for LayoutError {
+    fn from(error: std::io::Error) -> Self {
+        LayoutError::IoError(error)
+    }
+}
+impl From<String> for LayoutError {
+    fn from(error: String) -> Self {
+        LayoutError::StringOnly(error)
+    }
+}
+
+/// Result type for the `layout` crate.
+pub type Result<T> = std::result::Result<T, LayoutError>;
+
+/// Create a `LayoutError::StringOnly` from a string.
+pub fn err_str<T>(error_str: &str) -> Result<T> {
+    Err(LayoutError::StringOnly(error_str.to_string()))
+}
+
 
 /// A coil.
 /// Contains a list of points.
@@ -21,7 +60,7 @@ pub struct Coil {
 
 impl Coil {
     /// Create a new coil.
-    pub fn new(points: Vec<Point>, center: Point) -> crate::Result<Self>{
+    pub fn new(points: Vec<Point>, center: Point) -> Result<Self>{
 
         // Check if the coil is closed and ordered.
         let mut prev_point_id: usize = points.len() - 1;
@@ -30,10 +69,10 @@ impl Coil {
         for (point_id, point) in points.iter().enumerate() {
             prev_point = &points[prev_point_id];
             if point.adj.len() != 2 {
-                return crate::err_string("Coil point has wrong number of adjacent points".to_string());
+                err_str("Coil point has wrong number of adjacent points")?;
             }
             if point.adj[0] != prev_point_id || prev_point.adj[1] != point_id  {
-                return crate::err_string("Coil point has wrong adjacent points (out of order or unclosed)".to_string());
+                err_str("Coil point has wrong adjacent points (out of order or unclosed)")?;
             }
             prev_point_id = point_id;
         }
@@ -73,7 +112,7 @@ pub struct LayoutTarget {
 impl LayoutTarget {
     /// Construct a layout target from a config file.
     #[allow(unused_variables)]
-    pub fn from_cfg(layout_cfg_file: &str) -> crate::Result<Self> {
+    pub fn from_cfg(layout_cfg_file: &str) -> args::Result<Self> {
         // TODO: Remove hardcoded shortcircuit
         let layout_method = LayoutChoice::from_name("iterative_circle")?;
         let layout_args = LayoutArgs{input_path: "tests/data/tiny_cap_remesh.stl".to_string()};
@@ -84,7 +123,7 @@ impl LayoutTarget {
 
 /// Run the layout process.
 /// Returns a `Result` with the `Layout` or an `Err`.
-pub fn do_layout(layout_target: &LayoutTarget) -> crate::Result<Layout> {
+pub fn do_layout(layout_target: &LayoutTarget) -> Result<Layout> {
     
     // Extract the information from the layout target
     let layout_method = &layout_target.layout_method;
@@ -99,11 +138,4 @@ pub fn do_layout(layout_target: &LayoutTarget) -> crate::Result<Layout> {
     // Run the layout method
     println!("Running layout method: {}...", layout_method.get_method_name());
     layout_method.do_layout(&surface)
-}
-
-/// Mesh the layout to output it to MARIE.
-#[allow(unused_variables)]
-pub fn mesh_layout(layout_out: &Layout, shared_args: &crate::args::SharedArgs) -> crate::Result<()>{
-    println!("Dummy mesh_layout");
-    crate::err_string("Meshing not implemented yet".to_string())
 }

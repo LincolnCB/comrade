@@ -1,9 +1,10 @@
 pub mod layout;
+pub mod mesh;
+pub mod sim;
 pub mod matching;
 pub mod args;
 
-use std::io;
-use clap;
+
 use strum::IntoEnumIterator;
 
 /// Targets struct.
@@ -16,42 +17,69 @@ pub struct Targets{
     pub shared_args: args::SharedArgs,
 }
 
-// TODO: Refactor error types
-/// Result type for the `comrade` crate.
-type Result<T> = std::result::Result<T, ComradeError>;
-
 /// Error-type enum for the `comrade` crate.
 /// Can handle errors from the `clap` crate and the `stl_io` crate.
 /// Will handle other errors in the future.
 #[derive(Debug)]
 pub enum ComradeError {
-    // TODO: Refactor error types
-    IOError(io::Error),
-    ClapError(clap::Error),
-    Default(String),
+    ArgError(args::ArgError),
+    LayoutError(layout::LayoutError),
+    MeshError(mesh::MeshError),
+    SimError(sim::SimError),
+    MatchingError(matching::MatchingError),
+    StringOnly(String),
 }
-impl From<io::Error> for ComradeError {
-    fn from(error: io::Error) -> Self {
-        ComradeError::IOError(error)
-    }
-}
-impl From<clap::Error> for ComradeError {
-    fn from(error: clap::Error) -> Self {
-        ComradeError::ClapError(error)
+impl std::fmt::Display for ComradeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ComradeError::ArgError(error) => write!(f, "Argument Error:\n{}", error),
+            ComradeError::LayoutError(error) => write!(f, "Layout Error:\n{}", error),
+            ComradeError::MeshError(error) => write!(f, "Meshing Error:\n{}", error),
+            ComradeError::SimError(error) => write!(f, "Simulation Error:\n{}", error),
+            ComradeError::MatchingError(error) => write!(f, "Matching Error:\n{}", error),
+            ComradeError::StringOnly(error) => write!(f, "COMRADE Error:\n{}", error),
+        }
     }
 }
 impl From<String> for ComradeError {
     fn from(error: String) -> Self {
-        ComradeError::Default(error)
+        ComradeError::StringOnly(error)
+    }
+}
+impl From<args::ArgError> for ComradeError {
+    fn from(error: args::ArgError) -> Self {
+        ComradeError::ArgError(error)
+    }
+}
+impl From<layout::LayoutError> for ComradeError {
+    fn from(error: layout::LayoutError) -> Self {
+        ComradeError::LayoutError(error)
+    }
+}
+impl From<mesh::MeshError> for ComradeError {
+    fn from(error: mesh::MeshError) -> Self {
+        ComradeError::MeshError(error)
+    }
+}
+impl From<sim::SimError> for ComradeError {
+    fn from(error: sim::SimError) -> Self {
+        ComradeError::SimError(error)
+    }
+}
+impl From<matching::MatchingError> for ComradeError {
+    fn from(error: matching::MatchingError) -> Self {
+        ComradeError::MatchingError(error)
     }
 }
 
+/// Result type for the `comrade` crate.
+type Result<T> = std::result::Result<T, ComradeError>;
+
 /// Create a `Result` with an `Err` from a string.
-/// Shorthand to avoid writing `Err(crate::ComradeError::Default(error_str))`.
-pub fn err_string<T>(error_str: String) -> crate::Result<T> {
-    Err(ComradeError::Default(error_str))
+/// Shorthand to avoid writing `Err(crate::ComradeError::StringOnly(error_str))`.
+pub fn err_str<T>(error_str: &str) -> crate::Result<T> {
+    Err(ComradeError::StringOnly(error_str.to_string()))
 }
-    
 
 /// [Stage 1.]
 /// Parse the command line arguments for the comrade binary.
@@ -67,13 +95,13 @@ pub fn handle_cli_args(cli_args : args::ComradeCli) -> crate::Result<Targets>{
     };
 
     if cli_args.start_stage.stage_num() > end_stage.stage_num() {
-        return crate::err_string(format!("Start stage {} is after end stage {}", cli_args.start_stage, end_stage));
+        args::err_str(&format!("Start stage ({}) is after end stage ({})", cli_args.start_stage, end_stage))?;
     }
     if cli_args.start_stage.stage_num() == end_stage.stage_num() {
-        println!("Running stage {}...", cli_args.start_stage);
+        println!("Stage to run: {}...", cli_args.start_stage);
     }
     else {
-        println!("Running from stage {} to stage {}...", cli_args.start_stage, end_stage);
+        println!("Stages to run: {} through {} ...", cli_args.start_stage, end_stage);
     }
 
     let mut targets = Targets{
@@ -99,34 +127,34 @@ pub fn handle_cli_args(cli_args : args::ComradeCli) -> crate::Result<Targets>{
                     targets.layout_target = Some(layout::LayoutTarget::from_cfg(layout_cfg)?);
                 }
                 else {
-                    return crate::err_string("Layout config file not specified".to_string());
+                    args::err_str("Layout config file not specified")?;
                 }
             },
             args::RunStage::Mesh => {
                 if let Some(mesh_cfg) = &cli_args.mesh_cfg {
                     println!("Loading mesh config file: {}", mesh_cfg);
-                    return crate::err_string("Mesh config not yet implemented!!!".to_string());
+                    args::err_str("Mesh config not yet implemented!!!")?;
                 }
                 else {
-                    return crate::err_string("Mesh config file not specified".to_string());
+                    args::err_str("Mesh config file not specified")?;
                 }
             },
             args::RunStage::Sim => {
                 if let Some(sim_cfg) = &cli_args.sim_cfg {
                     println!("Loading simulation config file: {}", sim_cfg);
-                    return crate::err_string("Simulation config not yet implemented!!!".to_string());
+                    args::err_str("Simulation config not yet implemented!!!")?;
                 }
                 else {
-                    return crate::err_string("Simulation config file not specified".to_string());
+                    args::err_str("Simulation config file not specified")?;
                 }
             },
             args::RunStage::Match => {
                 if let Some(matching_cfg) = &cli_args.matching_cfg {
                     println!("Loading matching config file: {}", matching_cfg);
-                    return crate::err_string("Matching config not yet implemented!!!".to_string());
+                    args::err_str("Matching config not yet implemented!!!")?;
                 }
                 else {
-                    return crate::err_string("Matching config file not specified".to_string());
+                    args::err_str("Matching config file not specified")?;
                 }
             },
         }
@@ -154,7 +182,7 @@ pub fn run_process(targets: Targets) -> crate::Result<()> {
         println!("################");
         println!("Running mesh...");
         println!("################");
-        return crate::err_string("Meshing not yet implemented!!!".to_string());
+        mesh::err_str("Meshing not yet implemented!!!")?;
     }
 
     // 2.3 Run the simulation process
@@ -162,7 +190,7 @@ pub fn run_process(targets: Targets) -> crate::Result<()> {
         println!("####################");
         println!("Running simulation...");
         println!("####################");
-        return crate::err_string("Simulation not yet implemented!!!".to_string());
+        sim::err_str("Simulation not yet implemented!!!")?;
     }
 
     // 2.4 Run the matching process
@@ -170,7 +198,7 @@ pub fn run_process(targets: Targets) -> crate::Result<()> {
         println!("##################");
         println!("Running matching...");
         println!("##################");
-        return crate::err_string("Matching not yet implemented!!!".to_string());
+        matching::err_str("Matching not yet implemented!!!")?;
     }
 
     Ok(())

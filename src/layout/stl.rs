@@ -1,7 +1,8 @@
 use std::fs::OpenOptions;
 use stl_io;
 
-use crate::layout::geo_3d::{
+use crate::layout;
+use layout::geo_3d::{
     Surface,
     Point,
 };
@@ -9,7 +10,7 @@ use crate::layout::geo_3d::{
 /// Load a STL file from the inut path.
 /// Uses the `stl_io` crate.
 /// Returns a `Result` with the `Surface` or an `Err`
-pub fn load_stl(filename: &str) -> crate::Result<Surface>{
+pub fn load_stl(filename: &str) -> layout::Result<Surface>{
     let mut file = OpenOptions::new().read(true).open(filename)?;
     let stl = stl_io::read_stl(&mut file)?;
 
