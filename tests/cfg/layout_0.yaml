@@ -1,0 +1,4 @@
+method: iterative_circle
+input: tests/data/tiny_cap_remesh.stl
+output: tests/data/tiny_cap_remesh_layout
+force_save: false

@@ -1,22 +1,26 @@
 pub mod geo_3d;
 mod proc_errors;
+mod cfg;
 mod methods;
 mod stl;
 
-use crate::{
-    args,
-};
 use geo_3d::*;
 
-// Re-export things from methods module
-pub use methods::{
-    LayoutChoice,
-    LayoutMethod,
-};
+// Re-export errors
 pub use proc_errors::{
     LayoutError,
     ProcResult,
     err_str,
+};
+// Re-export cfg handling
+pub use cfg::{
+    LayoutArgs,
+    LayoutTarget,
+};
+// Re-export things from methods module
+pub use methods::{
+    LayoutChoice,
+    LayoutMethod,
 };
 
 /// A coil.
@@ -63,31 +67,6 @@ impl Layout {
     /// Create a new layout.
     pub fn new() -> Self{
         Layout{coils: Vec::new()}
-    }
-}
-
-/// Arguments for the layout process.
-pub struct LayoutArgs {
-    /// Input path for the STL file.
-    pub input_path: String,
-}
-
-pub struct LayoutTarget {
-    /// Layout method.
-    pub layout_method: LayoutChoice,
-    /// Layout arguments.
-    pub layout_args: LayoutArgs,
-}
-
-impl LayoutTarget {
-    /// Construct a layout target from a config file.
-    #[allow(unused_variables)]
-    pub fn from_cfg(layout_cfg_file: &str) -> args::ProcResult<Self> {
-        // TODO: Remove hardcoded shortcircuit
-        let layout_method = LayoutChoice::from_name("iterative_circle")?;
-        let layout_args = LayoutArgs{input_path: "tests/data/tiny_cap_remesh.stl".to_string()};
-
-        Ok(LayoutTarget{layout_method, layout_args})
     }
 }
 

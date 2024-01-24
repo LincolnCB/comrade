@@ -3,8 +3,13 @@ use clap;
 /// Argument parsing error type.
 #[derive(Debug)]
 pub enum ArgError {
+    /// CLI error.
     ClapError(clap::Error),
+    /// IO error.
     IoError(std::io::Error),
+    /// Serde error.
+    SerdeError(serde_yaml::Error),
+    /// StringOnly error.
     StringOnly(String),
 }
 impl std::fmt::Display for ArgError {
@@ -12,6 +17,7 @@ impl std::fmt::Display for ArgError {
         match self {
             ArgError::ClapError(error) => write!(f, "CLI Error:\n{}", error),
             ArgError::IoError(error) => write!(f, "IO Error:\n{}", error),
+            ArgError::SerdeError(error) => write!(f, "Serde Error:\n{}", error),
             ArgError::StringOnly(error) => write!(f, "{}", error),
         }
     }
@@ -24,6 +30,16 @@ impl From<clap::Error> for ArgError {
 impl From<std::io::Error> for ArgError {
     fn from(error: std::io::Error) -> Self {
         ArgError::IoError(error)
+    }
+}
+impl From<serde_yaml::Error> for ArgError {
+    fn from(error: serde_yaml::Error) -> Self {
+        ArgError::SerdeError(error)
+    }
+}
+impl From<String> for ArgError {
+    fn from(error: String) -> Self {
+        ArgError::StringOnly(error)
     }
 }
 

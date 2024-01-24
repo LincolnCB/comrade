@@ -61,12 +61,16 @@ pub fn build_targets(cli_args : args::ComradeCli) -> ComradeResult<Targets>{
         if stage.stage_num() > end_stage.stage_num() {
             break;
         }
+        let is_last = stage.stage_num() == end_stage.stage_num();
 
         match stage {
             args::RunStage::Layout => {
                 if let Some(layout_cfg) = &cli_args.layout_cfg {
                     println!("Loading layout config file: {}", layout_cfg);
-                    targets.layout_target = Some(layout::LayoutTarget::from_cfg(layout_cfg)?);
+                    targets.layout_target = Some(layout::LayoutTarget::from_cfg(
+                        layout_cfg,
+                        is_last
+                    )?);
                 }
                 else {
                     args::err_str("Layout config file not specified")?;
