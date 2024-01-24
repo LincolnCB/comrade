@@ -1,6 +1,7 @@
+pub mod geo_3d;
+mod proc_errors;
 mod methods;
 mod stl;
-pub mod geo_3d;
 
 use crate::{
     args,
@@ -12,42 +13,11 @@ pub use methods::{
     LayoutChoice,
     LayoutMethod,
 };
-
-/// Layout process error type.
-#[derive(Debug)]
-pub enum LayoutError {
-    /// IO error.
-    IoError(std::io::Error),
-    /// StringOnly error.
-    StringOnly(String),
-}
-impl std::fmt::Display for LayoutError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            LayoutError::IoError(error) => write!(f, "IO Error:\n{}", error),
-            LayoutError::StringOnly(error) => write!(f, "{}", error),
-        }
-    }
-}
-impl From<std::io::Error> for LayoutError {
-    fn from(error: std::io::Error) -> Self {
-        LayoutError::IoError(error)
-    }
-}
-impl From<String> for LayoutError {
-    fn from(error: String) -> Self {
-        LayoutError::StringOnly(error)
-    }
-}
-
-/// Result type for the `layout` crate.
-pub type Result<T> = std::result::Result<T, LayoutError>;
-
-/// Create a `LayoutError::StringOnly` from a string.
-pub fn err_str<T>(error_str: &str) -> Result<T> {
-    Err(LayoutError::StringOnly(error_str.to_string()))
-}
-
+pub use proc_errors::{
+    LayoutError,
+    Result,
+    err_str,
+};
 
 /// A coil.
 /// Contains a list of points.
@@ -138,4 +108,10 @@ pub fn do_layout(layout_target: &LayoutTarget) -> Result<Layout> {
     // Run the layout method
     println!("Running layout method: {}...", layout_method.get_method_name());
     layout_method.do_layout(&surface)
+}
+
+pub fn save_layout(layout: &Layout, output_path: &str) -> Result<()> {
+    println!("Saving layout to {}...", output_path);
+    // TODO: serde to YAML
+    Ok(())
 }

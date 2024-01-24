@@ -48,7 +48,11 @@ pub fn err_str<T>(error_str: &str) -> Result<T> {
     version = "0.1.0",
     author = "Lincoln Craven-Brightman",
     about = "Constrained Optimization for Magnetic Resonance Array Design tool",
-    override_usage = "comrade <START_STAGE> [OPTIONS]")]
+    override_usage = 
+"comrade <START_STAGE> [OPTIONS]
+    ⎡Some options are required:     ⎤
+    ⎢   (-l|--larmor) <LARMOR_MHZ>  ⎥
+    ⎣                               ⎦")]
 pub struct ComradeCli {
 
     pub start_stage: RunStage,

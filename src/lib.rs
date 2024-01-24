@@ -87,7 +87,7 @@ pub fn err_str<T>(error_str: &str) -> crate::Result<T> {
 /// Expects to see a start stage and an optional end stage that must come after the start
 /// For each stage to be run between them, checks for a required corresponding config file.
 /// Returns a `Result` with the `Targets` or an `Err`.
-pub fn handle_cli_args(cli_args : args::ComradeCli) -> crate::Result<Targets>{
+pub fn build_targets(cli_args : args::ComradeCli) -> crate::Result<Targets>{
     let end_stage = if let Some(end_stage) = cli_args.end_stage {
         end_stage
     } else {
@@ -175,6 +175,8 @@ pub fn run_process(targets: Targets) -> crate::Result<()> {
         println!("Running layout...");
         println!("#################");
         let layout_out = layout::do_layout(&layout_target)?;
+
+        
     };
 
     // 2.2 Run the mesh process
