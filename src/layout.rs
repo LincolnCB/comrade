@@ -15,7 +15,7 @@ pub use methods::{
 };
 pub use proc_errors::{
     LayoutError,
-    Result,
+    ProcResult,
     err_str,
 };
 
@@ -30,7 +30,7 @@ pub struct Coil {
 
 impl Coil {
     /// Create a new coil.
-    pub fn new(points: Vec<Point>, center: Point) -> Result<Self>{
+    pub fn new(points: Vec<Point>, center: Point) -> ProcResult<Self>{
 
         // Check if the coil is closed and ordered.
         let mut prev_point_id: usize = points.len() - 1;
@@ -82,7 +82,7 @@ pub struct LayoutTarget {
 impl LayoutTarget {
     /// Construct a layout target from a config file.
     #[allow(unused_variables)]
-    pub fn from_cfg(layout_cfg_file: &str) -> args::Result<Self> {
+    pub fn from_cfg(layout_cfg_file: &str) -> args::ProcResult<Self> {
         // TODO: Remove hardcoded shortcircuit
         let layout_method = LayoutChoice::from_name("iterative_circle")?;
         let layout_args = LayoutArgs{input_path: "tests/data/tiny_cap_remesh.stl".to_string()};
@@ -92,8 +92,8 @@ impl LayoutTarget {
 }
 
 /// Run the layout process.
-/// Returns a `Result` with the `Layout` or an `Err`.
-pub fn do_layout(layout_target: &LayoutTarget) -> Result<Layout> {
+/// Returns a `ProcResult` with the `Layout` or an `Err`.
+pub fn do_layout(layout_target: &LayoutTarget) -> ProcResult<Layout> {
     
     // Extract the information from the layout target
     let layout_method = &layout_target.layout_method;
@@ -110,7 +110,7 @@ pub fn do_layout(layout_target: &LayoutTarget) -> Result<Layout> {
     layout_method.do_layout(&surface)
 }
 
-pub fn save_layout(layout: &Layout, output_path: &str) -> Result<()> {
+pub fn save_layout(layout: &Layout, output_path: &str) -> ProcResult<()> {
     println!("Saving layout to {}...", output_path);
     // TODO: serde to YAML
     Ok(())

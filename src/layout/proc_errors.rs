@@ -26,9 +26,9 @@ impl From<String> for LayoutError {
 }
 
 /// Result type for the `layout` crate.
-pub type Result<T> = std::result::Result<T, LayoutError>;
+pub type ProcResult<T> = std::result::Result<T, LayoutError>;
 
 /// Create a `LayoutError::StringOnly` from a string.
-pub fn err_str<T>(error_str: &str) -> Result<T> {
+pub fn err_str<T>(error_str: &str) -> ProcResult<T> {
     Err(LayoutError::StringOnly(error_str.to_string()))
 }

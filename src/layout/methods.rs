@@ -31,13 +31,13 @@ pub trait LayoutMethod {
 
     /// Parse the layout method argument file (allows different arguments for different methods).
     /// Takes a `&str` with the path to the argument file.
-    fn parse_method_args(&mut self, arg_file: &str) -> args::Result<()>;
+    fn parse_method_args(&mut self, arg_file: &str) -> args::ProcResult<()>;
 
     /// Run the layout process with the given arguments.
     /// Uses the `layout` module.
     /// Takes a loaded `Surface`.
-    /// Returns a `Result` with the `layout::Layout` or an `Err`.
-    fn do_layout(&self, surface: &crate::layout::geo_3d::Surface) -> layout::Result<layout::Layout>;
+    /// Returns a `ProcResult` with the `layout::Layout` or an `Err`.
+    fn do_layout(&self, surface: &crate::layout::geo_3d::Surface) -> layout::ProcResult<layout::Layout>;
 }
 
 /// Layout methods enum.
@@ -73,13 +73,13 @@ const LAYOUT_TARGET_CONSTRUCTION: &[LayoutConstructor] = &[
 /// Layout constructor struct. Used to construct the layout methods from the name string.
 struct LayoutConstructor {
     name: &'static str,
-    constructor: fn() -> args::Result<LayoutChoice>,
+    constructor: fn() -> args::ProcResult<LayoutChoice>,
 }
 
 /// Layout target construction
 impl LayoutChoice {
     /// Construct a layout method from a commandline name.
-    pub fn from_name(name: &str) -> args::Result<Self> {
+    pub fn from_name(name: &str) -> args::ProcResult<Self> {
         for constructor in LAYOUT_TARGET_CONSTRUCTION.iter() {
             if constructor.name == name {
                 return (constructor.constructor)();

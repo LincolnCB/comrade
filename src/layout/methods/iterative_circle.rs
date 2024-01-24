@@ -22,7 +22,7 @@ struct MethodArgs {
 }
 
 impl Method {
-    pub fn new() -> args::Result<Self> {
+    pub fn new() -> args::ProcResult<Self> {
         Ok(Method{method_args: MethodArgs{}}) // TODO: Default values
     }
 }
@@ -35,7 +35,7 @@ impl methods::LayoutMethod for Method {
 
     /// Parse the layout method argument file
     #[allow(unused_variables)]
-    fn parse_method_args(&mut self, arg_file: &str) -> args::Result<()>{
+    fn parse_method_args(&mut self, arg_file: &str) -> args::ProcResult<()>{
         // TODO: Expand
         Ok(())
     }
@@ -43,8 +43,8 @@ impl methods::LayoutMethod for Method {
     /// Run the layout process with the given arguments.
     /// Uses the `layout` module.
     /// Takes parsed arguments (from `parse_layout_args` or future GUI).
-    /// Returns a `Result` with the `layout::Layout` or an `Err`.
-    fn do_layout(&self, surface: &Surface) -> layout::Result<layout::Layout> {
+    /// Returns a `ProcResult` with the `layout::Layout` or an `Err`.
+    fn do_layout(&self, surface: &Surface) -> layout::ProcResult<layout::Layout> {
         let mut layout_out = layout::Layout::new();
 
         // TODO: Temporary hardcode coil size estimate
@@ -83,7 +83,7 @@ impl methods::LayoutMethod for Method {
     }
 }
 
-fn clean_by_angle(points: Vec<Point>, center: &Point, normal: &GeoVector, split_count: u32) -> layout::Result<Vec<Point>> {
+fn clean_by_angle(points: Vec<Point>, center: &Point, normal: &GeoVector, split_count: u32) -> layout::ProcResult<Vec<Point>> {
     
     if split_count < 3 {
         layout::err_str("Split count must be at least 3")?;

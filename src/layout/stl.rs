@@ -9,8 +9,8 @@ use layout::geo_3d::{
 
 /// Load a STL file from the inut path.
 /// Uses the `stl_io` crate.
-/// Returns a `Result` with the `Surface` or an `Err`
-pub fn load_stl(filename: &str) -> layout::Result<Surface>{
+/// Returns a `ProcResult` with the `Surface` or an `Err`
+pub fn load_stl(filename: &str) -> layout::ProcResult<Surface>{
     let mut file = OpenOptions::new().read(true).open(filename)?;
     let stl = stl_io::read_stl(&mut file)?;
 

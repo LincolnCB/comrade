@@ -26,9 +26,9 @@ impl From<String> for MatchingError {
 }
 
 /// Result type for the `matching` crate.
-pub type Result<T> = std::result::Result<T, MatchingError>;
+pub type ProcResult<T> = std::result::Result<T, MatchingError>;
 
 /// Create a `MatchingError::StringOnly` from a string.
-pub fn err_str<T>(error_str: &str) -> Result<T> {
+pub fn err_str<T>(error_str: &str) -> ProcResult<T> {
     Err(MatchingError::StringOnly(error_str.to_string()))
 }

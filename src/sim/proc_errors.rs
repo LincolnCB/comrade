@@ -26,9 +26,9 @@ impl From<String> for SimError {
 }
 
 /// Result type for the `sim` crate.
-pub type Result<T> = std::result::Result<T, SimError>;
+pub type ProcResult<T> = std::result::Result<T, SimError>;
 
 /// Create a `SimError::StringOnly` from a string.
-pub fn err_str<T>(error_str: &str) -> Result<T> {
+pub fn err_str<T>(error_str: &str) -> ProcResult<T> {
     Err(SimError::StringOnly(error_str.to_string()))
 }

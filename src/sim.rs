@@ -2,6 +2,6 @@ mod proc_errors;
 
 pub use proc_errors::{
     SimError,
-    Result,
+    ProcResult,
     err_str,
 };

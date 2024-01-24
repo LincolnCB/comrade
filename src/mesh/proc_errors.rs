@@ -26,9 +26,9 @@ impl From<String> for MeshError {
 }
 
 /// Result type for the `mesh` crate.
-pub type Result<T> = std::result::Result<T, MeshError>;
+pub type ProcResult<T> = std::result::Result<T, MeshError>;
 
 /// Create a `MeshError::StringOnly` from a string.
-pub fn err_str<T>(error_str: &str) -> Result<T> {
+pub fn err_str<T>(error_str: &str) -> ProcResult<T> {
     Err(MeshError::StringOnly(error_str.to_string()))
 }

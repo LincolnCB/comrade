@@ -3,6 +3,6 @@ mod networks;
 
 pub use proc_errors::{
     MatchingError,
-    Result,
+    ProcResult,
     err_str,
 };
