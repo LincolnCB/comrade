@@ -2,20 +2,20 @@
 #[derive(Debug)]
 pub enum MatchingError {
     /// IO error.
-    IoError(std::io::Error),
+    IoError(crate::io::IoError),
     /// StringOnly error.
     StringOnly(String),
 }
 impl std::fmt::Display for MatchingError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            MatchingError::IoError(error) => write!(f, "IO Error:\n{}", error),
-            MatchingError::StringOnly(error) => write!(f, "{}", error),
+            MatchingError::IoError(error) => write!(f, "- IO Error:\n{}", error),
+            MatchingError::StringOnly(error) => write!(f, "- {}", error),
         }
     }
 }
-impl From<std::io::Error> for MatchingError {
-    fn from(error: std::io::Error) -> Self {
+impl From<crate::io::IoError> for MatchingError {
+    fn from(error: crate::io::IoError) -> Self {
         MatchingError::IoError(error)
     }
 }

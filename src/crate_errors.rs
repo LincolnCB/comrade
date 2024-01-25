@@ -21,12 +21,12 @@ pub enum ComradeError {
 impl std::fmt::Display for ComradeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ComradeError::ArgError(error) => write!(f, "Argument Error:\n{}", error),
-            ComradeError::LayoutError(error) => write!(f, "Layout Error:\n{}", error),
-            ComradeError::MeshError(error) => write!(f, "Meshing Error:\n{}", error),
-            ComradeError::SimError(error) => write!(f, "Simulation Error:\n{}", error),
-            ComradeError::MatchingError(error) => write!(f, "Matching Error:\n{}", error),
-            ComradeError::StringOnly(error) => write!(f, "COMRADE Error:\n{}", error),
+            ComradeError::ArgError(error) => write!(f, "! ARGUMENT ERROR:\n{}", error),
+            ComradeError::LayoutError(error) => write!(f, "! LAYOUT ERROR:\n{}", error),
+            ComradeError::MeshError(error) => write!(f, "! MESHING ERROR:\n{}", error),
+            ComradeError::SimError(error) => write!(f, "! SIMULATION ERROR:\n{}", error),
+            ComradeError::MatchingError(error) => write!(f, "! MATCHING ERROR:\n{}", error),
+            ComradeError::StringOnly(error) => write!(f, "! COMRADE ERROR:\n- {}", error),
         }
     }
 }

@@ -1,2 +1,3 @@
 /target
-LOCAL*
+LOCAL
+tests/out

@@ -3,6 +3,7 @@ use std::ops::{
     Sub,
 };
 use std::fmt;
+use serde::{Serialize, Deserialize};
 
 /// The substrate surface.
 /// Contains a list of points.
@@ -16,7 +17,7 @@ pub struct Surface {
 /// Contains the coordinates and a list of adjacent points.
 /// The adjacent points are stored as indices in the `Surface` struct.
 /// Adjacent points are found from the triangles in the STL file.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Point {
     pub x: f32,
     pub y: f32,

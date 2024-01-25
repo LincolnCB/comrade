@@ -3,6 +3,7 @@ pub mod mesh;
 pub mod sim;
 pub mod matching;
 pub mod args;
+pub mod io;
 mod crate_errors;
 
 use strum::IntoEnumIterator;
@@ -116,13 +117,19 @@ pub fn build_targets(cli_args : args::ComradeCli) -> ComradeResult<Targets>{
 pub fn run_process(targets: Targets) -> ComradeResult<()> {
 
     // 2.1 Run the layout process
-    if let Some(layout_target) = targets.layout_target {
-        println!("#################");
-        println!("Running layout...");
-        println!("#################");
-        let layout_out = layout::do_layout(&layout_target)?;
+    let layout_out = match targets.layout_target {
+        Some(layout_target) => {
+            println!("#################");
+            println!("Running layout...");
+            println!("#################");
+            let layout_out = layout::do_layout(&layout_target)?;
 
-        
+            if layout_target.layout_args.save {
+                layout::save_layout(&layout_out, &layout_target.layout_args.output_path.unwrap())?;
+            }
+            Some(layout_out)
+        },
+        None => None,
     };
 
     // 2.2 Run the mesh process

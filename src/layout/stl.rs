@@ -1,4 +1,3 @@
-use std::fs::OpenOptions;
 use stl_io;
 
 use crate::layout;
@@ -11,8 +10,20 @@ use layout::geo_3d::{
 /// Uses the `stl_io` crate.
 /// Returns a `ProcResult` with the `Surface` or an `Err`
 pub fn load_stl(filename: &str) -> layout::ProcResult<Surface>{
-    let mut file = OpenOptions::new().read(true).open(filename)?;
-    let stl = stl_io::read_stl(&mut file)?;
+    let mut file = match std::fs::OpenOptions::new().read(true).open(filename)
+    {
+        Ok(file) => file,
+        Err(error) => {
+            return Err(crate::io::IoError{file: filename.to_string(), cause: error}.into());
+        },
+    };
+    let stl = match stl_io::read_stl(&mut file)
+    {
+        Ok(stl) => stl,
+        Err(error) => {
+            return Err(crate::io::IoError{file: filename.to_string(), cause: error}.into());
+        },
+    };
 
     // Initialize the surface struct
     let mut surface = Surface{points: Vec::new(), area: 0.0};

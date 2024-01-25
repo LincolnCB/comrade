@@ -2,20 +2,20 @@
 #[derive(Debug)]
 pub enum SimError {
     /// IO error.
-    IoError(std::io::Error),
+    IoError(crate::io::IoError),
     /// StringOnly error.
     StringOnly(String),
 }
 impl std::fmt::Display for SimError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SimError::IoError(error) => write!(f, "IO Error:\n{}", error),
-            SimError::StringOnly(error) => write!(f, "{}", error),
+            SimError::IoError(error) => write!(f, "- IO Error:\n{}", error),
+            SimError::StringOnly(error) => write!(f, "- {}", error),
         }
     }
 }
-impl From<std::io::Error> for SimError {
-    fn from(error: std::io::Error) -> Self {
+impl From<crate::io::IoError> for SimError {
+    fn from(error: crate::io::IoError) -> Self {
         SimError::IoError(error)
     }
 }

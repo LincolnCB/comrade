@@ -6,19 +6,19 @@ pub enum ArgError {
     /// CLI error.
     ClapError(clap::Error),
     /// IO error.
-    IoError(std::io::Error),
-    /// Serde error.
-    SerdeError(serde_yaml::Error),
+    IoError(crate::io::IoError),
+    /// Serde YAML error.
+    SerdeYamlError(serde_yaml::Error),
     /// StringOnly error.
     StringOnly(String),
 }
 impl std::fmt::Display for ArgError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ArgError::ClapError(error) => write!(f, "CLI Error:\n{}", error),
-            ArgError::IoError(error) => write!(f, "IO Error:\n{}", error),
-            ArgError::SerdeError(error) => write!(f, "Serde Error:\n{}", error),
-            ArgError::StringOnly(error) => write!(f, "{}", error),
+            ArgError::ClapError(error) => write!(f, "- CLI Error:\n{}", error),
+            ArgError::IoError(error) => write!(f, "- IO Error:\n{}", error),
+            ArgError::SerdeYamlError(error) => write!(f, "- YAML Serialization/Deserialization Error:\n{}", error),
+            ArgError::StringOnly(error) => write!(f, "- {}", error),
         }
     }
 }
@@ -27,14 +27,14 @@ impl From<clap::Error> for ArgError {
         ArgError::ClapError(error)
     }
 }
-impl From<std::io::Error> for ArgError {
-    fn from(error: std::io::Error) -> Self {
+impl From<crate::io::IoError> for ArgError {
+    fn from(error: crate::io::IoError) -> Self {
         ArgError::IoError(error)
     }
 }
 impl From<serde_yaml::Error> for ArgError {
     fn from(error: serde_yaml::Error) -> Self {
-        ArgError::SerdeError(error)
+        ArgError::SerdeYamlError(error)
     }
 }
 impl From<String> for ArgError {

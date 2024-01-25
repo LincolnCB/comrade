@@ -2,21 +2,29 @@
 #[derive(Debug)]
 pub enum LayoutError {
     /// IO error.
-    IoError(std::io::Error),
+    IoError(crate::io::IoError),
+    /// Serde JSON error.
+    SerdeJsonError(serde_json::Error),
     /// StringOnly error.
     StringOnly(String),
 }
 impl std::fmt::Display for LayoutError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LayoutError::IoError(error) => write!(f, "IO Error:\n{}", error),
-            LayoutError::StringOnly(error) => write!(f, "{}", error),
+            LayoutError::IoError(error) => write!(f, "- IO Error:\n{}", error),
+            LayoutError::SerdeJsonError(error) => write!(f, "- JSON Serialization/Deserialization Error:\n{}", error),
+            LayoutError::StringOnly(error) => write!(f, "- {}", error),
         }
     }
 }
-impl From<std::io::Error> for LayoutError {
-    fn from(error: std::io::Error) -> Self {
+impl From<crate::io::IoError> for LayoutError {
+    fn from(error: crate::io::IoError) -> Self {
         LayoutError::IoError(error)
+    }
+}
+impl From<serde_json::Error> for LayoutError {
+    fn from(error: serde_json::Error) -> Self {
+        LayoutError::SerdeJsonError(error)
     }
 }
 impl From<String> for LayoutError {
