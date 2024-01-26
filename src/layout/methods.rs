@@ -9,8 +9,6 @@
  * 
  */
 
-mod iterative_circle;
-
 use enum_dispatch::enum_dispatch;
 
 use crate::{
@@ -24,6 +22,9 @@ use crate::{
 //      |
 //      V
 //
+
+// Source files for the layout methods
+mod iterative_circle;
 
 /// Layout methods enum.
 /// To add a new method:
@@ -64,7 +65,7 @@ const LAYOUT_TARGET_CONSTRUCTION: &[LayoutConstructor] = &[
 /// include it in the `LayoutChoice` enum,
 /// add handling for its constructor in `LAYOUT_TARGET_CONSTRUCTION`,
 /// and implement this trait for it.
-#[enum_dispatch] // enum dispatch allows us to use the enum as a kind of trait object
+#[enum_dispatch] // This is a macro that allows the enum to be used in a trait object-like way
 pub trait LayoutMethod {
     /// Get the arg_name of the layout method.
     fn get_method_name(&self) -> String;
@@ -82,7 +83,9 @@ pub trait LayoutMethod {
 
 /// Layout constructor struct. Used to construct the layout methods from the arg_name string.
 struct LayoutConstructor {
+    /// Name of the layout method.
     arg_name: &'static str,
+    /// Constructor function.
     constructor: fn() -> args::ProcResult<LayoutChoice>,
 }
 
@@ -95,7 +98,7 @@ struct LayoutConstructor {
 
 /// Layout target construction
 impl LayoutChoice {
-    /// Construct a layout method from a commandline arg_name.
+    /// Construct a layout method from a name (given in the config file).
     pub fn from_name(arg_name: &str) -> args::ProcResult<Self> {
         for constructor in LAYOUT_TARGET_CONSTRUCTION.iter() {
             if constructor.arg_name == arg_name {
@@ -105,10 +108,9 @@ impl LayoutChoice {
 
         // If the arg_name is not found, return an error with the available methods
         let mut error_str = format!("Layout method not found: {arg_name}\n");
-        error_str.push_str("Available methods: ");
+        error_str.push_str("Available methods:\n");
         for constructor in LAYOUT_TARGET_CONSTRUCTION.iter() {
-            error_str.push_str(constructor.arg_name);
-            error_str.push_str("\n");
+            error_str.push_str(&format!("    {}\n", constructor.arg_name));
         }
         args::err_str(&error_str)
     }

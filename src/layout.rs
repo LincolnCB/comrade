@@ -19,21 +19,34 @@ pub use cfg::{
     LayoutArgs,
     LayoutTarget,
 };
-// Re-export things from methods module
+// Re-export layout methods
 pub use methods::{
     LayoutChoice,
     LayoutMethod,
 };
+
+/// Layout struct.
+/// This struct contains all the necessary results from the layout process.
+/// Returned from the layout process, used as input to the matching process.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Layout {
+    pub coils: Vec<Coil>,
+}
+impl Layout {
+    /// Create a new layout.
+    pub fn new() -> Self{
+        Layout{coils: Vec::new()}
+    }
+}
 
 /// A coil.
 /// Contains a list of points.
 #[derive(Debug, Serialize, Deserialize)]
 #[allow(dead_code)]
 pub struct Coil {
-    points: Vec<Point>,
-    center: Point,
+    pub points: Vec<Point>,
+    pub center: Point,
 }
-
 impl Coil {
     /// Create a new coil.
     pub fn new(points: Vec<Point>, center: Point) -> ProcResult<Self>{
@@ -57,31 +70,17 @@ impl Coil {
     }
 }
 
-/// Layout struct.
-/// This struct contains all the necessary results from the layout process.
-/// Returned from the layout process, used as input to the matching process.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Layout {
-    pub coils: Vec<Coil>,
-}
-
-impl Layout {
-    /// Create a new layout.
-    pub fn new() -> Self{
-        Layout{coils: Vec::new()}
-    }
-}
-
 /// Run the layout process.
 /// Returns a `ProcResult` with the `Layout` or an `Err`.
 pub fn do_layout(layout_target: &LayoutTarget) -> ProcResult<Layout> {
     
-    // Extract the information from the layout target
+    // Extract the layout method and arguments from target
     let layout_method = &layout_target.layout_method;
     let layout_args = &layout_target.layout_args;
 
-    println!("Layout method: {}", layout_method.get_method_name());
-
+    // TODO: Handle meshing different types of files here.
+    // Make sure to put all the optional filetype names in the cfg module.
+    
     // Load the STL file
     println!("Loading STL file...");
     let surface = stl::load_stl(&layout_args.input_path)?;

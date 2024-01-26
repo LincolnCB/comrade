@@ -18,7 +18,7 @@ pub use crate_errors::{
 /// This struct contains the layout and matching targets to do.
 pub struct Targets{
     pub layout_target: Option<layout::LayoutTarget>,
-    pub mesh_target: Option<()>, // TODO THIS IS A DUMMY
+    pub mesh_target: Option<mesh::MeshTarget>,
     pub sim_target: Option<()>, // TODO THIS IS A DUMMY
     pub matching_target: Option<()>, // TODO THIS IS A DUMMY
     pub shared_args: args::SharedArgs,
@@ -62,6 +62,7 @@ pub fn build_targets(cli_args : args::ComradeCli) -> ComradeResult<Targets>{
         if stage.stage_num() > end_stage.stage_num() {
             break;
         }
+        let is_first = stage.stage_num() == cli_args.start_stage.stage_num();
         let is_last = stage.stage_num() == end_stage.stage_num();
 
         match stage {
@@ -80,7 +81,11 @@ pub fn build_targets(cli_args : args::ComradeCli) -> ComradeResult<Targets>{
             args::RunStage::Mesh => {
                 if let Some(mesh_cfg) = &cli_args.mesh_cfg {
                     println!("Loading mesh config file: {}", mesh_cfg);
-                    args::err_str("Mesh config not yet implemented!!!")?;
+                    targets.mesh_target = Some(mesh::MeshTarget::from_cfg(
+                        mesh_cfg,
+                        is_first,
+                        is_last
+                    )?);
                 }
                 else {
                     args::err_str("Mesh config file not specified")?;
@@ -134,10 +139,21 @@ pub fn run_process(targets: Targets) -> ComradeResult<()> {
 
     // 2.2 Run the mesh process
     if let Some(mesh_target) = targets.mesh_target {
+        let layout_in = match layout_out {
+            Some(layout_out) => layout_out,
+            None => {
+                let input_path = match mesh_target.mesh_args.input_path.as_ref() {
+                    Some(input_path) => input_path,
+                    None => mesh::err_str("BUG: Running the meshing, but missing input path! Should've been checked!")?,
+                };
+                println!("Loading layout file: {}", input_path);
+                layout::load_layout(input_path)?
+            }
+        };
         println!("################");
         println!("Running mesh...");
         println!("################");
-        mesh::err_str("Meshing not yet implemented!!!")?;
+        mesh::do_mesh(&mesh_target, &layout_in)?;
     }
 
     // 2.3 Run the simulation process

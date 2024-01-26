@@ -31,30 +31,35 @@ pub struct LayoutTarget {
 
 impl LayoutTarget {
     /// Construct a layout target from a config file.
-    #[allow(unused_variables)]
     pub fn from_cfg(cfg_file: &str, is_last: bool) -> args::ProcResult<Self> {
         let f = crate::io::open(cfg_file)?;
         let mut layout_args: LayoutArgs = serde_yaml::from_reader(f)?;
         
         let layout_method = LayoutChoice::from_name(&layout_args.method_name)?;
 
+        // Check that the input path is a supported filetype (TODO: expand types)
+        if !layout_args.input_path.ends_with(".stl") {
+            args::err_str("Layout input path must end with .stl")?;
+        }
+
+        // Check the output path
         if layout_args.save && layout_args.output_path.is_none() {
             args::err_str("Layout output path not specified, but force_save was set")?;
         }
 
         layout_args.save |= is_last;
 
-        if layout_args.save && layout_args.output_path.is_none() {
-            args::err_str("Layout output path not specified, but saving is required at the last stage")?;
-        }
-
         if layout_args.save {
-            let output_path = layout_args.output_path.as_ref().unwrap();
-            if !output_path.ends_with(".json")
-            {
-                args::err_str("Layout output path must end with .json")?;
+            if let Some(output_path) = layout_args.output_path.as_ref() {
+                if !output_path.ends_with(".json")
+                {
+                    args::err_str("Layout output path must end with .json")?;
+                }
+                let _ = crate::io::create(output_path)?;
             }
-            let _ = crate::io::create(output_path)?;
+            else {
+                args::err_str("Layout output path not specified, but saving is required at the last stage")?;
+            }
         }
 
         Ok(LayoutTarget{layout_method, layout_args})

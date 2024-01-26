@@ -1,6 +1,7 @@
 use std::ops::{
     Add,
     Sub,
+    Mul,
 };
 use std::fmt;
 use serde::{Serialize, Deserialize};
@@ -57,7 +58,7 @@ pub type Angle = f32;
 
 /// A vector in 3D space.
 /// Used for the normal vector of a point.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct GeoVector {
     pub x: f32,
     pub y: f32,
@@ -145,6 +146,43 @@ impl Sub for GeoVector {
             x: self.x - other.x,
             y: self.y - other.y,
             z: self.z - other.z,
+        }
+    }
+}
+
+impl Mul<GeoVector> for f32 {
+    type Output = GeoVector;
+
+    fn mul(self, other: GeoVector) -> GeoVector {
+        GeoVector{
+            x: self * other.x,
+            y: self * other.y,
+            z: self * other.z,
+        }
+    }
+}
+
+impl Mul<f32> for GeoVector {
+    type Output = GeoVector;
+
+    fn mul(self, other: f32) -> GeoVector {
+        GeoVector{
+            x: self.x * other,
+            y: self.y * other,
+            z: self.z * other,
+        }
+    }
+}
+
+impl Add<GeoVector> for Point {
+    type Output = Self;
+
+    fn add(self, other: GeoVector) -> Self {
+        Point{
+            x: self.x + other.x,
+            y: self.y + other.y,
+            z: self.z + other.z,
+            adj: Vec::new(),
         }
     }
 }
