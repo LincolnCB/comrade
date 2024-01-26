@@ -28,7 +28,7 @@ struct MethodArgs {
 impl Method {
     pub fn new() -> args::ProcResult<Self> {
         Ok(Method{method_args: MethodArgs{
-            radius: 1.0,
+            radius: 0.3,
             // TODO: Make sure polynum is over 3
             poly_num: 8,
         }})
@@ -56,6 +56,8 @@ impl methods::MeshMethod for Method {
             mesh::err_str("BUG: Mesh output path must end with .stl -- somehow got to the meshing stage without that!!")?;
         }
         
+        let mut full_triangles = Vec::<stl_io::Triangle>::new();
+
         // Mesh each coil
         for (coil_n, coil) in layout.coils.iter().enumerate() {
             println!("Coil {}...", coil_n);
@@ -72,19 +74,29 @@ impl methods::MeshMethod for Method {
                     mesh::err_str(&format!("Coil point {point} has wrong number of adjacent points {}", point.adj.len()))?;
                 }
 
-                let prev_point = &coil.points[point.adj[0]];
-                let next_point = &coil.points[point.adj[1]];
+                // let prev_point = &coil.points[point.adj[0]];
+                // let next_point = &coil.points[point.adj[1]];
 
-                let mut vec1 = GeoVector::new_from_points(prev_point, point);
-                let mut vec2 = GeoVector::new_from_points(next_point, point);
+                // let mut vec1 = GeoVector::new_from_points(prev_point, point);
+                // let mut vec2 = GeoVector::new_from_points(next_point, point);
 
-                vec1.normalize();
-                vec2.normalize();
+                // vec1.normalize();
+                // vec2.normalize();
 
-                let mut out_vec = vec1 + vec2;
+                // let mut out_vec = vec1 + vec2;
+                // out_vec.normalize();
+
+                // let mut up_vec = vec1.cross(&vec2);
+                // up_vec.normalize();
+
+                let mut out_vec = GeoVector::new_from_points(&coil.center, point);
                 out_vec.normalize();
 
-                let mut up_vec = vec1.cross(&vec2);
+                let prev_point = &coil.points[point.adj[0]];
+                let mut prev_vec = GeoVector::new_from_points(prev_point, point);
+                prev_vec.normalize();
+
+                let mut up_vec = prev_vec.cross(&out_vec);
                 up_vec.normalize();
 
                 // Put the polygon points around the plane given by the point and the out_vec/up_vec
@@ -120,23 +132,11 @@ impl methods::MeshMethod for Method {
                     n0.normalize();
                     n1.normalize();
 
-                    triangles.push(stl_io::Triangle{
-                        normal: stl_io::Normal::new([n0.x, n0.y, n0.z]),
-                        vertices: [
-                            stl_io::Vertex::new([v0.x, v0.y, v0.z]),
-                            stl_io::Vertex::new([v1.x, v1.y, v1.z]),
-                            stl_io::Vertex::new([w0.x, w0.y, w0.z]),
-                        ]
-                    });
+                    triangles.push(stl_triangle(&n0, v0, v1, w0));
+                    triangles.push(stl_triangle(&n1, v1, w1, w0));
 
-                    triangles.push(stl_io::Triangle{
-                        normal: stl_io::Normal::new([n1.x, n1.y, n1.z]),
-                        vertices: [
-                            stl_io::Vertex::new([v1.x, v1.y, v1.z]),
-                            stl_io::Vertex::new([w1.x, w1.y, w1.z]),
-                            stl_io::Vertex::new([w0.x, w0.y, w0.z]),
-                        ]
-                    });
+                    full_triangles.push(stl_triangle(&n0, v0, v1, w0));
+                    full_triangles.push(stl_triangle(&n1, v1, w1, w0));
                 }
             }
 
@@ -159,8 +159,35 @@ impl methods::MeshMethod for Method {
             };
         }
 
+        // Save a full set of coils (often just for visualization)
+        println!("Saving full array to {}", output_path);
+        let mut file = match OpenOptions::new().write(true).create(true).open(&output_path)
+        {
+            Ok(file) => file,
+            Err(error) => {
+                return Err(crate::io::IoError{file: output_path.to_string(), cause: error}.into());
+            },
+        };
+        match stl_io::write_stl(&mut file, full_triangles.iter())
+        {
+            Ok(_) => (),
+            Err(error) => {
+                return Err(crate::io::IoError{file: output_path.to_string(), cause: error}.into());
+            },
+        };
+
         Ok(())
     }
 }
 
-
+/// Helper function for triangle construction.
+fn stl_triangle(normal: &GeoVector, v0: &Point, v1: &Point, v2: &Point) -> stl_io::Triangle {
+    stl_io::Triangle{
+        normal: stl_io::Normal::new([normal.x, normal.y, normal.z]),
+        vertices: [
+            stl_io::Vertex::new([v0.x, v0.y, v0.z]),
+            stl_io::Vertex::new([v1.x, v1.y, v1.z]),
+            stl_io::Vertex::new([v2.x, v2.y, v2.z]),
+        ]
+    }
+} 
