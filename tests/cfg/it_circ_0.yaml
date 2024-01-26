@@ -1,1 +1,3 @@
-coil_count: 1
+coil_radius: 5.0
+epsilon: 0.15
+section_count: 32

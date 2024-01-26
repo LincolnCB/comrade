@@ -16,14 +16,21 @@ pub struct Method {
     method_args: MethodArgs,
 }
 
-/// TODO: Expand, maybe use serde_yaml? Maybe try to write this as an external example?
+/// TODO: Deserialize from yaml cfg file
 #[derive(Debug)]
 struct MethodArgs {
+    coil_radius: f32,
+    epsilon: f32,
+    section_count: u32,
 }
 
 impl Method {
     pub fn new() -> args::ProcResult<Self> {
-        Ok(Method{method_args: MethodArgs{}}) // TODO: Default values
+        Ok(Method{method_args: MethodArgs{
+            coil_radius: 5.0,
+            epsilon: 0.15,
+            section_count: 32,
+        }})
     }
 }
 
@@ -36,7 +43,7 @@ impl methods::LayoutMethod for Method {
     /// Parse the layout method argument file
     #[allow(unused_variables)]
     fn parse_method_args(&mut self, arg_file: &str) -> args::ProcResult<()>{
-        // TODO: Expand
+        // TODO: Deserialize here
         Ok(())
     }
 
@@ -47,19 +54,18 @@ impl methods::LayoutMethod for Method {
     fn do_layout(&self, surface: &Surface) -> layout::ProcResult<layout::Layout> {
         let mut layout_out = layout::Layout::new();
 
-        // TODO: Temporary hardcode coil size estimate
-        let coil_area = surface.area / 4.0;
-        let coil_radius = (coil_area / PI).sqrt();
-        let epsilon : f32 = 0.299433 / 2.0;
-        let section_count = 32;
+        // Grab arguments to save typing
+        let coil_radius = self.method_args.coil_radius;
+        let epsilon = self.method_args.epsilon;
+        let section_count = self.method_args.section_count;
 
-        // for coil_n in 0..self.layout_args.coil_count {
         for coil_n in 0..1 {
             println!("Coil {}...", coil_n);
 
             let mut points = Vec::new();
 
-            // TODO: Temporary hard code!
+            // TODO: Temporary hard code! 
+            // Move this to deserialization after first deserialization works
             let center = Point::new(-1.305, 1.6107, 29.919);
             let normal = GeoVector::new(-0.041038, 0.062606, 0.997194);
 

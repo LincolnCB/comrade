@@ -78,7 +78,7 @@ pub fn do_layout(layout_target: &LayoutTarget) -> ProcResult<Layout> {
     let layout_method = &layout_target.layout_method;
     let layout_args = &layout_target.layout_args;
 
-    // TODO: Handle meshing different types of files here.
+    // TODO: Handle different types of mesh files here.
     // Make sure to put all the optional filetype names in the cfg module.
     
     // Load the STL file

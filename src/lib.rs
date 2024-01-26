@@ -68,7 +68,7 @@ pub fn build_targets(cli_args : args::ComradeCli) -> ComradeResult<Targets>{
         match stage {
             args::RunStage::Layout => {
                 if let Some(layout_cfg) = &cli_args.layout_cfg {
-                    println!("Loading layout config file: {}", layout_cfg);
+                    println!("Loading layout config file: {}...", layout_cfg);
                     targets.layout_target = Some(layout::LayoutTarget::from_cfg(
                         layout_cfg,
                         is_last
@@ -80,7 +80,7 @@ pub fn build_targets(cli_args : args::ComradeCli) -> ComradeResult<Targets>{
             },
             args::RunStage::Mesh => {
                 if let Some(mesh_cfg) = &cli_args.mesh_cfg {
-                    println!("Loading mesh config file: {}", mesh_cfg);
+                    println!("Loading mesh config file: {}...", mesh_cfg);
                     targets.mesh_target = Some(mesh::MeshTarget::from_cfg(
                         mesh_cfg,
                         is_first,
@@ -93,7 +93,7 @@ pub fn build_targets(cli_args : args::ComradeCli) -> ComradeResult<Targets>{
             },
             args::RunStage::Sim => {
                 if let Some(sim_cfg) = &cli_args.sim_cfg {
-                    println!("Loading simulation config file: {}", sim_cfg);
+                    println!("Loading simulation config file: {}...", sim_cfg);
                     args::err_str("Simulation config not yet implemented!!!")?;
                 }
                 else {
@@ -102,7 +102,7 @@ pub fn build_targets(cli_args : args::ComradeCli) -> ComradeResult<Targets>{
             },
             args::RunStage::Match => {
                 if let Some(matching_cfg) = &cli_args.matching_cfg {
-                    println!("Loading matching config file: {}", matching_cfg);
+                    println!("Loading matching config file: {}...", matching_cfg);
                     args::err_str("Matching config not yet implemented!!!")?;
                 }
                 else {
@@ -139,6 +139,9 @@ pub fn run_process(targets: Targets) -> ComradeResult<()> {
 
     // 2.2 Run the mesh process
     if let Some(mesh_target) = targets.mesh_target {
+        println!("################");
+        println!("Running mesh...");
+        println!("################");
         let layout_in = match layout_out {
             Some(layout_out) => layout_out,
             None => {
@@ -146,13 +149,9 @@ pub fn run_process(targets: Targets) -> ComradeResult<()> {
                     Some(input_path) => input_path,
                     None => mesh::err_str("BUG: Running the meshing, but missing input path! Should've been checked!")?,
                 };
-                println!("Loading layout file: {}", input_path);
                 layout::load_layout(input_path)?
             }
         };
-        println!("################");
-        println!("Running mesh...");
-        println!("################");
         mesh::do_mesh(&mesh_target, &layout_in)?;
     }
 

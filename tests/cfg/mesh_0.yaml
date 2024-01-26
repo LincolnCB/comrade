@@ -1,2 +1,3 @@
 method: stl_polygons
+input: tests/out/layout_0.json
 output: tests/out/mesh_0.stl
