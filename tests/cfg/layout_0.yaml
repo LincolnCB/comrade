@@ -1,4 +1,4 @@
-method: iterative_circle
+method: single_circle
 input: tests/data/tiny_cap_remesh.stl
 output: tests/out/layout_0.json
 force_save: false

@@ -24,7 +24,7 @@ use crate::{
 //
 
 // Source files for the layout methods
-mod iterative_circle;
+mod single_circle;
 
 /// Layout methods enum.
 /// To add a new method:
@@ -35,7 +35,7 @@ mod iterative_circle;
 #[enum_dispatch(LayoutMethod)]
 pub enum LayoutChoice {
     /// Basic circular layout, based on Monika Sliwak's MATLAB prototype.
-    IterativeCircle(iterative_circle::Method),
+    SingleCircle(single_circle::Method),
 }
 
 /// Layout construction array -- Written out in once place for easy modification.
@@ -46,8 +46,8 @@ pub enum LayoutChoice {
 const LAYOUT_TARGET_CONSTRUCTION: &[LayoutConstructor] = &[
     // Example layout constructor.
     LayoutConstructor{
-        arg_name: "iterative_circle", 
-        constructor: || {Ok(LayoutChoice::IterativeCircle(iterative_circle::Method::new()?))},
+        arg_name: "single_circle", 
+        constructor: || {Ok(LayoutChoice::SingleCircle(single_circle::Method::new()?))},
     },
 ];
 

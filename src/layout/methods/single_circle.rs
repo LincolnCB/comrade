@@ -7,12 +7,12 @@ use layout::geo_3d::*;
 
 use std::f32::consts::PI;
 
-/// Iterative Circle Method struct.
-/// This struct contains all the parameters for the Iterative Circle layout method.
+/// Single Circle Method struct.
+/// This struct contains all the parameters for the Single Circle layout method.
 #[derive(Debug)]
 #[allow(dead_code)]
 pub struct Method {
-    /// Arguments for the Iterative Circle method.
+    /// Arguments for the Single Circle method.
     method_args: MethodArgs,
 }
 
@@ -37,7 +37,7 @@ impl Method {
 impl methods::LayoutMethod for Method {
     /// Get the name of the layout method.
     fn get_method_name(&self) -> String {
-        "Iterative Circle".to_string()
+        "Single Circle".to_string()
     }
 
     /// Parse the layout method argument file
