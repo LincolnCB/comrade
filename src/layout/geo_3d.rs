@@ -1,7 +1,8 @@
 use std::ops::{
-    Add,
-    Sub,
-    Mul,
+    Add, AddAssign,
+    Sub, SubAssign,
+    Mul, MulAssign,
+    Div, DivAssign,
 };
 use std::fmt;
 use serde::{Serialize, Deserialize};
@@ -11,30 +12,37 @@ use serde::{Serialize, Deserialize};
 #[derive(Debug)]
 pub struct Surface {
     pub points: Vec<Point>,
+    pub adj: Vec<Vec<usize>>,
     pub area: f32,
+    pub point_normals: Vec<GeoVector>,
+}
+impl Surface {
+    pub fn empty() -> Self {
+        Surface{
+            points: Vec::new(),
+            adj: Vec::new(),
+            area: 0.0,
+            point_normals: Vec::new(),
+        }
+    }
 }
 
+/// Angle type (alias for f32).
+pub type Angle = f32;
+
 /// A point in 3D space.
-/// Contains the coordinates and a list of adjacent points.
-/// The adjacent points are stored as indices in the `Surface` struct.
-/// Adjacent points are found from the triangles in the STL file.
-#[derive(Debug, Serialize, Deserialize)]
+/// Contains the coordinates of the point.
+/// Has basic math support for adding and subtracting vectors.
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub struct Point {
     pub x: f32,
     pub y: f32,
     pub z: f32,
-    pub adj: Vec<usize>,
 }
-
 impl Point {
     /// Create a new point.
     pub fn new(x: f32, y: f32, z: f32) -> Self {
-        Point{x, y, z, adj: Vec::new()}
-    }
-
-    /// Create a duplicate of the point, with no adjacent points.
-    pub fn dup(&self) -> Self {
-        Point{x: self.x, y: self.y, z: self.z, adj: Vec::new()}
+        Point{x, y, z}
     }
 
     /// Get the distance between two points.
@@ -46,46 +54,78 @@ impl Point {
         (dx*dx + dy*dy + dz*dz).sqrt()
     }
 }
-
 impl fmt::Display for Point {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "({}, {}, {})", self.x, self.y, self.z)
     }
 }
+impl Add<GeoVector> for Point {
+    type Output = Self;
 
-/// Angle type (alias for f32).
-pub type Angle = f32;
+    fn add(self, rhs: GeoVector) -> Self {
+        Point{
+            x: self.x + rhs.x,
+            y: self.y + rhs.y,
+            z: self.z + rhs.z,
+        }
+    }
+}
+impl Sub<GeoVector> for Point {
+    type Output = Self;
+
+    fn sub(self, rhs: GeoVector) -> Self {
+        Point{
+            x: self.x - rhs.x,
+            y: self.y - rhs.y,
+            z: self.z - rhs.z,
+        }
+    }
+}
+impl Sub<Point> for Point {
+    type Output = GeoVector;
+
+    fn sub(self, rhs: Self) -> GeoVector {
+        GeoVector{
+            x: self.x - rhs.x,
+            y: self.y - rhs.y,
+            z: self.z - rhs.z,
+        }
+    }
+}
+impl Sub<&Point> for &Point {
+    type Output = GeoVector;
+
+    fn sub(self, rhs: &Point) -> GeoVector {
+        GeoVector{
+            x: self.x - rhs.x,
+            y: self.y - rhs.y,
+            z: self.z - rhs.z,
+        }
+    }
+}
 
 /// A vector in 3D space.
 /// Used for the normal vector of a point.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub struct GeoVector {
     pub x: f32,
     pub y: f32,
     pub z: f32,
 }
-
 impl GeoVector {
     /// Create a new vector.
     pub fn new(x: f32, y: f32, z: f32) -> Self {
         GeoVector{x, y, z}
     }
 
-    /// Create a new vector from two points.
-    pub fn new_from_points(p1: &Point, p2: &Point) -> Self {
-        GeoVector{
-            x: p2.x - p1.x,
-            y: p2.y - p1.y,
-            z: p2.z - p1.z,
-        }
-    }
-
     /// Normailze in place
-    pub fn normalize(&mut self) {
+    pub fn normalize(&self) -> Self {
         let mag = self.mag();
-        self.x /= mag;
-        self.y /= mag;
-        self.z /= mag;
+        GeoVector{
+            x: self.x / mag,
+            y: self.y / mag,
+            z: self.z / mag,
+        }
     }
 
     /// Get the dot product of two vectors.
@@ -125,7 +165,6 @@ impl GeoVector {
         }
     }
 }
-
 impl Add for GeoVector {
     type Output = Self;
 
@@ -137,7 +176,13 @@ impl Add for GeoVector {
         }
     }
 }
-
+impl AddAssign for GeoVector {
+    fn add_assign(&mut self, other: Self) {
+        self.x += other.x;
+        self.y += other.y;
+        self.z += other.z;
+    }
+}
 impl Sub for GeoVector {
     type Output = Self;
 
@@ -149,7 +194,13 @@ impl Sub for GeoVector {
         }
     }
 }
-
+impl SubAssign for GeoVector {
+    fn sub_assign(&mut self, other: Self) {
+        self.x -= other.x;
+        self.y -= other.y;
+        self.z -= other.z;
+    }
+}
 impl Mul<GeoVector> for f32 {
     type Output = GeoVector;
 
@@ -161,7 +212,6 @@ impl Mul<GeoVector> for f32 {
         }
     }
 }
-
 impl Mul<f32> for GeoVector {
     type Output = GeoVector;
 
@@ -173,20 +223,42 @@ impl Mul<f32> for GeoVector {
         }
     }
 }
+impl MulAssign<f32> for GeoVector {
+    fn mul_assign(&mut self, other: f32) {
+        self.x *= other;
+        self.y *= other;
+        self.z *= other;
+    }
+}
+impl Div<f32> for GeoVector {
+    type Output = GeoVector;
 
-impl Add<GeoVector> for Point {
-    type Output = Self;
-
-    fn add(self, other: GeoVector) -> Self {
-        Point{
-            x: self.x + other.x,
-            y: self.y + other.y,
-            z: self.z + other.z,
-            adj: Vec::new(),
+    fn div(self, other: f32) -> GeoVector {
+        GeoVector{
+            x: self.x / other,
+            y: self.y / other,
+            z: self.z / other,
         }
     }
 }
+impl DivAssign<f32> for GeoVector {
+    fn div_assign(&mut self, other: f32) {
+        self.x /= other;
+        self.y /= other;
+        self.z /= other;
+    }
+}
+impl std::ops::Neg for GeoVector {
+    type Output = GeoVector;
 
+    fn neg(self) -> GeoVector {
+        GeoVector{
+            x: -self.x,
+            y: -self.y,
+            z: -self.z,
+        }
+    }
+}
 impl fmt::Display for GeoVector {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "({}, {}, {})", self.x, self.y, self.z)

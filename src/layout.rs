@@ -44,30 +44,65 @@ impl Layout {
 #[derive(Debug, Serialize, Deserialize)]
 #[allow(dead_code)]
 pub struct Coil {
-    pub points: Vec<Point>,
     pub center: Point,
+    pub normal: GeoVector,
+    pub points: Vec<CoilPoint>,
 }
 impl Coil {
     /// Create a new coil.
-    pub fn new(points: Vec<Point>, center: Point) -> ProcResult<Self>{
+    /// Points must be in order -- the coil will be closed automatically.
+    pub fn new(
+        center: Point,
+        normal: GeoVector,
+        points: Vec<Point>,
+        point_normals: Vec<GeoVector>,
+        point_radial_tangents: Vec<GeoVector>,
+    ) -> ProcResult<Self>{
 
-        // Check if the coil is closed and ordered.
-        let mut prev_point_id: usize = points.len() - 1;
-        let mut prev_point;
-
-        for (point_id, point) in points.iter().enumerate() {
-            prev_point = &points[prev_point_id];
-            if point.adj.len() != 2 {
-                err_str("Coil point has wrong number of adjacent points")?;
-            }
-            if point.adj[0] != prev_point_id || prev_point.adj[1] != point_id  {
-                err_str("Coil point has wrong adjacent points (out of order or unclosed)")?;
-            }
-            prev_point_id = point_id;
+        // Check that there are at least 3 points
+        if points.len() < 3 {
+            err_str("Coil must have at least 3 points!")?;
         }
 
-        Ok(Coil{points, center})
+        // Check that the point lists are the correct length
+        if points.len() != point_normals.len() || points.len() != point_radial_tangents.len() {
+            err_str(&format!("Point list (length: {0}) must be the same length as the normal list ({1}) and radial tangent list ({2})!",
+                points.len(), point_normals.len(), point_radial_tangents.len()))?;
+        }
+
+        // Connect the points
+        let mut coil_points = Vec::<CoilPoint>::new();
+
+        for (point_id, point) in points.iter().enumerate() {
+            let next_id = (point_id + 1) % points.len();
+            let prev_id = (point_id + points.len() - 1) % points.len();
+
+            let normal = point_normals[point_id];
+            let radial_tangent = point_radial_tangents[point_id];
+
+            coil_points.push(CoilPoint{
+                point: point.clone(),
+                id: point_id,
+                next_id,
+                prev_id,
+                normal,
+                radial_tangent,
+            });
+        }
+
+        Ok(Coil{center, normal, points: coil_points})
     }
+}
+
+/// A point on a coil (includes adjacency and surface vectors).
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CoilPoint {
+    pub point: Point,
+    pub id: usize,
+    pub next_id: usize,
+    pub prev_id: usize,
+    pub normal: GeoVector,
+    pub radial_tangent: GeoVector,
 }
 
 /// Run the layout process.

@@ -78,28 +78,17 @@ impl methods::MeshMethod for Method {
 
             // Create the corner slice polygons
             let mut corner_slices = Vec::<Vec::<Point>>::new();
-            for point in coil.points.iter() {
+            for coil_point in coil.points.iter() {
                 let mut corner_slice = Vec::new();
 
-                if point.adj.len() != 2 {
-                    mesh::err_str(&format!("Coil point {point} has wrong number of adjacent points {}", point.adj.len()))?;
-                }
-
-                let mut out_vec = GeoVector::new_from_points(&coil.center, point);
-                out_vec.normalize();
-
-                let prev_point = &coil.points[point.adj[0]];
-                let mut prev_vec = GeoVector::new_from_points(prev_point, point);
-                prev_vec.normalize();
-
-                let mut up_vec = prev_vec.cross(&out_vec);
-                up_vec.normalize();
+                let out_vec = coil_point.radial_tangent;
+                let up_vec = coil_point.normal;
+                let point = coil_point.point;
 
                 // Put the polygon points around the plane given by the point and the out_vec/up_vec
                 for i in 0..self.method_args.poly_num {
                     let angle = (i as Angle) * 2.0 * PI / (self.method_args.poly_num as Angle);
-                    let mut poly_point = point.dup() + out_vec * angle.cos() * self.method_args.radius + up_vec * angle.sin() * self.method_args.radius;
-                    poly_point.adj = vec![(i + self.method_args.poly_num - 1) % self.method_args.poly_num, (i + 1) % self.method_args.poly_num];
+                    let poly_point = point + out_vec * angle.cos() * self.method_args.radius + up_vec * angle.sin() * self.method_args.radius;
                     corner_slice.push(poly_point);
                 }
 
@@ -107,8 +96,8 @@ impl methods::MeshMethod for Method {
             }
 
             // For each corner, mesh the section to the next corner
-            for (slice_id, point) in coil.points.iter().enumerate() {
-                let next_slice_id = point.adj[1];
+            for (slice_id, coil_point) in coil.points.iter().enumerate() {
+                let next_slice_id = coil_point.next_id;
                 let slice = &corner_slices[slice_id];
                 let next_slice = &corner_slices[next_slice_id];
 
@@ -117,16 +106,14 @@ impl methods::MeshMethod for Method {
                         slice_id, slice.len(), next_slice_id, next_slice.len()))?;
                 }
                 
-                for (v_n, v0) in slice.iter().enumerate() {
-                    let v1 = &slice[v0.adj[1]];
-                    let w0 = &next_slice[v_n];
-                    let w1 = &next_slice[w0.adj[1]];
+                for (i, v0) in slice.iter().enumerate() {
+                    let i_next = (i + 1) % slice.len();
+                    let v1 = &slice[i_next];
+                    let w0 = &next_slice[i];
+                    let w1 = &next_slice[i_next];
 
-                    let mut n0 = GeoVector::new_from_points(v0, v1).cross(&GeoVector::new_from_points(v0, w0));
-                    let mut n1 = GeoVector::new_from_points(w0, v1).cross(&GeoVector::new_from_points(w0, w1));
-
-                    n0.normalize();
-                    n1.normalize();
+                    let n0 = (v1 - v0).cross(&(w0 - v0)).normalize();
+                    let n1 = (v1 - w0).cross(&(w1 - w0)).normalize();
 
                     triangles.push(stl_triangle(&n0, v0, v1, w0));
                     triangles.push(stl_triangle(&n1, v1, w1, w0));

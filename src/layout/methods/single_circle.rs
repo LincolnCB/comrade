@@ -78,26 +78,34 @@ impl methods::LayoutMethod for Method {
         for coil_n in 0..1 {
             println!("Coil {}...", coil_n);
 
-            let mut points = Vec::new();
+            let mut points = Vec::<Point>::new();
+            let mut point_normals = Vec::<GeoVector>::new();
+            let mut point_radial_tangents = Vec::<GeoVector>::new();
 
             // TODO: Temporary hard code! 
             // Move this to deserialization after first deserialization works
             let center = Point::new(-1.305, 1.6107, 29.919);
             let normal = GeoVector::new(-0.041038, 0.062606, 0.997194);
 
-            for point in surface.points.iter() {
+            for (id, &point) in surface.points.iter().enumerate() {
                 if (point.distance(&center) - coil_radius).abs() < epsilon {
-                    points.push(point.dup());
+                    points.push(point);
+
+                    let n = surface.point_normals[id].normalize();
+                    let r = point - center;
+                    let t = (r - r.proj_onto(&n)).normalize();
+
+                    point_normals.push(n);
+                    point_radial_tangents.push(t);
                 }
             }
 
             println!("Uncleaned point count: {}", points.len());
 
-            points = clean_by_angle(points, &center, &normal, section_count)?;
+            let coil = clean_by_angle(points, center, normal, point_normals, point_radial_tangents, section_count)?;
 
-            println!("Cleaned point count: {}", points.len());
+            println!("Cleaned point count: {}", coil.points.len());
 
-            let coil = layout::Coil::new(points, center)?;
             layout_out.coils.push(coil);
         }
 
@@ -105,7 +113,15 @@ impl methods::LayoutMethod for Method {
     }
 }
 
-fn clean_by_angle(points: Vec<Point>, center: &Point, normal: &GeoVector, split_count: u32) -> layout::ProcResult<Vec<Point>> {
+/// Clean a set of points by angle.
+fn clean_by_angle(
+    points: Vec<Point>,
+    center: Point,
+    normal: GeoVector,
+    point_normals: Vec<GeoVector>,
+    point_radial_tangents: Vec<GeoVector>,
+    split_count: u32,
+) -> layout::ProcResult<layout::Coil> {
     
     if split_count < 3 {
         layout::err_str("Split count must be at least 3")?;
@@ -114,37 +130,38 @@ fn clean_by_angle(points: Vec<Point>, center: &Point, normal: &GeoVector, split_
         layout::err_str("Not enough points to clean by angle")?;
     }
 
+    // Check that the point lists are the correct length
+    if points.len() != point_normals.len() || points.len() != point_radial_tangents.len() {
+        layout::err_str(&format!("clean_by_angle: Point list (length: {0}) must be the same length as the normal list ({1}) and radial tangent list ({2})!",
+            points.len(), point_normals.len(), point_radial_tangents.len()))?;
+    }
+
     // Initialize the angle bins
     let angle_step: Angle = 2.0 * PI / split_count as Angle;
     let mut bin_error: Vec<Angle> = vec![angle_step; split_count as usize];
-    let mut binned_points: Vec<Option<Point>> = Vec::with_capacity(split_count as usize);
-    for _ in 0..split_count {
-        binned_points.push(None);
-    }
+    let mut binned_points: Vec<Option<usize>> = vec![None as Option<usize>; split_count as usize];
 
     let angle_to_normal = |point: &Point| {
-        let angle = normal.angle_to(&GeoVector::new_from_points(center, point));
+        let angle = normal.angle_to(&(*point - center));
         (PI / 2.0 - angle.abs()).abs()
     };
 
     // Pick a starting zero-angle direction by finding the point most perpendicular to the normal
-    let zero_angle_vector = GeoVector::new_from_points(
-        center, 
-        match points.iter().min_by(|a, b| {angle_to_normal(a).total_cmp(&angle_to_normal(b))}) {
+    let zero_angle_vector =         
+        *match points.iter().min_by(|a, b| {angle_to_normal(a).total_cmp(&angle_to_normal(b))}) {
             Some(point) => point,
             None => layout::err_str("Math error: clean_by_angle, no minimum point found")?,
-        }
-    );
+        } - center;
 
     // Iteratively bin the points
-    for point in points.iter() {
+    for (point_id, point) in points.iter().enumerate() {
         // Find the angle of the point relative to the zero-angle direction
-        let vector_to_point = GeoVector::new_from_points(center, point);
+        let vector_to_point = *point - center;
         let flattened_vector = vector_to_point.proj_onto(&normal) - vector_to_point;
         let mut angle = zero_angle_vector.angle_to(&flattened_vector);
 
         // Check if the angle is in the correct direction
-        if flattened_vector.cross(&zero_angle_vector).dot(normal) < 0.0 {
+        if flattened_vector.cross(&zero_angle_vector).dot(&normal) < 0.0 {
             angle = (2.0 * PI) - angle;
         }
 
@@ -156,7 +173,7 @@ fn clean_by_angle(points: Vec<Point>, center: &Point, normal: &GeoVector, split_
         let error = (angle - bin_id as Angle * angle_step).abs();
         if error < bin_error[bin_id] {
             bin_error[bin_id] = error;
-            binned_points[bin_id] = Some(point.dup());
+            binned_points[bin_id] = Some(point_id);
         }
 
         // Optional debug: print the bins
@@ -169,18 +186,19 @@ fn clean_by_angle(points: Vec<Point>, center: &Point, normal: &GeoVector, split_
     }
 
     // Unwrap the points
-    let mut out_points: Vec<Point> = binned_points.into_iter().map(|p| p.unwrap()).collect();
+    let mut out_points = Vec::<Point>::new();
+    let mut out_normals = Vec::<GeoVector>::new();
+    let mut out_radial_tangents = Vec::<GeoVector>::new();
 
-    // Construct the adjacency list
-    let length = split_count as usize;
-
-    out_points[0].adj = vec![length-1, 1];
-    for (pid, point) in out_points.iter_mut().enumerate().skip(1).take(length-2) {
-        point.adj = vec![pid-1, pid+1];
+    for id in binned_points.iter() {
+        let point_id = id.unwrap();
+        out_points.push(points[point_id]);
+        out_normals.push(point_normals[point_id]);
+        out_radial_tangents.push(point_radial_tangents[point_id]);
     }
-    out_points[length-1].adj = vec![length-2, 0];
 
-    Ok(out_points)
+    // Construct and output the coil
+    Ok(layout::Coil::new(center, normal, out_points, out_normals, out_radial_tangents)?)
 }
 
 #[cfg(test)]
