@@ -55,19 +55,11 @@ impl Coil {
         center: Point,
         normal: GeoVector,
         points: Vec<Point>,
-        point_normals: Vec<GeoVector>,
-        point_radial_tangents: Vec<GeoVector>,
     ) -> ProcResult<Self>{
 
         // Check that there are at least 3 points
         if points.len() < 3 {
             err_str("Coil must have at least 3 points!")?;
-        }
-
-        // Check that the point lists are the correct length
-        if points.len() != point_normals.len() || points.len() != point_radial_tangents.len() {
-            err_str(&format!("Point list (length: {0}) must be the same length as the normal list ({1}) and radial tangent list ({2})!",
-                points.len(), point_normals.len(), point_radial_tangents.len()))?;
         }
 
         // Connect the points
@@ -77,16 +69,11 @@ impl Coil {
             let next_id = (point_id + 1) % points.len();
             let prev_id = (point_id + points.len() - 1) % points.len();
 
-            let normal = point_normals[point_id];
-            let radial_tangent = point_radial_tangents[point_id];
-
             coil_points.push(CoilPoint{
                 point: point.clone(),
                 id: point_id,
                 next_id,
                 prev_id,
-                normal,
-                radial_tangent,
             });
         }
 
@@ -101,8 +88,6 @@ pub struct CoilPoint {
     pub id: usize,
     pub next_id: usize,
     pub prev_id: usize,
-    pub normal: GeoVector,
-    pub radial_tangent: GeoVector,
 }
 
 /// Run the layout process.

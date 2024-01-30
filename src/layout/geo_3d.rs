@@ -70,6 +70,13 @@ impl Add<GeoVector> for Point {
         }
     }
 }
+impl AddAssign<GeoVector> for Point {
+    fn add_assign(&mut self, rhs: GeoVector) {
+        self.x += rhs.x;
+        self.y += rhs.y;
+        self.z += rhs.z;
+    }
+}
 impl Sub<GeoVector> for Point {
     type Output = Self;
 
@@ -79,6 +86,13 @@ impl Sub<GeoVector> for Point {
             y: self.y - rhs.y,
             z: self.z - rhs.z,
         }
+    }
+}
+impl SubAssign<GeoVector> for Point {
+    fn sub_assign(&mut self, rhs: GeoVector) {
+        self.x -= rhs.x;
+        self.y -= rhs.y;
+        self.z -= rhs.z;
     }
 }
 impl Sub<Point> for Point {
@@ -163,6 +177,26 @@ impl GeoVector {
             y: dot * other.y / mag,
             z: dot * other.z / mag,
         }
+    }
+
+    /// Get the vector rejection of `self` onto `other`.
+    pub fn rej_onto(&self, other: &GeoVector) -> GeoVector {
+        *self - self.proj_onto(other)
+    }
+
+    /// Construct an xhat vector.
+    pub fn xhat() -> Self {
+        GeoVector{x: 1.0, y: 0.0, z: 0.0}
+    }
+
+    /// Construct a yhat vector.
+    pub fn yhat() -> Self {
+        GeoVector{x: 0.0, y: 1.0, z: 0.0}
+    }
+
+    /// Construct a zhat vector.
+    pub fn zhat() -> Self {
+        GeoVector{x: 0.0, y: 0.0, z: 1.0}
     }
 }
 impl Add for GeoVector {
