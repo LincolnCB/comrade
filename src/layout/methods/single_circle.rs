@@ -5,32 +5,48 @@ use crate::{
 use layout::methods;
 use layout::geo_3d::*;
 
+use serde::{Serialize, Deserialize};
 use std::f32::consts::PI;
 
 /// Single Circle Method struct.
 /// This struct contains all the parameters for the Single Circle layout method.
 #[derive(Debug)]
-#[allow(dead_code)]
 pub struct Method {
     /// Arguments for the Single Circle method.
     method_args: MethodArgs,
 }
-
-/// TODO: Deserialize from yaml cfg file
-#[derive(Debug)]
-struct MethodArgs {
-    coil_radius: f32,
-    epsilon: f32,
-    section_count: u32,
-}
-
 impl Method {
     pub fn new() -> args::ProcResult<Self> {
-        Ok(Method{method_args: MethodArgs{
-            coil_radius: 5.0,
-            epsilon: 0.15,
-            section_count: 32,
-        }})
+        Ok(Method{method_args: MethodArgs::default()})
+    }
+}
+
+/// Deserializer from yaml arg file
+#[derive(Debug, Serialize, Deserialize)]
+struct MethodArgs {
+    #[serde(default = "MethodArgs::default_radius", alias = "radius")]
+    coil_radius: f32,
+    #[serde(default = "MethodArgs::default_epsilon")]
+    epsilon: f32,
+    #[serde(default = "MethodArgs::default_section_count", alias = "sections")]
+    section_count: u32,
+}
+impl MethodArgs {
+    pub fn default_radius() -> f32 {
+        5.0
+    }
+    pub fn default_epsilon() -> f32 {
+        0.15
+    }
+    pub fn default_section_count() -> u32 {
+        32
+    }
+    pub fn default() -> Self {
+        MethodArgs{
+            coil_radius: Self::default_radius(),
+            epsilon: Self::default_epsilon(),
+            section_count: Self::default_section_count(),
+        }
     }
 }
 
@@ -41,9 +57,9 @@ impl methods::LayoutMethod for Method {
     }
 
     /// Parse the layout method argument file
-    #[allow(unused_variables)]
     fn parse_method_args(&mut self, arg_file: &str) -> args::ProcResult<()>{
-        // TODO: Deserialize here
+        let f = crate::io::open(arg_file)?;
+        self.method_args = serde_yaml::from_reader(f)?;
         Ok(())
     }
 

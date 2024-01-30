@@ -6,32 +6,43 @@ use crate::{
 use mesh::methods;
 use layout::geo_3d::*;
 
-use std::f32::consts::PI;
+use serde::{Serialize, Deserialize};
 use std::fs::OpenOptions;
+use std::f32::consts::PI;
 
 /// STL Polygons Method struct.
 /// This struct contains all the parameters for the STL Polygons meshing method.
 #[derive(Debug)]
-#[allow(dead_code)]
 pub struct Method {
     /// Arguments for the STL Polygons method.
     method_args: MethodArgs,
 }
-
-/// TODO: Expand to actually parse argfile
-#[derive(Debug)]
-struct MethodArgs {
-    radius: f32,
-    poly_num: usize,
-}
-
 impl Method {
     pub fn new() -> args::ProcResult<Self> {
-        Ok(Method{method_args: MethodArgs{
-            radius: 0.3,
-            // TODO: Make sure polynum is over 3
-            poly_num: 8,
-        }})
+        Ok(Method{method_args: MethodArgs::default()})
+    }
+}
+
+/// Deserializer from yaml arg file
+#[derive(Debug, Serialize, Deserialize)]
+struct MethodArgs {
+    #[serde(default = "MethodArgs::default_radius", alias = "wire_radius")]
+    radius: f32,
+    #[serde(default = "MethodArgs::default_poly_num")]
+    poly_num: usize,
+}
+impl MethodArgs {
+    pub fn default_radius() -> f32 {
+        0.3
+    }
+    pub fn default_poly_num() -> usize {
+        8
+    }
+    pub fn default() -> Self {
+        MethodArgs{
+            radius: Self::default_radius(),
+            poly_num: Self::default_poly_num(),
+        }
     }
 }
 
@@ -42,9 +53,9 @@ impl methods::MeshMethod for Method {
     }
 
     /// Parse the meshing method argument file
-    #[allow(unused_variables)]
     fn parse_method_args(&mut self, arg_file: &str) -> args::ProcResult<()>{
-        // TODO: Deserialize here
+        let f = crate::io::open(arg_file)?;
+        self.method_args = serde_yaml::from_reader(f)?;
         Ok(())
     }
 
@@ -73,21 +84,6 @@ impl methods::MeshMethod for Method {
                 if point.adj.len() != 2 {
                     mesh::err_str(&format!("Coil point {point} has wrong number of adjacent points {}", point.adj.len()))?;
                 }
-
-                // let prev_point = &coil.points[point.adj[0]];
-                // let next_point = &coil.points[point.adj[1]];
-
-                // let mut vec1 = GeoVector::new_from_points(prev_point, point);
-                // let mut vec2 = GeoVector::new_from_points(next_point, point);
-
-                // vec1.normalize();
-                // vec2.normalize();
-
-                // let mut out_vec = vec1 + vec2;
-                // out_vec.normalize();
-
-                // let mut up_vec = vec1.cross(&vec2);
-                // up_vec.normalize();
 
                 let mut out_vec = GeoVector::new_from_points(&coil.center, point);
                 out_vec.normalize();
@@ -143,41 +139,33 @@ impl methods::MeshMethod for Method {
             // Save each coil to a separate file
             let numbered_output_path = output_path.replace(".stl", &format!("_c{}.stl", coil_n));
             println!("Saving coil {} to {}...", coil_n, numbered_output_path);
-            let mut file = match OpenOptions::new().write(true).create(true).open(&numbered_output_path)
-            {
-                Ok(file) => file,
-                Err(error) => {
-                    return Err(crate::io::IoError{file: numbered_output_path.to_string(), cause: error}.into());
-                },
-            };
-            match stl_io::write_stl(&mut file, triangles.iter())
-            {
-                Ok(_) => (),
-                Err(error) => {
-                    return Err(crate::io::IoError{file: numbered_output_path.to_string(), cause: error}.into());
-                },
-            };
+            save_stl(&triangles, &numbered_output_path)?;
         }
 
         // Save a full set of coils (often just for visualization)
         println!("Saving full array to {}", output_path);
-        let mut file = match OpenOptions::new().write(true).create(true).open(&output_path)
-        {
-            Ok(file) => file,
-            Err(error) => {
-                return Err(crate::io::IoError{file: output_path.to_string(), cause: error}.into());
-            },
-        };
-        match stl_io::write_stl(&mut file, full_triangles.iter())
-        {
-            Ok(_) => (),
-            Err(error) => {
-                return Err(crate::io::IoError{file: output_path.to_string(), cause: error}.into());
-            },
-        };
+        save_stl(&full_triangles, output_path)?;
 
         Ok(())
     }
+}
+
+fn save_stl(triangles: &Vec<stl_io::Triangle>, output_path: &str) -> mesh::ProcResult<()> {
+    let mut file = match OpenOptions::new().write(true).create(true).open(&output_path)
+    {
+        Ok(file) => file,
+        Err(error) => {
+            return Err(crate::io::IoError{file: output_path.to_string(), cause: error}.into());
+        },
+    };
+    match stl_io::write_stl(&mut file, triangles.iter())
+    {
+        Ok(_) => (),
+        Err(error) => {
+            return Err(crate::io::IoError{file: output_path.to_string(), cause: error}.into());
+        },
+    };
+    Ok(())
 }
 
 /// Helper function for triangle construction.

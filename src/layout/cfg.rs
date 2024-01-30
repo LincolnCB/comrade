@@ -1,5 +1,8 @@
 use crate::args;
-use crate::layout::LayoutChoice;
+use crate::layout::{
+    LayoutChoice,
+    LayoutMethod,
+};
 use serde::{Serialize, Deserialize};
 
 /// Arguments for the layout process.
@@ -8,6 +11,9 @@ pub struct LayoutArgs {
     /// Layout method.
     #[serde(rename = "method")]
     pub method_name: String,
+
+    /// Layout method argfile.
+    pub argfile: String,
 
     /// Input path for the STL file.
     #[serde(alias = "input", alias = "in", alias = "i")]
@@ -35,7 +41,7 @@ impl LayoutTarget {
         let f = crate::io::open(cfg_file)?;
         let mut layout_args: LayoutArgs = serde_yaml::from_reader(f)?;
         
-        let layout_method = LayoutChoice::from_name(&layout_args.method_name)?;
+        let mut layout_method = LayoutChoice::from_name(&layout_args.method_name)?;
 
         // Check that the input path is a supported filetype (TODO: expand types)
         if !layout_args.input_path.ends_with(".stl") {
@@ -61,6 +67,9 @@ impl LayoutTarget {
                 args::err_str("Layout output path not specified, but saving is required at the last stage")?;
             }
         }
+
+        // Parse the method-specific arguments
+        layout_method.parse_method_args(&layout_args.argfile)?;
 
         Ok(LayoutTarget{layout_method, layout_args})
     }

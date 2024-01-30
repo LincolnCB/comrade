@@ -1,5 +1,8 @@
 use crate::args;
-use crate::mesh::MeshChoice;
+use crate::mesh::{
+    MeshChoice,
+    MeshMethod,
+};
 use serde::{Serialize, Deserialize};
 
 /// Arguments for the mesh process.
@@ -8,6 +11,9 @@ pub struct MeshArgs {
     /// Meshing method.
     #[serde(rename = "method")]
     pub method_name: String,
+
+    /// Meshing method argfile.
+    pub argfile: String,
 
     /// Input path for the layout file (must be json).
     #[serde(default, alias = "input", alias = "in", alias = "i")]
@@ -35,7 +41,7 @@ impl MeshTarget {
         let f = crate::io::open(cfg_file)?;
         let mut mesh_args: MeshArgs = serde_yaml::from_reader(f)?;
         
-        let mesh_method = MeshChoice::from_name(&mesh_args.method_name)?;
+        let mut mesh_method = MeshChoice::from_name(&mesh_args.method_name)?;
 
         // Check the input path
         if is_first {
@@ -58,6 +64,9 @@ impl MeshTarget {
         let _ = crate::io::create(&mesh_args.output_path)?;
 
         mesh_args.save |= is_last;
+
+        // Parse the method-specific arguments
+        mesh_method.parse_method_args(&mesh_args.argfile)?;
 
         Ok(MeshTarget{mesh_method, mesh_args})
     }
