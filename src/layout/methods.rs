@@ -16,6 +16,9 @@ use crate::{
     args,
 };
 
+// Some helpful method examples
+pub mod helper;
+
 //
 // ------------------------------------------------------------
 // Code that requires modification to add a new layout method
