@@ -1,3 +1,7 @@
 coil_radius: 5.0
 epsilon: 0.15
 pre_shift: false
+center:
+  x: -1.305
+  y: 1.6107
+  z: 29.919

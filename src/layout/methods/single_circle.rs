@@ -24,6 +24,7 @@ impl Method {
 /// Deserializer from yaml arg file
 #[derive(Debug, Serialize, Deserialize)]
 struct MethodArgs {
+    center: Point,
     #[serde(default = "MethodArgs::default_radius", alias = "radius")]
     coil_radius: f32,
     #[serde(default = "MethodArgs::default_epsilon")]
@@ -41,11 +42,15 @@ impl MethodArgs {
     pub fn default_pre_shift() -> bool {
         true
     }
+    pub fn default_center() -> Point {
+        Point::new(-1.305, 1.6107, 29.919)
+    }
     pub fn default() -> Self {
         MethodArgs{
             coil_radius: Self::default_radius(),
             epsilon: Self::default_epsilon(),
             pre_shift: Self::default_pre_shift(),
+            center: Self::default_center(),
         }
     }
 }
@@ -74,12 +79,9 @@ impl methods::LayoutMethod for Method {
         let coil_radius = self.method_args.coil_radius;
         let epsilon = self.method_args.epsilon;
         let pre_shift = self.method_args.pre_shift;
+        let center = self.method_args.center;
 
         println!("Coil 1/1...");
-
-        // TODO: Temporary hard code! 
-        // Move this to deserialization after first deserialization works
-        let center = Point::new(-1.305, 1.6107, 29.919);
 
         // Intersect the surface with a sphere
         let (cid, points, point_normals) = 
@@ -103,20 +105,30 @@ impl methods::LayoutMethod for Method {
     }
 }
 
+mod debug {
+    use super::*;
+
+        // Optional print for visualization
+        #[allow(dead_code)]
+        pub fn print_bins(bins: &Vec<Option<Point>>) {
+            print!("[");
+            for bin in bins.iter() {
+                match bin {
+                    Some(_) => print!("*"),
+                    None => print!("_"),
+                }
+            }
+            println!("]");
+        }
+    
+        #[allow(dead_code)]
+        pub fn dump_yaml(method: &Method) {
+            let s = serde_yaml::to_string(&method.method_args).unwrap();
+            println!("{}", s);
+        }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // Optional print for visualization
-    #[allow(dead_code)]
-    pub fn print_bins(bins: &Vec<Option<Point>>) {
-        print!("[");
-        for bin in bins.iter() {
-            match bin {
-                Some(_) => print!("*"),
-                None => print!("_"),
-            }
-        }
-        println!("]");
-    }
 }
