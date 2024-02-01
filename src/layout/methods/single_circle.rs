@@ -97,7 +97,7 @@ impl methods::LayoutMethod for Method {
             pre_shift,
         )?;
 
-        println!("Cleaned point count: {}", coil.points.len());
+        println!("Cleaned point count: {}", coil.vertices.len());
 
         layout_out.coils.push(coil);
 

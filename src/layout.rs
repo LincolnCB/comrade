@@ -6,6 +6,9 @@ mod stl;
 
 use serde::{Serialize, Deserialize};
 
+use std::f32::consts::PI;
+const MU0: f32 = 1.256637062 * 1e-3; // mu0 in uH/mm
+
 use geo_3d::*;
 
 // Re-export errors
@@ -46,7 +49,7 @@ impl Layout {
 pub struct Coil {
     pub center: Point,
     pub normal: GeoVector,
-    pub points: Vec<CoilPoint>,
+    pub vertices: Vec<CoilVertex>,
 }
 impl Coil {
     /// Create a new coil.
@@ -63,13 +66,13 @@ impl Coil {
         }
 
         // Connect the points
-        let mut coil_points = Vec::<CoilPoint>::new();
+        let mut coil_vertices = Vec::<CoilVertex>::new();
 
         for (point_id, point) in points.iter().enumerate() {
             let next_id = (point_id + 1) % points.len();
             let prev_id = (point_id + points.len() - 1) % points.len();
 
-            coil_points.push(CoilPoint{
+            coil_vertices.push(CoilVertex{
                 point: point.clone(),
                 id: point_id,
                 next_id,
@@ -77,13 +80,72 @@ impl Coil {
             });
         }
 
-        Ok(Coil{center, normal, points: coil_points})
+        Ok(Coil{center, normal, vertices: coil_vertices})
+    }
+
+    /// Calculate the mutual inductance between two coils, in uH.
+    /// dl is the maximum length infinitessimal approximation within a segment.
+    /// For example, for a wire segment of length 2.3 * dl,
+    /// there will be two segments of length dl and one of length 0.3 * dl.
+    /// This value will have no effect on the calculation if longer than a given segment length.
+    pub fn mutual_inductance(&self, other: &Coil, dl: f32) -> f32 {
+        let mut lambda = 0.0;
+        let dl_sq = dl * dl;
+
+        for vertex in self.vertices.iter() {
+            // Lay out the first coil segment
+            let p0 = vertex.point;
+            let p1 = self.vertices[vertex.next_id].point;
+            let np = (p1 - p0).normalize();
+            let dp = p0.distance(&p1);
+            let i_max = (dp / dl).ceil() as u32;
+            let dp_remainder = dp - (i_max as f32 - 1.0) * dl;
+            let dp_remainder_normalized = dp_remainder / dp;
+
+            for other_vertex in other.vertices.iter() {
+                // Lay out the second coil segment
+                let q0 = other_vertex.point;
+                let q1 = other.vertices[other_vertex.next_id].point;
+                let nq = (q1 - q0).normalize();
+                let dq = q0.distance(&q1);
+                let j_max = (dq / dl).ceil() as u32;
+                let dq_remainder = dq - (j_max as f32 - 1.0) * dl;
+                let dq_remainder_normalized = dq_remainder / dq;
+
+                // Get the dot product of the two normalized segments
+                let dot = np.dot(&nq);
+                let dl_sq_dot = dl_sq * dot;
+
+                // Iterate over sub-segments
+                for i in 0..i_max {
+                    let p = p0 + np * (i as f32 + 0.5) * dl;
+                    for j in 0..j_max {
+                        let q = q0 + nq * (j as f32 + 0.5) * dl;
+                        lambda += dl_sq_dot / p.distance(&q)
+                    }
+                    // Remainder for second segment
+                    let q = q0 + nq * (1.0 - 0.5 * dq_remainder_normalized);
+                    lambda += dl * dq_remainder * dot / p.distance(&q);
+                }
+                // Remainder for first segment
+                let p = p0 + np * (1.0 - 0.5 * dp_remainder_normalized);
+                for j in 0..j_max {
+                    let q = q0 + nq * (j as f32 + 0.5) * dl;
+                    lambda += dl * dp_remainder * dot / p.distance(&q);
+                }
+                // Remainder for both segments
+                let q = q0 + nq * (1.0 - 0.5 * dq_remainder_normalized);
+                lambda += dp_remainder * dq_remainder * dot / p.distance(&q); 
+            }
+        }
+        // Multiply by the constant factor of mu0/4pi. mu0 is already in units of uH/mm.
+        MU0 * lambda / (4.0 * PI)
     }
 }
 
 /// A point on a coil (includes adjacency and surface vectors).
 #[derive(Debug, Serialize, Deserialize)]
-pub struct CoilPoint {
+pub struct CoilVertex {
     pub point: Point,
     pub id: usize,
     pub next_id: usize,

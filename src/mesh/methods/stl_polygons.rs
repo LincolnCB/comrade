@@ -78,13 +78,13 @@ impl methods::MeshMethod for Method {
 
             // Create the corner slice polygons
             let mut corner_slices = Vec::<Vec::<Point>>::new();
-            for coil_point in coil.points.iter() {
+            for coil_vertex in coil.vertices.iter() {
                 let mut corner_slice = Vec::new();
 
-                let point = coil_point.point;
+                let point = coil_vertex.point;
                 let vec_to_point = (point - coil.center).normalize();
-                let prev_vec = (point - coil.points[coil_point.prev_id].point).normalize();
-                let next_vec = (coil.points[coil_point.next_id].point - point).normalize();
+                let prev_vec = (point - coil.vertices[coil_vertex.prev_id].point).normalize();
+                let next_vec = (coil.vertices[coil_vertex.next_id].point - point).normalize();
 
                 let up_vec = (prev_vec.cross(&vec_to_point).normalize() + next_vec.cross(&vec_to_point).normalize()).normalize();
                 let radial_vec = (point - coil.center).normalize();
@@ -101,8 +101,8 @@ impl methods::MeshMethod for Method {
             }
 
             // For each corner, mesh the section to the next corner
-            for (slice_id, coil_point) in coil.points.iter().enumerate() {
-                let next_slice_id = coil_point.next_id;
+            for (slice_id, coil_vertex) in coil.vertices.iter().enumerate() {
+                let next_slice_id = coil_vertex.next_id;
                 let slice = &corner_slices[slice_id];
                 let next_slice = &corner_slices[next_slice_id];
 
