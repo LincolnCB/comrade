@@ -165,6 +165,13 @@ impl GeoVector {
     pub fn angle_to(&self, other: &GeoVector) -> Angle {
         let dot = self.dot(other);
         let mag = self.mag() * other.mag();
+        // Catch float errors when vectors are exactly aligned
+        if (dot / mag) > 1.0 {
+            return 0.0;
+        }
+        if (dot / mag) < -1.0 {
+            return std::f32::consts::PI;
+        }
         (dot / mag).acos()
     }
 

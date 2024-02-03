@@ -1,0 +1,5 @@
+method: single_circle
+argfile: tests/cfg/step_test_single_sphere.yaml
+input: tests/data/10mm_step.stl
+output: tests/out/single_step.json
+force_save: true

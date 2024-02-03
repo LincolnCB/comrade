@@ -1,0 +1,7 @@
+coil_radius: 30.0
+epsilon: 1.5
+pre_shift: true
+center:
+  x: 10
+  y: 0
+  z: 0.000000

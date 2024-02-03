@@ -92,8 +92,8 @@ impl methods::MeshMethod for Method {
 
                 // Put the polygon points around the plane given by the point and the out_vec/up_vec
                 for i in 0..self.method_args.poly_num {
-                    let angle = (i as Angle) * 2.0 * PI / (self.method_args.poly_num as Angle);
-                    let poly_point = point + out_vec * angle.cos() * self.method_args.radius + up_vec * angle.sin() * self.method_args.radius;
+                    let angle = 2.0 * PI * (i as Angle - 0.5) / (self.method_args.poly_num as Angle);
+                    let poly_point = point + out_vec * angle.sin() * self.method_args.radius - up_vec * angle.cos() * self.method_args.radius;
                     corner_slice.push(poly_point);
                 }
 

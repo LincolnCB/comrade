@@ -1,0 +1,4 @@
+method: stl_polygons
+argfile: tests/cfg/step_test_poly.yaml
+input: tests/out/single_step.json
+output: tests/out/single_step.stl

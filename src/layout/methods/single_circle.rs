@@ -4,7 +4,7 @@ use crate::{
 };
 use layout::methods;
 use layout::geo_3d::*;
-use methods::helper::{sphere_intersect, clean_by_filter};
+use methods::helper::{sphere_intersect, clean_by_angle};
 
 use serde::{Serialize, Deserialize};
 
@@ -91,7 +91,7 @@ impl methods::LayoutMethod for Method {
 
         println!("Uncleaned point count: {}", points.len());
 
-        let coil = clean_by_filter(
+        let coil = clean_by_angle(
             center, coil_normal, coil_radius,
             points, point_normals,
             pre_shift,
