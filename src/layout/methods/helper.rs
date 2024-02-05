@@ -126,7 +126,7 @@ pub fn bin_by_angle(
     }
 
     // Construct and output the coil
-    Ok(layout::Coil::new(center, normal, out_points)?)
+    Ok(layout::Coil::new(center, normal, out_points, out_normals)?)
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -346,7 +346,7 @@ pub fn clean_by_angle(
             if angle_pair.theta - prev_angle_pair.theta > PI {
                 prev_angle_pair.theta += 2.0 * PI;
             }
-            
+
             if next_angle_pair.theta - angle_pair.theta > PI {
                 next_angle_pair.theta -= 2.0 * PI;
             }
@@ -395,7 +395,7 @@ pub fn clean_by_angle(
         points.push(point);
     }
 
-    Ok(layout::Coil::new(center, normal, points)?)
+    Ok(layout::Coil::new(center, normal, points, new_normals)?)
 }
 
 mod debug {

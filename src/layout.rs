@@ -58,11 +58,17 @@ impl Coil {
         center: Point,
         normal: GeoVector,
         points: Vec<Point>,
+        point_normals: Vec<GeoVector>,
     ) -> ProcResult<Self>{
 
         // Check that there are at least 3 points
         if points.len() < 3 {
             err_str("Coil must have at least 3 points!")?;
+        }
+
+        // Check that the number of points and normals match
+        if points.len() != point_normals.len() {
+            err_str("Number of points and normals must match!")?;
         }
 
         // Connect the points
@@ -77,6 +83,7 @@ impl Coil {
                 id: point_id,
                 next_id,
                 prev_id,
+                normal: point_normals[point_id].clone(),
             });
         }
 
@@ -150,6 +157,7 @@ pub struct CoilVertex {
     pub id: usize,
     pub next_id: usize,
     pub prev_id: usize,
+    pub normal: GeoVector,
 }
 
 /// Run the layout process.

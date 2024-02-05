@@ -1,4 +1,4 @@
 method: stl_polygons
 argfile: tests/cfg/multi_step/stl_poly.yaml
-input: tests/out/manual_circles_step.json
-output: tests/out/manual_circles_step.stl
+input: tests/out/multi_step/array_layout.json
+output: tests/out/multi_step/array_mesh.stl

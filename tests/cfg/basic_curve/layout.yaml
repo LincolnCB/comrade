@@ -1,5 +1,5 @@
 method: single_circle
 argfile: tests/cfg/basic_curve/single_circle.yaml
 input: tests/data/tiny_cap_remesh.stl
-output: tests/out/layout_0.json
+output: tests/out/basic_curve/array_layout.json
 force_save: true

@@ -1,4 +1,4 @@
 method: stl_polygons
 argfile: tests/cfg/basic_curve/stl_poly.yaml
-input: tests/out/layout_0.json
-output: tests/out/mesh_0.stl
+input: tests/out/basic_curve/array_layout.json
+output: tests/out/basic_curve/array_mesh.stl
