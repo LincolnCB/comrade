@@ -82,13 +82,9 @@ impl methods::MeshMethod for Method {
                 let mut corner_slice = Vec::new();
 
                 let point = coil_vertex.point;
-                let vec_to_point = (point - coil.center).normalize();
-                let prev_vec = (point - coil.vertices[coil_vertex.prev_id].point).normalize();
-                let next_vec = (coil.vertices[coil_vertex.next_id].point - point).normalize();
 
-                let up_vec = (prev_vec.cross(&vec_to_point).normalize() + next_vec.cross(&vec_to_point).normalize()).normalize();
-                let radial_vec = (point - coil.center).normalize();
-                let out_vec = (radial_vec - radial_vec.proj_onto(&up_vec)).normalize();
+                let up_vec = coil_vertex.normal.normalize();
+                let out_vec = (point - coil.center).rej_onto(&up_vec).normalize();
 
                 // Put the polygon points around the plane given by the point and the out_vec/up_vec
                 for i in 0..self.method_args.poly_num {
