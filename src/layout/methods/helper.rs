@@ -129,6 +129,13 @@ pub fn bin_by_angle(
     Ok(layout::Coil::new(center, normal, out_points)?)
 }
 
+#[derive(Debug, Clone, Copy)]
+struct AngleFormat {
+    theta: Angle,
+    phi: Angle,
+    point_id: usize,
+}
+
 /// Clean a set of points by filtering
 #[allow(dead_code)]
 pub fn clean_by_angle(
@@ -139,7 +146,6 @@ pub fn clean_by_angle(
     point_normals: Vec<GeoVector>,
     pre_shift: bool,
 ) -> layout::ProcResult<layout::Coil> {
-
     if points.len() < 3 {
         layout::err_str("Not enough points to clean by angle")?;
     }
@@ -152,35 +158,33 @@ pub fn clean_by_angle(
 
     let normal = normal.normalize();
 
-    let mut angles = vec![[0.0, 0.0] as [Angle; 2]; points.len()];
-
+    
     // Shift points along the surface tangent to the right radius
     if pre_shift {
         for (point_id, point) in points.iter_mut().enumerate() {
             let vec_to_point = (*point - center).normalize();
             let radial_tangent = vec_to_point.rej_onto(&point_normals[point_id]).normalize();
             let r_err = radius - point.distance(&center);
-
+            
             let angle = radial_tangent.angle_to(&vec_to_point);
-
+            
             if (angle - PI / 2.0).abs() < 0.1 {
                 continue;
                 // layout::err_str(&format!("Point {} {} is at too harsh an angle relative to the coil normal \
                 //     (centered at {}, normal {}). Try setting pre_shift to false.",
                 //     point_id, point, center, normal))?;
             }
-
+            
             let test_point = *point + r_err * radial_tangent / angle.cos();
             if test_point.x.is_nan() || test_point.y.is_nan() || test_point.z.is_nan() {
                 layout::err_str(&format!("BUG! Point {} {} shifted to NaN (centered at {}, normal {}, angle {}).",
                     point_id, point, center, normal, angle))?;
-            }
-
-            *point += r_err * radial_tangent / angle.cos();
+                }
+                
+                *point += r_err * radial_tangent / angle.cos();
         }
-    }
-        
-
+    } 
+    
     // Calculate the angles
     // Get a reference zero-angle vector in the plane of the coil
     // Project the zhat vector onto the plane of the coil for this
@@ -192,26 +196,37 @@ pub fn clean_by_angle(
         GeoVector::xhat().rej_onto(&normal).normalize()
     };
     let pi2_theta_vec = zero_theta_vec.cross(&normal).normalize();
-      
+    
     // Convert each point to a pair of angles
+    // Store the point_id for normals sorting
+    let mut angles = Vec::<AngleFormat>::with_capacity(points.len());
     for (point_id, point) in points.iter().enumerate() {
+        let mut angle_pair = AngleFormat {
+            theta: 0.0,
+            phi: 0.0,
+            point_id,
+        };
+
         let vec_to_point = *point - center;
         let flat_vec = vec_to_point.rej_onto(&normal).normalize();
 
-        angles[point_id][0] = zero_theta_vec.angle_to(&flat_vec);
+        angle_pair.theta = zero_theta_vec.angle_to(&flat_vec);
         if flat_vec.cross(&zero_theta_vec).dot(&normal) < 0.0 {
-            angles[point_id][0] = (2.0 * PI) - angles[point_id][0];
+            angle_pair.theta = (2.0 * PI) - angle_pair.theta;
         }
 
-        angles[point_id][1] = normal.angle_to(&vec_to_point);
+        angle_pair.phi = normal.angle_to(&vec_to_point);
+
+        angles.push(angle_pair);
     }
 
-    angles.sort_by(|a, b| a[0].total_cmp(&b[0]));
+    angles.sort_by(|a, b| a.theta.total_cmp(&b.theta));
 
     // TODO: Edge detection and reordering
     // TODO: Calculate theta from point selection epsilon
     // TODO: Make edge_buffer a variable
     // TODO: Handle edges that go around the start/end of the list
+    println!("Detecting edges...");
     let angle_eps = 0.005;
     let edge_buffer = 2;
     let mut in_edge = false;
@@ -221,16 +236,15 @@ pub fn clean_by_angle(
     let mut edges = Vec::<(usize, usize)>::new();
     for (pid, angle_pair) in angles.iter().enumerate() {
         let prev_pair = &angles[prev_id];
-        // let total_angle = (angle_pair[0] * angle_pair[0] + angle_pair[1] * angle_pair[1]).sqrt();
 
         if !in_edge {
-            if (angle_pair[0] - prev_pair[0]).abs() < angle_eps && angle_pair[1] - prev_pair[1] > angle_eps {
+            if (angle_pair.theta - prev_pair.theta).abs() < angle_eps && angle_pair.phi - prev_pair.phi > angle_eps {
                 in_edge = true;
                 edge_start = (prev_id + angles.len() - edge_buffer) % angles.len();
             }
         }
         else {
-            if (angle_pair[0] - prev_pair[0]).abs() > angle_eps && angle_pair[1] - prev_pair[1] < angle_eps {
+            if (angle_pair.theta - prev_pair.theta).abs() > angle_eps && angle_pair.phi - prev_pair.phi < angle_eps {
                 in_edge = false;
                 edge_end = (pid + edge_buffer) % angles.len();
                 edges.push((edge_start, edge_end));
@@ -242,49 +256,49 @@ pub fn clean_by_angle(
 
     // Merge edges
     // TODO: Handle edges that go around the start/end of the list
-    println!("Edges: {:?}", edges);
-    let mut merged_edges = Vec::<(usize, usize)>::new();
-    let mut edge = edges[0].clone();
-    for i in 0..edges.len() {
-        if i < edges.len() - 1 {
-            let next_edge = edges[i + 1].clone();
-            if edge.1 > next_edge.0 {
-                edge.1 = next_edge.1;
-                continue;
+    if edges.len() > 1 {
+        println!("Merging edges...");
+        let mut merged_edges = Vec::<(usize, usize)>::new();
+        let mut edge = edges[0].clone();
+        for i in 0..edges.len() {
+            if i < edges.len() - 1 {
+                let next_edge = edges[i + 1].clone();
+                if edge.1 > next_edge.0 {
+                    edge.1 = next_edge.1;
+                    continue;
+                }
+                else {
+                    merged_edges.push(edge);
+                    edge = next_edge;
+                }
             }
             else {
                 merged_edges.push(edge);
-                edge = next_edge;
             }
         }
-        else {
-            merged_edges.push(edge);
-        }
+        edges = merged_edges;
     }
-    println!("Merged edges: {:?}", merged_edges);
-    edges = merged_edges;
         
     // Reorder within the edges
     let anchor_buffer = 3;
     let mut i: usize = 0;
-    let l1_angle = |a1: &[Angle; 2], a2: &[Angle; 2]| -> f32 {
-        let dtheta = (a1[0] - a2[0]).abs();
-        let dphi = (a1[1] - a2[1]).abs();
+    let l1_angle = |a1: &AngleFormat, a2: &AngleFormat| -> f32 {
+        let dtheta = (a1.theta - a2.theta).abs();
+        let dphi = (a1.phi - a2.phi).abs();
         dtheta + dphi
     };
     if edges.len() > 0 {
-        let mut new_angles = Vec::<[Angle; 2]>::new();
+        let mut new_angles = Vec::<AngleFormat>::new();
         for edge in edges.iter() {
             let (start, end) = edge;
             let start = *start;
             let end = *end;
-            let start_anchor = angles[if start > anchor_buffer { start - anchor_buffer } else { 0 }];
-            // let end_anchor = angles[if end < angles.len() - 3 { end + 3 } else { angles.len() - 1 }];
-            let mut sorted_edge = Vec::<[Angle; 2]>::new();
+            let anchor = angles[if start > anchor_buffer { start - anchor_buffer } else { 0 }];
+            let mut sorted_edge = Vec::<AngleFormat>::new();
             for j in start..end {
                 sorted_edge.push(angles[j]);
             }
-            sorted_edge.sort_by(|a, b| l1_angle(&a, &start_anchor).total_cmp(&l1_angle(&b, &start_anchor)));
+            sorted_edge.sort_by(|a, b| l1_angle(&a, &anchor).total_cmp(&l1_angle(&b, &anchor)));
 
             if i < start {
                 new_angles.extend_from_slice(&angles[i..start]);
@@ -302,32 +316,57 @@ pub fn clean_by_angle(
         angles = new_angles;
     }
 
+    // Reorder the normals to match the points
+    let mut new_normals = Vec::<GeoVector>::new();
+    for angle_pair in angles.iter() {
+        new_normals.push(point_normals[angle_pair.point_id]);
+    }
+
+    // Smooth the angles by averaging with neighbors
+    // Smooth the normals as well
     // TODO: Make smooth count a variable
     let smooth_count = 2;
     for _ in 0..smooth_count {
+        let mut prev_i = angles.len() - 1;
+        let mut next_i = 1;
         for i in 0..angles.len() {
+            // Grab the angles and normals
             let mut angle_pair = angles[i];
-            let mut prev_angle_pair = if i > 0 { angles[i - 1] } else { angles[angles.len() - 1] };
-            let mut next_angle_pair = if i < angles.len() - 1 { angles[i + 1] } else { angles[0] };
+            let mut prev_angle_pair = angles[prev_i];
+            let mut next_angle_pair = angles[next_i];
+
+            let mut point_normal = new_normals[i];
+            let prev_normal = new_normals[prev_i];
+            let next_normal = new_normals[next_i];
             
-            if prev_angle_pair[0] - angle_pair[0] > PI {
-                prev_angle_pair[0] -= 2.0 * PI;
+            // Account for angles that wrap around
+            if prev_angle_pair.theta - angle_pair.theta > PI {
+                prev_angle_pair.theta -= 2.0 * PI;
             }
-            if angle_pair[0] - prev_angle_pair[0] > PI {
-                prev_angle_pair[0] += 2.0 * PI;
+            if angle_pair.theta - prev_angle_pair.theta > PI {
+                prev_angle_pair.theta += 2.0 * PI;
             }
-    
-            if next_angle_pair[0] - angle_pair[0] > PI {
-                next_angle_pair[0] -= 2.0 * PI;
+            
+            if next_angle_pair.theta - angle_pair.theta > PI {
+                next_angle_pair.theta -= 2.0 * PI;
             }
-            if angle_pair[0] - next_angle_pair[0] > PI {
-                next_angle_pair[0] += 2.0 * PI;
+            if angle_pair.theta - next_angle_pair.theta > PI {
+                next_angle_pair.theta += 2.0 * PI;
             }
-    
-            angle_pair[0] = (angle_pair[0] + prev_angle_pair[0] + next_angle_pair[0]) / 3.0;
-            angle_pair[1] = (angle_pair[1] + prev_angle_pair[1] + next_angle_pair[1]) / 3.0;
-    
+            
+            // Average the angles and normals
+            angle_pair.theta = (angle_pair.theta + prev_angle_pair.theta + next_angle_pair.theta) / 3.0;
+            angle_pair.phi = (angle_pair.phi + prev_angle_pair.phi + next_angle_pair.phi) / 3.0;
+            
+            point_normal = (point_normal + prev_normal + next_normal).normalize();
+
+            // Store the new angles and normals
             angles[i] = angle_pair;
+            new_normals[i] = point_normal;
+
+            // Update the indices
+            prev_i = i;
+            next_i = (i + 1) % angles.len();
         } 
     }
 
@@ -335,9 +374,9 @@ pub fn clean_by_angle(
     // Reconstruct the coil
     let mut points = Vec::<Point>::new();
 
-    for (pid, angle_pair) in angles.iter().enumerate() {
-        let theta = angle_pair[0];
-        let phi = angle_pair[1];
+    for (new_point_id, angle_pair) in angles.iter().enumerate() {
+        let theta = angle_pair.theta;
+        let phi = angle_pair.phi;
 
         let point = center + radius * (
                 phi.sin() * (zero_theta_vec * theta.cos() + pi2_theta_vec * theta.sin())
@@ -347,12 +386,31 @@ pub fn clean_by_angle(
         // NaN check
         if point.x.is_nan() || point.y.is_nan() || point.z.is_nan() {
             layout::err_str(&format!("BUG! helper::clean_by_angle \
-                Point {} {} constructed as NaN (centered at {}, normal {}, angles [{}, {}]).",
-                pid, point, center, normal, theta, phi))?;
+                Point {} {} (originally point {}) \
+                constructed as NaN (centered at {}, normal {}, angles [{}, {}]).",
+                new_point_id, point, angle_pair.point_id, 
+                center, normal, theta, phi))?;
         }
         
         points.push(point);
     }
 
     Ok(layout::Coil::new(center, normal, points)?)
+}
+
+mod debug {
+    use super::*;
+
+    // Optional print for visualization
+    #[allow(dead_code)]
+    pub fn print_bins(bins: &Vec<Option<Point>>) {
+        print!("[");
+        for bin in bins.iter() {
+            match bin {
+                Some(_) => print!("*"),
+                None => print!("_"),
+            }
+        }
+        println!("]");
+    }
 }

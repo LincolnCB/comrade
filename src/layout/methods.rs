@@ -28,6 +28,7 @@ pub mod helper;
 
 // Source files for the layout methods
 mod single_circle;
+mod manual_circles;
 
 /// Layout methods enum.
 /// To add a new method:
@@ -39,6 +40,8 @@ mod single_circle;
 pub enum LayoutChoice {
     /// Basic circular layout, based on Monika Sliwak's MATLAB prototype.
     SingleCircle(single_circle::Method),
+    /// Manual circles layout, for specifying multiple circles by hand.
+    ManualCircles(manual_circles::Method),
 }
 
 /// Layout construction array -- Written out in once place for easy modification.
@@ -47,10 +50,16 @@ pub enum LayoutChoice {
 /// add handling for its constructor here,
 /// and implement the `LayoutMethod` trait for it.
 const LAYOUT_TARGET_CONSTRUCTION: &[LayoutConstructor] = &[
-    // Example layout constructor.
+    // EXAMPLE:
+    // Single Circle layout constructor.
     LayoutConstructor{
         arg_name: "single_circle", 
         constructor: || {Ok(LayoutChoice::SingleCircle(single_circle::Method::new()?))},
+    },
+    // Manual Circles layout constructor.
+    LayoutConstructor{
+        arg_name: "manual_circles", 
+        constructor: || {Ok(LayoutChoice::ManualCircles(manual_circles::Method::new()?))},
     },
 ];
 
@@ -111,10 +120,13 @@ impl LayoutChoice {
 
         // If the arg_name is not found, return an error with the available methods
         let mut error_str = format!("Layout method not found: {arg_name}\n");
+        error_str.push_str("\n");
         error_str.push_str("Available methods:\n");
         for constructor in LAYOUT_TARGET_CONSTRUCTION.iter() {
             error_str.push_str(&format!("    {}\n", constructor.arg_name));
         }
+        error_str.push_str("\n");
+        error_str.push_str("New methods need to be added to src/layout/methods.rs");
         args::err_str(&error_str)
     }
 }

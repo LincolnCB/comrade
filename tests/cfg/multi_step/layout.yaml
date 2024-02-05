@@ -1,0 +1,5 @@
+method: manual_circles
+argfile: tests/cfg/multi_step/manual_circles.yaml
+input: tests/data/10mm_step.stl
+output: tests/out/manual_circles_step.json
+force_save: true

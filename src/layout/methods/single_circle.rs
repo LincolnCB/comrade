@@ -43,7 +43,7 @@ impl MethodArgs {
         true
     }
     pub fn default_center() -> Point {
-        Point::new(-1.305, 1.6107, 29.919)
+        Point::new(0.0, 0.0, 0.0)
     }
     pub fn default() -> Self {
         MethodArgs{
@@ -108,24 +108,11 @@ impl methods::LayoutMethod for Method {
 mod debug {
     use super::*;
 
-        // Optional print for visualization
-        #[allow(dead_code)]
-        pub fn print_bins(bins: &Vec<Option<Point>>) {
-            print!("[");
-            for bin in bins.iter() {
-                match bin {
-                    Some(_) => print!("*"),
-                    None => print!("_"),
-                }
-            }
-            println!("]");
-        }
-    
-        #[allow(dead_code)]
-        pub fn dump_yaml(method: &Method) {
-            let s = serde_yaml::to_string(&method.method_args).unwrap();
-            println!("{}", s);
-        }
+    #[allow(dead_code)]
+    pub fn dump_yaml(method: &Method) {
+        let s = serde_yaml::to_string(&method.method_args).unwrap();
+        println!("{}", s);
+    }
 }
 
 #[cfg(test)]
