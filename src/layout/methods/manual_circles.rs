@@ -77,9 +77,6 @@ impl methods::LayoutMethod for Method {
     /// Parse the layout method argument file
     fn parse_method_args(&mut self, arg_file: &str) -> args::ProcResult<()>{
         let f = crate::io::open(arg_file)?;
-
-        debug::dump_yaml(self);
-
         self.method_args = serde_yaml::from_reader(f)?;
         Ok(())
     }
