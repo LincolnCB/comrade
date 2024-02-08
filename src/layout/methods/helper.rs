@@ -45,9 +45,10 @@ pub fn sphere_intersect(
 
 /// Clean a set of points by angle.
 #[allow(dead_code)]
-pub fn bin_by_angle(
+pub fn clean_coil_by_bins(
     center: Point,
     normal: GeoVector,
+    wire_radius: f32,
     points: Vec<Point>,
     point_normals: Vec<GeoVector>,
     split_count: u32,
@@ -62,7 +63,7 @@ pub fn bin_by_angle(
 
     // Check that the point lists are the correct length
     if points.len() != point_normals.len() {
-        layout::err_str(&format!("clean_by_angle: Point list (length: {0}) must be the same length as the normal list ({1})",
+        layout::err_str(&format!("clean_coil_by_angle: Point list (length: {0}) must be the same length as the normal list ({1})",
             points.len(), point_normals.len()))?;
     }
 
@@ -80,7 +81,7 @@ pub fn bin_by_angle(
     let zero_angle_vector =         
         *match points.iter().min_by(|a, b| {angle_to_normal(a).total_cmp(&angle_to_normal(b))}) {
             Some(point) => point,
-            None => layout::err_str("Math error: clean_by_angle, no minimum point found")?,
+            None => layout::err_str("Math error: clean_coil_by_angle, no minimum point found")?,
         } - center;
 
     // Iteratively bin the points
@@ -126,7 +127,7 @@ pub fn bin_by_angle(
     }
 
     // Construct and output the coil
-    Ok(layout::Coil::new(center, normal, out_points, out_normals)?)
+    Ok(layout::Coil::new(center, normal, out_points, wire_radius, out_normals)?)
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -138,10 +139,11 @@ struct AngleFormat {
 
 /// Clean a set of points by filtering
 #[allow(dead_code)]
-pub fn clean_by_angle(
+pub fn clean_coil_by_angle(
     center: Point,
     normal: GeoVector,
     radius: f32,
+    wire_radius: f32,
     mut points: Vec<Point>,
     point_normals: Vec<GeoVector>,
     pre_shift: bool,
@@ -152,7 +154,7 @@ pub fn clean_by_angle(
 
     // Check that the point lists are the correct length
     if points.len() != point_normals.len() {
-        layout::err_str(&format!("clean_by_angle: Point list (length: {0}) must be the same length as the normal list ({1})",
+        layout::err_str(&format!("clean_coil_by_angle: Point list (length: {0}) must be the same length as the normal list ({1})",
             points.len(), point_normals.len()))?;
     }
 
@@ -385,7 +387,7 @@ pub fn clean_by_angle(
 
         // NaN check
         if point.x.is_nan() || point.y.is_nan() || point.z.is_nan() {
-            layout::err_str(&format!("BUG! helper::clean_by_angle \
+            layout::err_str(&format!("BUG! helper::clean_coil_by_angle \
                 Point {} {} (originally point {}) \
                 constructed as NaN (centered at {}, normal {}, angles [{}, {}]).",
                 new_point_id, point, angle_pair.point_id, 
@@ -395,7 +397,7 @@ pub fn clean_by_angle(
         points.push(point);
     }
 
-    Ok(layout::Coil::new(center, normal, points, new_normals)?)
+    Ok(layout::Coil::new(center, normal, points, wire_radius, new_normals)?)
 }
 
 mod debug {

@@ -1,0 +1,4 @@
+method: stl_polygons
+method_cfg: tests/cfg/multi_step/stl_poly.cfg
+input: tests/out/multi_step/array_layout.json
+output: tests/out/multi_step/array_mesh

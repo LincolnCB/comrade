@@ -12,8 +12,8 @@ pub struct LayoutArgs {
     #[serde(rename = "method")]
     pub method_name: String,
 
-    /// Layout method argfile.
-    pub argfile: String,
+    /// Layout method method_cfg.
+    pub method_cfg: String,
 
     /// Input path for the STL file.
     #[serde(alias = "input", alias = "in", alias = "i")]
@@ -28,6 +28,8 @@ pub struct LayoutArgs {
     pub save: bool,
 }
 
+/// Layout target struct.
+/// Contains the layout method and arguments.
 pub struct LayoutTarget {
     /// Layout method.
     pub layout_method: LayoutChoice,
@@ -37,7 +39,7 @@ pub struct LayoutTarget {
 
 impl LayoutTarget {
     /// Construct a layout target from a config file.
-    pub fn from_cfg(cfg_file: &str, is_last: bool) -> args::ProcResult<Self> {
+    pub fn from_argfile(cfg_file: &str, is_last: bool) -> args::ProcResult<Self> {
         let f = crate::io::open(cfg_file)?;
         let mut layout_args: LayoutArgs = serde_yaml::from_reader(f)?;
         
@@ -69,7 +71,7 @@ impl LayoutTarget {
         }
 
         // Parse the method-specific arguments
-        layout_method.parse_method_args(&layout_args.argfile)?;
+        layout_method.parse_method_cfg(&layout_args.method_cfg)?;
 
         Ok(LayoutTarget{layout_method, layout_args})
     }

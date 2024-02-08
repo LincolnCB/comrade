@@ -82,9 +82,9 @@ pub trait LayoutMethod {
     /// Get the arg_name of the layout method.
     fn get_method_name(&self) -> String;
     
-    /// Parse the layout method argument file (allows different arguments for different methods).
+    /// Parse the layout method config file (allows different arguments for different methods).
     /// Takes a `&str` with the path to the argument file.
-    fn parse_method_args(&mut self, arg_file: &str) -> args::ProcResult<()>;
+    fn parse_method_cfg(&mut self, method_cfg_file: &str) -> args::ProcResult<()>;
     
     /// Run the layout process with the given arguments.
     /// Uses the `layout` module.

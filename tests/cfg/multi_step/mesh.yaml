@@ -1,4 +1,0 @@
-method: stl_polygons
-argfile: tests/cfg/multi_step/stl_poly.yaml
-input: tests/out/multi_step/array_layout.json
-output: tests/out/multi_step/array_mesh.stl

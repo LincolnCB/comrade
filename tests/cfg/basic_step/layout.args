@@ -1,5 +1,5 @@
 method: single_circle
-argfile: tests/cfg/basic_step/single_circle.yaml
+method_cfg: tests/cfg/basic_step/single_circle.cfg
 input: tests/data/10mm_step.stl
 output: tests/out/basic_step/array_layout.json
 force_save: true

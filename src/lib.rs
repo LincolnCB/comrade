@@ -67,10 +67,10 @@ pub fn build_targets(cli_args : args::ComradeCli) -> ComradeResult<Targets>{
 
         match stage {
             args::RunStage::Layout => {
-                if let Some(layout_cfg) = &cli_args.layout_cfg {
-                    println!("Loading layout config file: {}...", layout_cfg);
-                    targets.layout_target = Some(layout::LayoutTarget::from_cfg(
-                        layout_cfg,
+                if let Some(layout_argfile) = &cli_args.layout_args {
+                    println!("Loading layout config file: {}...", layout_argfile);
+                    targets.layout_target = Some(layout::LayoutTarget::from_argfile(
+                        layout_argfile,
                         is_last
                     )?);
                 }
@@ -79,10 +79,10 @@ pub fn build_targets(cli_args : args::ComradeCli) -> ComradeResult<Targets>{
                 }
             },
             args::RunStage::Mesh => {
-                if let Some(mesh_cfg) = &cli_args.mesh_cfg {
-                    println!("Loading mesh config file: {}...", mesh_cfg);
-                    targets.mesh_target = Some(mesh::MeshTarget::from_cfg(
-                        mesh_cfg,
+                if let Some(mesh_argfile) = &cli_args.mesh_args {
+                    println!("Loading mesh config file: {}...", mesh_argfile);
+                    targets.mesh_target = Some(mesh::MeshTarget::from_argfile(
+                        mesh_argfile,
                         is_first,
                         is_last
                     )?);
@@ -92,8 +92,8 @@ pub fn build_targets(cli_args : args::ComradeCli) -> ComradeResult<Targets>{
                 }
             },
             args::RunStage::Sim => {
-                if let Some(sim_cfg) = &cli_args.sim_cfg {
-                    println!("Loading simulation config file: {}...", sim_cfg);
+                if let Some(sim_argfile) = &cli_args.sim_args {
+                    println!("Loading simulation config file: {}...", sim_argfile);
                     args::err_str("Simulation config not yet implemented!!!")?;
                 }
                 else {
@@ -101,8 +101,8 @@ pub fn build_targets(cli_args : args::ComradeCli) -> ComradeResult<Targets>{
                 }
             },
             args::RunStage::Match => {
-                if let Some(matching_cfg) = &cli_args.matching_cfg {
-                    println!("Loading matching config file: {}...", matching_cfg);
+                if let Some(matching_argfile) = &cli_args.matching_args {
+                    println!("Loading matching config file: {}...", matching_argfile);
                     args::err_str("Matching config not yet implemented!!!")?;
                 }
                 else {

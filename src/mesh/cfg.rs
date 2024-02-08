@@ -12,8 +12,8 @@ pub struct MeshArgs {
     #[serde(rename = "method")]
     pub method_name: String,
 
-    /// Meshing method argfile.
-    pub argfile: String,
+    /// Meshing method method_cfg.
+    pub method_cfg: String,
 
     /// Input path for the layout file (must be json).
     #[serde(default, alias = "input", alias = "in", alias = "i")]
@@ -37,7 +37,7 @@ pub struct MeshTarget {
 
 impl MeshTarget {
     /// Construct a mesh target from a config file.
-    pub fn from_cfg(cfg_file: &str, is_first: bool, is_last: bool) -> args::ProcResult<Self> {
+    pub fn from_argfile(cfg_file: &str, is_first: bool, is_last: bool) -> args::ProcResult<Self> {
         let f = crate::io::open(cfg_file)?;
         let mut mesh_args: MeshArgs = serde_yaml::from_reader(f)?;
         
@@ -57,16 +57,12 @@ impl MeshTarget {
             }
         }
 
-        // Check the output path
-        if !mesh_args.output_path.ends_with(".stl") {
-            args::err_str("Mesh output path must end with .stl")?;
-        }
-        let _ = crate::io::create(&mesh_args.output_path)?;
+        let _ = crate::io::create(&format!("{}.{}", &mesh_args.output_path, mesh_method.get_output_extension()))?;
 
         mesh_args.save |= is_last;
 
         // Parse the method-specific arguments
-        mesh_method.parse_method_args(&mesh_args.argfile)?;
+        mesh_method.parse_method_cfg(&mesh_args.method_cfg)?;
 
         Ok(MeshTarget{mesh_method, mesh_args})
     }

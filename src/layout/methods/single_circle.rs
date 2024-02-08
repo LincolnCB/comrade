@@ -4,7 +4,7 @@ use crate::{
 };
 use layout::methods;
 use layout::geo_3d::*;
-use methods::helper::{sphere_intersect, clean_by_angle};
+use methods::helper::{sphere_intersect, clean_coil_by_angle};
 
 use serde::{Serialize, Deserialize};
 
@@ -13,28 +13,33 @@ use serde::{Serialize, Deserialize};
 #[derive(Debug)]
 pub struct Method {
     /// Arguments for the Single Circle method.
-    method_args: MethodArgs,
+    method_args: MethodCfg,
 }
 impl Method {
     pub fn new() -> args::ProcResult<Self> {
-        Ok(Method{method_args: MethodArgs::default()})
+        Ok(Method{method_args: MethodCfg::default()})
     }
 }
 
-/// Deserializer from yaml arg file
+/// Deserializer from yaml method cfg file
 #[derive(Debug, Serialize, Deserialize)]
-struct MethodArgs {
+struct MethodCfg {
     center: Point,
-    #[serde(default = "MethodArgs::default_radius", alias = "radius")]
+    #[serde(default = "MethodCfg::default_coil_radius", alias = "radius")]
     coil_radius: f32,
-    #[serde(default = "MethodArgs::default_epsilon")]
+    #[serde(default = "MethodCfg::default_wire_radius")]
+    wire_radius: f32,
+    #[serde(default = "MethodCfg::default_epsilon")]
     epsilon: f32,
-    #[serde(default = "MethodArgs::default_pre_shift")]
+    #[serde(default = "MethodCfg::default_pre_shift")]
     pre_shift: bool,
 }
-impl MethodArgs {
-    pub fn default_radius() -> f32 {
+impl MethodCfg {
+    pub fn default_coil_radius() -> f32 {
         5.0
+    }
+    pub fn default_wire_radius() -> f32 {
+        0.645
     }
     pub fn default_epsilon() -> f32 {
         0.15
@@ -46,8 +51,9 @@ impl MethodArgs {
         Point::new(0.0, 0.0, 0.0)
     }
     pub fn default() -> Self {
-        MethodArgs{
-            coil_radius: Self::default_radius(),
+        MethodCfg{
+            coil_radius: Self::default_coil_radius(),
+            wire_radius: Self::default_wire_radius(),
             epsilon: Self::default_epsilon(),
             pre_shift: Self::default_pre_shift(),
             center: Self::default_center(),
@@ -61,9 +67,9 @@ impl methods::LayoutMethod for Method {
         "Single Circle".to_string()
     }
 
-    /// Parse the layout method argument file
-    fn parse_method_args(&mut self, arg_file: &str) -> args::ProcResult<()>{
-        let f = crate::io::open(arg_file)?;
+    /// Parse the layout method config file
+    fn parse_method_cfg(&mut self, method_cfg_file: &str) -> args::ProcResult<()>{
+        let f = crate::io::open(method_cfg_file)?;
         self.method_args = serde_yaml::from_reader(f)?;
         Ok(())
     }
@@ -77,6 +83,7 @@ impl methods::LayoutMethod for Method {
 
         // Grab arguments to save typing
         let coil_radius = self.method_args.coil_radius;
+        let wire_radius = self.method_args.wire_radius;
         let epsilon = self.method_args.epsilon;
         let pre_shift = self.method_args.pre_shift;
         let center = self.method_args.center;
@@ -91,8 +98,9 @@ impl methods::LayoutMethod for Method {
 
         println!("Uncleaned point count: {}", points.len());
 
-        let coil = clean_by_angle(
-            center, coil_normal, coil_radius,
+        let coil = clean_coil_by_angle(
+            center, coil_normal,
+            coil_radius, wire_radius,
             points, point_normals,
             pre_shift,
         )?;

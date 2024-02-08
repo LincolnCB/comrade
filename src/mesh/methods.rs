@@ -71,8 +71,11 @@ pub trait MeshMethod {
     /// Get the name of the meshing method.
     fn get_method_name(&self) -> String;
 
-    /// Parse the method argument file
-    fn parse_method_args(&mut self, arg_file: &str) -> args::ProcResult<()>;
+    /// Get the output file extension for the meshing method.
+    fn get_output_extension(&self) -> String;
+
+    /// Parse the method config file
+    fn parse_method_cfg(&mut self, method_cfg_file: &str) -> args::ProcResult<()>;
 
     /// Save the mesh to a file.
     fn save_mesh(&self, layout: &layout::Layout, output_path: &str) -> mesh::ProcResult<()>;

@@ -37,21 +37,21 @@ pub struct ComradeCli {
     #[arg(long = "to")]
     pub end_stage: Option<RunStage>,
 
-    /// Layout config filepath (YAML).
+    /// Layout config filepath (YAML format).
     #[arg(long)]
-    pub layout_cfg: Option<String>,
+    pub layout_args: Option<String>,
 
-    /// Mesh config filepath (YAML).
+    /// Mesh config filepath (YAML format).
     #[arg(long)]
-    pub mesh_cfg: Option<String>,
+    pub mesh_args: Option<String>,
 
-    /// Simulation config filepath (YAML).
+    /// Simulation config filepath (YAML format).
     #[arg(long)]
-    pub sim_cfg: Option<String>,
+    pub sim_args: Option<String>,
 
-    /// Matching config filepath (YAML).
-    #[arg(long = "match_cfg")]
-    pub matching_cfg: Option<String>,
+    /// Matching config filepath (YAML format).
+    #[arg(long = "match_args")]
+    pub matching_args: Option<String>,
 }
 
 /// Run stage. Used as start and optional end of comrade process.

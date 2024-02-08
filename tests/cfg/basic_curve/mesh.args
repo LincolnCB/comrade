@@ -1,0 +1,4 @@
+method: stl_polygons
+method_cfg: tests/cfg/basic_curve/stl_poly.cfg
+input: tests/out/basic_curve/array_layout.json
+output: tests/out/basic_curve/array_mesh

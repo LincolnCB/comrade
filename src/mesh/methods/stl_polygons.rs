@@ -15,32 +15,32 @@ use std::f32::consts::PI;
 #[derive(Debug)]
 pub struct Method {
     /// Arguments for the STL Polygons method.
-    method_args: MethodArgs,
+    method_args: MethodCfg,
 }
 impl Method {
     pub fn new() -> args::ProcResult<Self> {
-        Ok(Method{method_args: MethodArgs::default()})
+        Ok(Method{method_args: MethodCfg::default()})
     }
 }
 
-/// Deserializer from yaml arg file
+/// Deserializer from yaml method cfg file
 #[derive(Debug, Serialize, Deserialize)]
-struct MethodArgs {
-    #[serde(default = "MethodArgs::default_radius", alias = "wire_radius")]
-    radius: f32,
-    #[serde(default = "MethodArgs::default_poly_num")]
+struct MethodCfg {
+    #[serde(default = "MethodCfg::default_radius_offset", alias = "offset")]
+    radius_offset: f32,
+    #[serde(default = "MethodCfg::default_poly_num")]
     poly_num: usize,
 }
-impl MethodArgs {
-    pub fn default_radius() -> f32 {
-        0.3
+impl MethodCfg {
+    pub fn default_radius_offset() -> f32 {
+        0.0
     }
     pub fn default_poly_num() -> usize {
         8
     }
     pub fn default() -> Self {
-        MethodArgs{
-            radius: Self::default_radius(),
+        MethodCfg{
+            radius_offset: Self::default_radius_offset(),
             poly_num: Self::default_poly_num(),
         }
     }
@@ -52,9 +52,14 @@ impl methods::MeshMethod for Method {
         "STL Polygons".to_string()
     }
 
-    /// Parse the meshing method argument file
-    fn parse_method_args(&mut self, arg_file: &str) -> args::ProcResult<()>{
-        let f = crate::io::open(arg_file)?;
+    /// Get the output file extension for the meshing method.
+    fn get_output_extension(&self) -> String {
+        "stl".to_string()
+    }
+
+    /// Parse the meshing method config file
+    fn parse_method_cfg(&mut self, method_cfg_file: &str) -> args::ProcResult<()>{
+        let f = crate::io::open(method_cfg_file)?;
         self.method_args = serde_yaml::from_reader(f)?;
         Ok(())
     }
@@ -62,16 +67,15 @@ impl methods::MeshMethod for Method {
     /// Run the meshing process with the given arguments.
     /// Uses the `mesh` and `layout` modules.
     fn save_mesh(&self, layout: &layout::Layout, output_path: &str) -> mesh::ProcResult<()> {
-        // Final check out output path
-        if !output_path.ends_with(".stl") {
-            mesh::err_str("BUG: Mesh output path must end with .stl -- somehow got to the meshing stage without that!!")?;
-        }
-        
+        let output_path = output_path.to_string() + ".stl";
+
         let mut full_triangles = Vec::<stl_io::Triangle>::new();
 
         // Mesh each coil
         for (coil_n, coil) in layout.coils.iter().enumerate() {
             println!("Coil {}...", coil_n);
+
+            let radius = coil.wire_radius + self.method_args.radius_offset;
 
             // Initialize the triangle list
             let mut triangles = Vec::<stl_io::Triangle>::new();
@@ -89,7 +93,7 @@ impl methods::MeshMethod for Method {
                 // Put the polygon points around the plane given by the point and the out_vec/up_vec
                 for i in 0..self.method_args.poly_num {
                     let angle = 2.0 * PI * (i as Angle - 0.5) / (self.method_args.poly_num as Angle);
-                    let poly_point = point + out_vec * angle.sin() * self.method_args.radius - up_vec * angle.cos() * self.method_args.radius;
+                    let poly_point = point + out_vec * angle.sin() * radius - up_vec * angle.cos() * radius;
                     corner_slice.push(poly_point);
                 }
 
@@ -132,7 +136,7 @@ impl methods::MeshMethod for Method {
 
         // Save a full set of coils (often just for visualization)
         println!("Saving full array to {}", output_path);
-        save_stl(&full_triangles, output_path)?;
+        save_stl(&full_triangles, &output_path)?;
 
         Ok(())
     }

@@ -49,6 +49,7 @@ impl Layout {
 pub struct Coil {
     pub center: Point,
     pub normal: GeoVector,
+    pub wire_radius: f32,
     pub vertices: Vec<CoilVertex>,
 }
 impl Coil {
@@ -58,6 +59,7 @@ impl Coil {
         center: Point,
         normal: GeoVector,
         points: Vec<Point>,
+        wire_radius: f32,
         point_normals: Vec<GeoVector>,
     ) -> ProcResult<Self>{
 
@@ -87,7 +89,7 @@ impl Coil {
             });
         }
 
-        Ok(Coil{center, normal, vertices: coil_vertices})
+        Ok(Coil{center, normal, wire_radius, vertices: coil_vertices})
     }
 
     /// Calculate the mutual inductance between two coils, in uH.
