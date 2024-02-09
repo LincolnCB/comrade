@@ -224,49 +224,69 @@ pub fn clean_coil_by_angle(
 
     angles.sort_by(|a, b| a.theta.total_cmp(&b.theta));
 
-    // TODO: Edge detection and reordering
-    // TODO: Calculate theta from point selection epsilon
-    // TODO: Make edge_buffer a variable
-    // TODO: Handle edges that go around the start/end of the list
+    // Edge detection and reordering
     println!("Detecting edges...");
-    let angle_eps = 0.005;
+    // Check if sequential points are steeper than the angle ratio cap
+    let angle_ratio_cap = 4.0;
+    let is_past_ratio = |a1: &AngleFormat, a2: &AngleFormat| -> bool {
+        let mut dtheta = (a1.theta - a2.theta).abs();
+        if dtheta > PI {
+            dtheta = 2.0 * PI - dtheta;
+        }
+
+        // Avoid division by zero
+        if dtheta < 0.0001 {
+            return true;
+        }
+
+        let dphi = (a1.phi - a2.phi).abs();
+        dphi / dtheta > angle_ratio_cap
+    };
+    // TODO: Make edge_buffer a variable
     let edge_buffer = 2;
+    if angles.len() < edge_buffer {
+        layout::err_str(&format!("Edge buffer {edge_buffer} is larger than the number of points"))?;
+    }
     let mut in_edge = false;
     let mut prev_id = angles.len() - 1;
     let mut edge_start = angles.len() - 1;
     let mut edge_end;
-    let mut edges = Vec::<(usize, usize)>::new();
+    let mut edges = Vec::<[usize; 2]>::new();
     for (pid, angle_pair) in angles.iter().enumerate() {
         let prev_pair = &angles[prev_id];
 
         if !in_edge {
-            if (angle_pair.theta - prev_pair.theta).abs() < angle_eps && angle_pair.phi - prev_pair.phi > angle_eps {
+            if is_past_ratio(angle_pair, prev_pair){
                 in_edge = true;
                 edge_start = (prev_id + angles.len() - edge_buffer) % angles.len();
             }
         }
         else {
-            if (angle_pair.theta - prev_pair.theta).abs() > angle_eps && angle_pair.phi - prev_pair.phi < angle_eps {
+            if !is_past_ratio(angle_pair, prev_pair) {
                 in_edge = false;
                 edge_end = (pid + edge_buffer) % angles.len();
-                edges.push((edge_start, edge_end));
+                edges.push([edge_start, edge_end]);
             }
         }
 
         prev_id = pid;
     }
+    // Close the last edge if necessary
+    if in_edge {
+        edge_end = edge_buffer - 1;
+        edges.push([edge_start, edge_end]);
+    }
 
     // Merge edges
-    // TODO: Handle edges that go around the start/end of the list
     if edges.len() > 1 {
         println!("Merging edges...");
-        let mut merged_edges = Vec::<(usize, usize)>::new();
+        let mut merged_edges = Vec::<[usize; 2]>::new();
         let mut edge = edges[0].clone();
         for i in 0..edges.len() {
             if i < edges.len() - 1 {
                 let next_edge = edges[i + 1].clone();
-                if edge.1 > next_edge.0 {
-                    edge.1 = next_edge.1;
+                if edge[1] > next_edge[0] {
+                    edge[1] = next_edge[1];
                     continue;
                 }
                 else {
@@ -280,22 +300,71 @@ pub fn clean_coil_by_angle(
         }
         edges = merged_edges;
     }
-        
+    // Handle the case where the last edge wraps around
+    if edges.len() > 0 {
+        let first_edge = edges[0];
+        let last_edge = edges[edges.len() - 1];
+        if last_edge[1] < last_edge[0] {
+            let unwrapped_last_end = last_edge[1] + angles.len();
+            let unwrapped_first_start = 
+                if first_edge[0] > first_edge[1] {
+                    first_edge[0]
+                }
+                else {
+                    first_edge[0] + angles.len()
+                };
+            if unwrapped_last_end > unwrapped_first_start {
+                if edges.len() == 1 {
+                    layout::err_str("Angle edge detection failed: one edge that fills the entire list.")?;
+                }
+                edges[0] = [last_edge[0], first_edge[1]];
+            }
+            else {
+                edges.insert(0, last_edge);
+            }
+            edges.pop();
+        }
+    }
+
     // Reorder within the edges
     let anchor_buffer = 3;
     let mut i: usize = 0;
     let l1_angle = |a1: &AngleFormat, a2: &AngleFormat| -> f32 {
-        let dtheta = (a1.theta - a2.theta).abs();
+        let mut dtheta = (a1.theta - a2.theta).abs();
+        if dtheta > PI {
+            dtheta = 2.0 * PI - dtheta;
+        }
         let dphi = (a1.phi - a2.phi).abs();
         dtheta + dphi
     };
     if edges.len() > 0 {
         let mut new_angles = Vec::<AngleFormat>::new();
-        for edge in edges.iter() {
-            let (start, end) = edge;
+        let mut end_wrap = Vec::<AngleFormat>::new();
+
+        if edges[0][1] < edges[0][0] {
+            // Handle the case where the first edge wraps around
+            let mut wrapped_edge = Vec::<AngleFormat>::new();
+            let anchor = angles[(edges[0][0] + angles.len() - anchor_buffer) % angles.len()];
+            let wrap = angles.len() - edges[0][0];
+            for j in edges[0][0]..angles.len() {
+                wrapped_edge.push(angles[j]);
+            }
+            for j in 0..edges[0][1] {
+                wrapped_edge.push(angles[j]);
+            }
+
+            wrapped_edge.sort_by(|a, b| l1_angle(&a, &anchor).total_cmp(&l1_angle(&b, &anchor)));
+            
+            new_angles.extend_from_slice(&wrapped_edge[wrap..wrapped_edge.len()]);
+            end_wrap.extend_from_slice(&wrapped_edge[0..wrap]);
+            i = edges[0][1];
+        }
+
+        for edge in edges.iter().skip(if edges[0][1] < edges[0][0] {1} else {0}) {
+            let [start, end] = edge;
             let start = *start;
             let end = *end;
-            let anchor = angles[if start > anchor_buffer { start - anchor_buffer } else { 0 }];
+            let anchor = angles[(start + angles.len() - anchor_buffer) % angles.len()];
             let mut sorted_edge = Vec::<AngleFormat>::new();
             for j in start..end {
                 sorted_edge.push(angles[j]);
@@ -311,9 +380,10 @@ pub fn clean_coil_by_angle(
             i = end;
         }
 
-        if i < angles.len() {
-            new_angles.extend_from_slice(&angles[i..angles.len()]);
+        if i < (angles.len() - end_wrap.len()) {
+            new_angles.extend_from_slice(&angles[i..(angles.len() - end_wrap.len())]);
         }
+        new_angles.extend_from_slice(&end_wrap);
         assert_eq!(new_angles.len(), angles.len());
         angles = new_angles;
     }
