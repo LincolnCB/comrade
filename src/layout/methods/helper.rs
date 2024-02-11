@@ -397,7 +397,7 @@ pub fn clean_coil_by_angle(
     // Smooth the angles by averaging with neighbors
     // Smooth the normals as well
     // TODO: Make smooth count a variable
-    let smooth_count = 2;
+    let smooth_count = 8;
     for _ in 0..smooth_count {
         let mut prev_i = angles.len() - 1;
         let mut next_i = 1;

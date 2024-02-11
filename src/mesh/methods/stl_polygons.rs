@@ -87,7 +87,7 @@ impl methods::MeshMethod for Method {
 
                 let point = coil_vertex.point;
 
-                let up_vec = coil_vertex.normal.normalize();
+                let up_vec = coil_vertex.wire_radius_normal.normalize();
                 let out_vec = (point - coil.center).rej_onto(&up_vec).normalize();
 
                 // Put the polygon points around the plane given by the point and the out_vec/up_vec

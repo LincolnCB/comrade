@@ -85,7 +85,8 @@ impl Coil {
                 id: point_id,
                 next_id,
                 prev_id,
-                normal: point_normals[point_id].clone(),
+                surface_normal: point_normals[point_id].clone(),
+                wire_radius_normal: point_normals[point_id].clone(),
             });
         }
 
@@ -130,7 +131,9 @@ impl Coil {
                     let p = p0 + np * (i as f32 + 0.5) * dl;
                     for j in 0..j_max {
                         let q = q0 + nq * (j as f32 + 0.5) * dl;
-                        lambda += dl_sq_dot / p.distance(&q)
+                        if p.distance(&q) > self.wire_radius + other.wire_radius {
+                            lambda += dl_sq_dot / p.distance(&q)
+                        }
                     }
                     // Remainder for second segment
                     let q = q0 + nq * (1.0 - 0.5 * dq_remainder_normalized);
@@ -159,7 +162,8 @@ pub struct CoilVertex {
     pub id: usize,
     pub next_id: usize,
     pub prev_id: usize,
-    pub normal: GeoVector,
+    pub surface_normal: GeoVector,
+    pub wire_radius_normal: GeoVector,
 }
 
 /// Run the layout process.

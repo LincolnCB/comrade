@@ -191,6 +191,15 @@ impl GeoVector {
         *self - self.proj_onto(other)
     }
 
+    /// Rotate around another vector by an angle.
+    pub fn rotate_around(&self, axis: &GeoVector, angle: Angle) -> GeoVector {
+        let c = angle.cos();
+        let s = angle.sin();
+        let cross = axis.cross(&self);
+
+        *self * c + cross * s + *axis * axis.dot(&self) * (1.0 - c)
+    }
+
     /// Construct an xhat vector.
     pub fn xhat() -> Self {
         GeoVector{x: 1.0, y: 0.0, z: 0.0}
