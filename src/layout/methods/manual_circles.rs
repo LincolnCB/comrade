@@ -13,7 +13,6 @@ use layout::geo_3d::*;
 use methods::helper::{sphere_intersect, clean_coil_by_angle};
 
 use serde::{Serialize, Deserialize};
-use std::f32::consts::PI;
 
 /// Manual Circles Method struct.
 /// This struct contains all the parameters for the Manual Circles layout method.
@@ -43,7 +42,7 @@ impl MethodCfg {
         }
     }
     pub fn default_clearance() -> f32 {
-        2.0
+        1.29
     }
 }
 
@@ -146,112 +145,272 @@ impl methods::LayoutMethod for Method {
             }
         }
 
-        let intersects = self.get_intersections(&layout_out);
+        
+        
+        let intersections = self.get_intersections(&layout_out, 2.0);
+        
+        // Structure for managing intersecting segments
+        #[derive(Clone)]
+        struct IntersectionSegment {
+            start: usize,
+            end: usize,
+            length: f32,
+            wire_crossings: Vec<f32>,
+        }
+        
+        // Do intersections for each coil
+        for (coil_id, coil) in layout_out.coils.iter_mut().enumerate() {
 
-        for (i, coil) in layout_out.coils.iter_mut().enumerate() {
-            let mut intersecting_points = Vec::<usize>::new();
-
-            // Get all the intersecting points in order, start segment management if there are any
+            // Get the length of the coil and the distance around of each point
+            let mut point_lengths = vec![0.0; coil.vertices.len()];
+            for p in 1..coil.vertices.len() {
+                point_lengths[p] = point_lengths[p - 1] + (coil.vertices[p].point - coil.vertices[p - 1].point).mag();
+            }
+            let coil_length = point_lengths[coil.vertices.len() - 1] + (coil.vertices[0].point - coil.vertices[coil.vertices.len() - 1].point).mag();
+    
+            // Closure for calculating the distance between two points (wrapping around the coil if necessary)
+            let point_distance = |start: usize, end: usize| -> f32 {
+                if start < end {
+                    point_lengths[end] - point_lengths[start]
+                }
+                else {
+                    point_lengths[end] + (coil_length - point_lengths[start])
+                }
+            };
+    
+            // Closure for calculating the length of a segment (adds an extra point to the start and end)
+            let segment_length = |start: usize, end: usize| -> f32 {
+                let start_anchor = (start + coil.vertices.len() - 1) % coil.vertices.len();
+                let end_anchor = (end + 1) % coil.vertices.len();
+                point_distance(start_anchor, end_anchor)
+            };
+            let mut segments = Vec::<IntersectionSegment>::new();
+            
+            // Get all the intersections between a coil and a coil of higher coil id than it. 
             let mut any_intersections = false;
-            for j in i+1..self.method_args.circles.len() {
-                if intersects[i][j].len() > 0 {
+            for other_id in coil_id+1..self.method_args.circles.len() {
+                let other_intersection = &intersections[coil_id][other_id];
+                if other_intersection.len() > 0 {
                     any_intersections = true;
-                    intersecting_points.extend_from_slice(&intersects[i][j]);
+                    
+                    let mut start = other_intersection[0];
+                    let mut end;
+                    
+                    // Check for wraparound
+                    let mut i_max = other_intersection.len();
+                    if other_intersection[0] == 0 {
+                        for (rev_id, p) in other_intersection.iter().rev().enumerate() {
+                            if *p != coil.vertices.len() - 1 - rev_id {
+                                i_max = other_intersection.len() - rev_id;
+                                start = other_intersection[i_max % other_intersection.len()];
+                                break;
+                            }
+                        } 
+                    }
+
+                    // Define the segments for this other coil
+                    for i in 1..i_max {
+                        let p = other_intersection[i];
+                        let prev_p = other_intersection[i - 1];
+                        if p > prev_p + 1 {
+                            end = prev_p;
+                            let length = segment_length(start, end);
+                            segments.push(IntersectionSegment{
+                                start,
+                                end,
+                                length,
+                                wire_crossings: vec![length * 0.5],
+                            });
+                            start = p;
+                        }
+                    }
+                    end = other_intersection[i_max - 1];
+                    let length = segment_length(start, end);
+                    segments.push(IntersectionSegment{
+                        start,
+                        end,
+                        length,
+                        wire_crossings: vec![length * 0.5],
+                    });
                 }
             }
             if !any_intersections {
                 continue;
             }
 
-            // Group the intersecting points into segments
-            intersecting_points.sort();
-            intersecting_points.dedup();
-            let mut segments = Vec::<Vec<(usize, f32)>>::new();
+            // Closure for merging segments
+            let merge_segments = |first_seg: &IntersectionSegment, second_seg: &IntersectionSegment| -> Option<IntersectionSegment> {
+                let (start, end) = match (first_seg.end < first_seg.start, second_seg.end < second_seg.start) {
+                    (true, true) => { // Both wrap
+                        match (first_seg.start < second_seg.start, first_seg.end < second_seg.end) {
+                            (true, true) => (first_seg.start, second_seg.end),
+                            (true, false) => (first_seg.start, first_seg.end),
+                            (false, true) => (second_seg.start, second_seg.end),
+                            (false, false) => (second_seg.start, first_seg.end),
+                        }
+                    },
+                    (true, false) => { // First wraps
+                        if first_seg.start < second_seg.start {
+                            (first_seg.start, first_seg.end)
+                        }
+                        else if first_seg.end > second_seg.end {
+                            (first_seg.start, first_seg.end)
+                        }
+                        else if first_seg.end > second_seg.start {
+                            (first_seg.start, second_seg.end)
+                        }
+                        else if first_seg.start < second_seg.end {
+                            (second_seg.start, first_seg.end)
+                        }
+                        else {
+                            return None; // No intersection
+                        }
+                    },
+                    (false, true) => { // Second wraps
+                        if second_seg.start < first_seg.start {
+                            (second_seg.start, second_seg.end)
+                        }
+                        else if second_seg.end > first_seg.end {
+                            (second_seg.start, second_seg.end)
+                        }
+                        else if second_seg.end > first_seg.start {
+                            (second_seg.start, first_seg.end)
+                        }
+                        else if second_seg.start < first_seg.end {
+                            (first_seg.start, second_seg.end)
+                        }
+                        else {
+                            return None; // No intersection
+                        }
+                    },
+                    (false, false) => { // Neither wrap
+                        if first_seg.start < second_seg.start {
+                            if first_seg.end < second_seg.start {
+                                return None; // No intersection
+                            }
+                            else if first_seg.end < second_seg.end {
+                                (first_seg.start, second_seg.end)
+                            }
+                            else {
+                                (first_seg.start, first_seg.end)
+                            }
+                        }
+                        else {
+                            if second_seg.end < first_seg.start {
+                                return None; // No intersection
+                            }
+                            else if second_seg.end < first_seg.end {
+                                (second_seg.start, first_seg.end)
+                            }
+                            else {
+                                (second_seg.start, second_seg.end)
+                            }
+                        }
+                    },
+                };  
+                let length = segment_length(start, end);
+                let mut wire_crossings = first_seg.wire_crossings.clone();
+                wire_crossings.append(&mut second_seg.wire_crossings.clone());
+                wire_crossings.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                wire_crossings.dedup();
+                Some(IntersectionSegment{
+                    start,
+                    end,
+                    length,
+                    wire_crossings,
+                })
+            };
 
-            let mut j_max = intersecting_points.len();
-            let mut segment = Vec::<(usize, f32)>::new();
+            // Sort the segments -- first by start, then by length
+            segments.sort_by(|a, b| a.start.cmp(&b.start).then(a.length.partial_cmp(&b.length).unwrap()));
 
-            // Check for a wraparound
-            if intersecting_points[0] == 0 {
-                let mut reverse = Vec::<(usize, f32)>::new();
-                let mut j = 0;
-                while intersecting_points[j_max - 1] == coil.vertices.len() - 1 - j {
-                    reverse.push((intersecting_points[j_max - 1], 1.0));
-                    j_max -= 1;
-                    j += 1;
-
-                    if j_max == 0 {
-                        layout::err_str("Coil is entirely intersecting!")?;
-                    }
+            // Merge the segments
+            let mut merged_segments = Vec::<IntersectionSegment>::new();
+            let mut current_segment = segments[0].clone();
+            for seg in segments.into_iter().skip(1) {
+                if let Some(merged) = merge_segments(&current_segment, &seg) {
+                    current_segment = merged;
                 }
+                else {
+                    merged_segments.push(current_segment);
+                    current_segment = seg;
+                }
+            }
+            // Handle wrapping
+            if let Some(merged) = merge_segments(&current_segment, &merged_segments[0]) {
+                merged_segments[0] = merged;
+            } else {
+                merged_segments.push(current_segment);
+            }
                 
-                for p in reverse.into_iter().rev() {
-                    segment.push(p);
-                }
-            }
 
-            // Define the segments
-            for j in 0..j_max {
-                let p = intersecting_points[j];
-                segment.push((p, 0.0));
-                if j < j_max - 1 {
-                    if intersecting_points[j + 1] != p + 1 {
-                        segments.push(segment);
-                        segment = Vec::<(usize, f32)>::new();
-                    }
-                }
-            }
-            segments.push(segment);
+            // Offset the segments
+            for segment in merged_segments.iter_mut() {
 
-            // Approximate the segment lengths
-            for segment in segments.iter_mut() {
-                let mut length = 0.0;
-                let mut p = (segment[0].0 + coil.vertices.len() - 1) % coil.vertices.len();
-                for i in 0..segment.len() {
-                    let next_p = segment[i].0;
-                    let dp = (coil.vertices[next_p].point - coil.vertices[p].point).mag();
-                    length += dp;
-                    segment[i].1 = length;
-                    p = next_p;
-                }
-                let next_p = (segment[segment.len() - 1].0 + 1) % coil.vertices.len();
-                let dp = (coil.vertices[next_p].point - coil.vertices[p].point).mag();
-                length += dp;
-
-                let scale_2 = self.method_args.clearance / 2.0 + coil.wire_radius;
+                let c = self.method_args.clearance + 2.0 * coil.wire_radius;
                 // The amount to offset the wire
+                let start_tail = segment.wire_crossings[0] / segment.length;
+                let end_tail = 1.0 - segment.wire_crossings[segment.wire_crossings.len() - 1] / segment.length;
+                let s = c / (2.0 - 2.0_f32.sqrt());
+                
                 let offset = |l: f32| -> f32 {
-                    let l_ratio = l / length;
-                    if l_ratio < 0.25 {
-                        scale_2 * (1.0 - (1.0 - 16.0 * l_ratio * l_ratio).sqrt())
-                    }
-                    else if l_ratio < 0.75 {
-                        scale_2 * (1.0 + (1.0 - 16.0 * (l_ratio - 0.5) * (l_ratio - 0.5)).sqrt())
-                    }
-                    else {
-                        scale_2 * (1.0 - (1.0 - 16.0 * (l_ratio - 1.0) * (l_ratio - 1.0)).sqrt())
+                    let l_ratio = l / segment.length;
+                    if l_ratio < start_tail {
+                        let l_ratio = l_ratio / start_tail;
+                        if l_ratio < 0.5 {
+                            s * (1.0 - (1.0 - 2.0 * l_ratio * l_ratio).sqrt())
+                        } else {
+                            s * (1.0 - 2.0_f32.sqrt() + (1.0 - 2.0 * (1.0 - l_ratio) * (1.0 - l_ratio)).sqrt())
+                        }
+                    } else if l_ratio > end_tail {
+                        let l_ratio = 1.0 - (l_ratio - end_tail) / (1.0 - end_tail);
+                        if l_ratio < 0.5 {
+                            s * (1.0 - (1.0 - 2.0 * l_ratio * l_ratio).sqrt())
+                        } else {
+                            s * (1.0 - 2.0_f32.sqrt() + (1.0 - 2.0 * (1.0 - l_ratio) * (1.0 - l_ratio)).sqrt())
+                        }
+                    } else {
+                        c
                     }
                 };
                 // The amount to curve the wire
                 let wire_rotation = |l: f32| -> f32 {
-                    let l_ratio = l / length;
-                    if l_ratio < 0.25 {
-                        2.0 * PI * l_ratio
-                    }
-                    else if l_ratio < 0.75 {
-                        2.0 * PI * (0.5 - l_ratio)
-                    }
-                    else {
-                        2.0 * PI * (l_ratio - 1.0)
+                    let l_ratio = l / segment.length;
+                    if l_ratio < start_tail {
+                        let l_ratio = l_ratio / start_tail;
+                        if l_ratio < 0.5 {
+                            l_ratio.asin()
+                        } else {
+                            (1.0 - l_ratio).asin()
+                        }
+                    } else if l_ratio > end_tail {
+                        let l_ratio = 1.0 - (l_ratio - end_tail) / (1.0 - end_tail);
+                        if l_ratio < 0.5 {
+                            -l_ratio.asin()
+                        } else {
+                            (l_ratio - 1.0).asin()
+                        }
+                    } else {
+                        0.0
                     }
                 };
-                        
-                for p in segment.iter_mut() {
-                    coil.vertices[p.0].point = coil.vertices[p.0].point - coil.vertices[p.0].surface_normal * offset(p.1);
-                    let surface_tangent = (coil.vertices[p.0].point - coil.center).rej_onto(&coil.vertices[p.0].surface_normal).normalize();
-                    coil.vertices[p.0].wire_radius_normal = 
-                        coil.vertices[p.0].wire_radius_normal
-                        .rotate_around(&surface_tangent, wire_rotation(p.1));
+
+                let unwrapped_end = if segment.end < segment.start {
+                    segment.end + coil.vertices.len()
+                }
+                else {
+                    segment.end
+                };
+
+                let start_anchor = (segment.start + coil.vertices.len() - 1) % coil.vertices.len();
+
+                for p in segment.start..=unwrapped_end {
+                    let pid = p % coil.vertices.len();
+                    coil.vertices[pid].point = coil.vertices[pid].point - coil.vertices[pid].surface_normal * offset(point_distance(start_anchor, pid));
+                    let surface_tangent = (coil.vertices[pid].point - coil.center).rej_onto(&coil.vertices[pid].surface_normal).normalize();
+                    coil.vertices[pid].wire_radius_normal = 
+                        coil.vertices[pid].wire_radius_normal
+                        .rotate_around(&surface_tangent, wire_rotation(point_distance(start_anchor, pid)));
                 }
             }
 
@@ -291,14 +450,14 @@ impl Method {
 
     /// Get a matrix of vectors of intersection points between cleaned coils
     #[allow(dead_code)]
-    fn get_intersections(&self, intersecting_layout: &layout::Layout) -> Vec<Vec<Vec<usize>>> {
+    fn get_intersections(&self, intersecting_layout: &layout::Layout, clearance_scale: f32) -> Vec<Vec<Vec<usize>>> {
         let mut intersections: Vec<Vec<Vec<usize>>> = vec![vec![vec![]; self.method_args.circles.len()]; self.method_args.circles.len()];
         for (i, coil) in intersecting_layout.coils.iter().enumerate() {
             for (j, other_coil) in intersecting_layout.coils.iter().enumerate() {
                 if i != j {
                     for (k, vertex) in coil.vertices.iter().enumerate() {
                         if ((vertex.point - other_coil.center).mag() - self.method_args.circles[j].coil_radius).abs() < 
-                            coil.wire_radius + other_coil.wire_radius + self.method_args.clearance {
+                            (coil.wire_radius + other_coil.wire_radius + self.method_args.clearance) * clearance_scale {
                             
                             intersections[i][j].push(k);
                         }
