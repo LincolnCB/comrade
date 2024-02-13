@@ -134,6 +134,9 @@ impl methods::LayoutMethod for Method {
             layout_out.coils.push(coil);
         }
 
+        // Do overlaps
+        self.mousehole_overlap(&mut layout_out);
+
         // Do mutual inductance estimate
         println!("Mutual inductance estimate:");
         for (coil_id, coil) in layout_out.coils.iter().enumerate() {
@@ -144,10 +147,16 @@ impl methods::LayoutMethod for Method {
                 }
             }
         }
+        
+        Ok(layout_out)
+    }
+}
 
-        
-        
-        let intersections = self.get_intersections(&layout_out, 2.0);
+impl Method {
+
+    /// Do overlaps between the coils
+    fn mousehole_overlap(&self, layout_out: &mut layout::Layout) {
+        let intersections = self.get_intersections(layout_out, 2.0);
         
         // Structure for managing intersecting segments
         #[derive(Clone)]
@@ -412,16 +421,9 @@ impl methods::LayoutMethod for Method {
                         coil.vertices[pid].wire_radius_normal
                         .rotate_around(&surface_tangent, wire_rotation(point_distance(start_anchor, pid)));
                 }
-            }
-
-                    
+            }  
         }
-
-        Ok(layout_out)
     }
-}
-
-impl Method {
 
     /// Get the adjacency matrix for the circles laid out on the surface
     #[allow(dead_code)]
