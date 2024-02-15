@@ -10,11 +10,11 @@ use serde::{Serialize, Deserialize};
 use std::fs::OpenOptions;
 use std::f32::consts::PI;
 
-/// STL Polygons Method struct.
-/// This struct contains all the parameters for the STL Polygons meshing method.
+/// STL Slot Method struct.
+/// This struct contains all the parameters for the STL Slot meshing method.
 #[derive(Debug)]
 pub struct Method {
-    /// Arguments for the STL Polygons method.
+    /// Arguments for the STL Slot method.
     method_args: MethodCfg,
 }
 impl Method {
@@ -55,7 +55,7 @@ impl MethodCfg {
 impl methods::MeshMethod for Method {
     /// Get the name of the meshing method.
     fn get_method_name(&self) -> String {
-        "STL Polygons".to_string()
+        "STL Slot".to_string()
     }
 
     /// Get the output file extension for the meshing method.

@@ -27,6 +27,7 @@ use crate::{
 // Source files for the meshing methods
 mod stl_polygons;
 mod stl_slot;
+mod gmsh;
 
 /// Meshing methods enum.
 /// To add a new method:
@@ -40,6 +41,8 @@ pub enum MeshChoice {
     StlPolygons(stl_polygons::Method),
     /// Meshing method that creates a slot for CAD models.
     StlSlot(stl_slot::Method),
+    /// Meshing method that creates a mesh for Marie's GMesh.
+    Gmsh(gmsh::Method),
 }
 
 /// Meshing construction array -- Written out in once place for easy modification.
@@ -57,6 +60,11 @@ const MESH_TARGET_CONSTRUCTION: &[MeshConstructor] = &[
     MeshConstructor{
         arg_name: "stl_slot", 
         constructor: || {Ok(MeshChoice::StlSlot(stl_slot::Method::new()?))},
+    },
+    // Marie's GMesh meshing constructor.
+    MeshConstructor{
+        arg_name: "gmsh", 
+        constructor: || {Ok(MeshChoice::Gmsh(gmsh::Method::new()?))},
     },
 ];
 
