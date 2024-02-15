@@ -44,7 +44,7 @@ impl MethodCfg {
         0.0
     }
     pub fn default_lc() -> f32 {
-        0.010000
+        0.25
     }
     pub fn default() -> Self {
         MethodCfg{
@@ -276,24 +276,24 @@ impl Method {
 
         // Write the points
         for (point_id, point) in points.iter().enumerate() {
-            writeln!(file, "Point({}) = {{{}, {}, {}, lc}};", point_id, point.x, point.y, point.z)?;
+            writeln!(file, "Point({}) = {{{}, {}, {}, lc}};", point_id + 1, point.x, point.y, point.z)?;
         }
         writeln!(file)?;
 
 
         // Write the arcs
         for (arc_id, arc) in arcs.iter().enumerate() {
-            writeln!(file, "Circle({}) = {{{}, {}, {}}};", arc_id, arc.start, arc.center, arc.end)?;
+            writeln!(file, "Circle({}) = {{{}, {}, {}}};", arc_id + 1, arc.start + 1, arc.center + 1, arc.end + 1)?;
         }
         writeln!(file)?;
 
         // Write the splines
         for (spline_n, spline) in splines.iter().enumerate() {
             let spline_id = spline_n + spline_offset;
-            let mut spline_str = format!("Spline({}) = {{", spline_id);
-            for (point_id, point) in spline.points.iter().enumerate() {
-                spline_str.push_str(&point.to_string());
-                if point_id < spline.points.len() - 1 {
+            let mut spline_str = format!("Spline({}) = {{", spline_id + 1);
+            for (point_n, point_id) in spline.points.iter().enumerate() {
+                spline_str.push_str(&(point_id + 1).to_string());
+                if point_n < spline.points.len() - 1 {
                     spline_str.push_str(", ");
                 }
             }
@@ -314,7 +314,8 @@ impl Method {
                     let second_spline_id = coil_n * break_count * 4 + segment_n * 4 + (i + 1) % 4 + spline_offset;
 
                     let loop_id = first_arc_id;
-                    writeln!(file, "Line Loop({}) = {{-{}, {}, {}, -{}}};", loop_id, first_arc_id, first_spline_id, second_arc_id, second_spline_id)?;
+                    writeln!(file, "Line Loop({}) = {{-{}, {}, {}, -{}}};", 
+                        loop_id + 1, first_arc_id + 1, first_spline_id + 1, second_arc_id + 1, second_spline_id + 1)?;
                 }
             }
         }
@@ -322,13 +323,14 @@ impl Method {
 
         // Write the ruled surfaces
         for id in 0..(coil_count * break_count * 4) {
-            writeln!(file, "Ruled Surface({id}) = {{{id}}};")?;
+            writeln!(file, "Ruled Surface({}) = {{{}}};", id + 1, id + 1)?;
         }
         writeln!(file)?;
 
         // Write the physical lines (four arcs)
         for (line_id, _) in arcs.iter().step_by(4).enumerate() {
-            writeln!(file, "Physical Line({}) = {{{}, {}, {}, {}}};", line_id, line_id * 4, line_id * 4 + 1, line_id * 4 + 2, line_id * 4 + 3)?;
+            writeln!(file, "Physical Line({}) = {{{}, {}, {}, {}}};", 
+                line_id + 1, line_id * 4 + 1, line_id * 4 + 2, line_id * 4 + 3, line_id * 4 + 4)?;
         }
         writeln!(file)?;
 
@@ -336,7 +338,7 @@ impl Method {
         for coil_n in 0..coil_count {
             let mut surface_str = format!("Physical Surface({}) = {{", coil_n);
             for surface_id in coil_n * break_count * 4..(coil_n + 1) * break_count * 4 {
-                surface_str.push_str(&surface_id.to_string());
+                surface_str.push_str(&(surface_id + 1).to_string());
                 if surface_id < (coil_n + 1) * break_count * 4 - 1 {
                     surface_str.push_str(", ");
                 }
