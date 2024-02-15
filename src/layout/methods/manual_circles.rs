@@ -33,16 +33,22 @@ struct MethodCfg {
     circles: Vec<CircleArgs>,
     #[serde(default = "MethodCfg::default_clearance")]
     clearance: f32,
+    #[serde(default = "MethodCfg::default_verbose")]
+    verbose: bool,
 }
 impl MethodCfg {
     pub fn default() -> Self {
         MethodCfg{
             circles: vec![CircleArgs::default()],
             clearance: Self::default_clearance(),
+            verbose: Self::default_verbose(),
         }
     }
     pub fn default_clearance() -> f32 {
         1.29
+    }
+    pub fn default_verbose() -> bool {
+        false
     }
 }
 
@@ -101,6 +107,7 @@ impl methods::LayoutMethod for Method {
 
     fn do_layout(&self, surface: &Surface) -> layout::ProcResult<layout::Layout> {
         let mut layout_out = layout::Layout::new();
+        let verbose = self.method_args.verbose;
 
         // Iterate through the circles
         let circles = &self.method_args.circles;
@@ -120,16 +127,16 @@ impl methods::LayoutMethod for Method {
                 sphere_intersect(surface, center, coil_radius, epsilon);
             let coil_normal = surface.point_normals[cid].normalize();
 
-            println!("Uncleaned point count: {}", points.len());
+            if verbose { println!("Uncleaned point count: {}", points.len()) };
 
             let coil = clean_coil_by_angle(
                 center, coil_normal,
                 coil_radius, wire_radius,
                 points, point_normals,
-                pre_shift,
+                pre_shift, verbose
             )?;
     
-            println!("Cleaned point count: {}", coil.vertices.len());
+            if verbose { println!("Cleaned point count: {}", coil.vertices.len()) };
     
             layout_out.coils.push(coil);
         }
@@ -137,13 +144,19 @@ impl methods::LayoutMethod for Method {
         // Do overlaps
         self.mousehole_overlap(&mut layout_out);
 
-        // Do mutual inductance estimate
-        println!("Mutual inductance estimate:");
-        for (coil_id, coil) in layout_out.coils.iter().enumerate() {
-            for (other_coil_id, other_coil) in layout_out.coils.iter().enumerate() {
-                if coil_id < other_coil_id {
-                    let inductance = coil.mutual_inductance(other_coil, 1.0);
-                    println!("Coil {} to Coil {}: {} uH", coil_id, other_coil_id, inductance);
+        // Do inductance estimates
+        if verbose {
+            for (coil_id, coil) in layout_out.coils.iter().enumerate() {
+                println!("Coil {} self-inductance: {:.2} nH", coil_id, coil.self_inductance(1.0));
+            }
+
+            println!("Mutual inductance estimate:");
+            for (coil_id, coil) in layout_out.coils.iter().enumerate() {
+                for (other_coil_id, other_coil) in layout_out.coils.iter().enumerate() {
+                    if coil_id < other_coil_id {
+                        let inductance = coil.mutual_inductance(other_coil, 1.0);
+                        println!("Coil {} to Coil {}: {:.2} nH", coil_id, other_coil_id, inductance);
+                    }
                 }
             }
         }

@@ -7,7 +7,7 @@ mod stl;
 use serde::{Serialize, Deserialize};
 
 use std::f32::consts::PI;
-const MU0: f32 = 1.256637062 * 1e-3; // mu0 in uH/mm
+const MU0: f32 = 1.256637062; // mu0 in nH/mm
 
 use geo_3d::*;
 
@@ -93,7 +93,12 @@ impl Coil {
         Ok(Coil{center, normal, wire_radius, vertices: coil_vertices})
     }
 
-    /// Calculate the mutual inductance between two coils, in uH.
+    /// Calculate the self-inductance of the coil, in nH.
+    pub fn self_inductance(&self, dl:f32) -> f32 {
+        self.mutual_inductance(&self, dl) / 2.0 // Divide by 2 to prevent double counting
+    }
+
+    /// Calculate the mutual inductance between two coils, in nH.
     /// dl is the maximum length infinitessimal approximation within a segment.
     /// For example, for a wire segment of length 2.3 * dl,
     /// there will be two segments of length dl and one of length 0.3 * dl.
@@ -137,20 +142,26 @@ impl Coil {
                     }
                     // Remainder for second segment
                     let q = q0 + nq * (1.0 - 0.5 * dq_remainder_normalized);
-                    lambda += dl * dq_remainder * dot / p.distance(&q);
+                    if p.distance(&q) > self.wire_radius + other.wire_radius {
+                        lambda += dl * dq_remainder * dot / p.distance(&q);
+                    }
                 }
                 // Remainder for first segment
                 let p = p0 + np * (1.0 - 0.5 * dp_remainder_normalized);
                 for j in 0..j_max {
                     let q = q0 + nq * (j as f32 + 0.5) * dl;
-                    lambda += dl * dp_remainder * dot / p.distance(&q);
+                    if p.distance(&q) > self.wire_radius + other.wire_radius {
+                        lambda += dl * dp_remainder * dot / p.distance(&q);
+                    }
                 }
                 // Remainder for both segments
                 let q = q0 + nq * (1.0 - 0.5 * dq_remainder_normalized);
-                lambda += dp_remainder * dq_remainder * dot / p.distance(&q); 
+                if p.distance(&q) > self.wire_radius + other.wire_radius {
+                    lambda += dp_remainder * dq_remainder * dot / p.distance(&q);
+                }
             }
         }
-        // Multiply by the constant factor of mu0/4pi. mu0 is already in units of uH/mm.
+        // Multiply by the constant factor of mu0/4pi. mu0 is already in units of nH/mm.
         MU0 * lambda / (4.0 * PI)
     }
 }

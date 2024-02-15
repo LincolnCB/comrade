@@ -147,6 +147,7 @@ pub fn clean_coil_by_angle(
     mut points: Vec<Point>,
     point_normals: Vec<GeoVector>,
     pre_shift: bool,
+    verbose: bool,
 ) -> layout::ProcResult<layout::Coil> {
     if points.len() < 3 {
         layout::err_str("Not enough points to clean by angle")?;
@@ -225,7 +226,7 @@ pub fn clean_coil_by_angle(
     angles.sort_by(|a, b| a.theta.total_cmp(&b.theta));
 
     // Edge detection and reordering
-    println!("Detecting edges...");
+    if verbose { println!("Detecting edges...") };
     // Check if sequential points are steeper than the angle ratio cap
     let angle_ratio_cap = 4.0;
     let is_past_ratio = |a1: &AngleFormat, a2: &AngleFormat| -> bool {
@@ -279,7 +280,7 @@ pub fn clean_coil_by_angle(
 
     // Merge edges
     if edges.len() > 1 {
-        println!("Merging edges...");
+        if verbose { println!("Merging edges...") };
         let mut merged_edges = Vec::<[usize; 2]>::new();
         let mut edge = edges[0].clone();
         for i in 0..edges.len() {

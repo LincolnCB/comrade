@@ -102,7 +102,7 @@ impl methods::LayoutMethod for Method {
             center, coil_normal,
             coil_radius, wire_radius,
             points, point_normals,
-            pre_shift,
+            pre_shift, true,
         )?;
 
         println!("Cleaned point count: {}", coil.vertices.len());
