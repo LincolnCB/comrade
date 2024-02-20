@@ -44,7 +44,7 @@ impl MethodCfg {
         0.0
     }
     pub fn default_lc() -> f32 {
-        0.25
+        0.002
     }
     pub fn default() -> Self {
         MethodCfg{
@@ -276,7 +276,7 @@ impl Method {
 
         // Write the points
         for (point_id, point) in points.iter().enumerate() {
-            writeln!(file, "Point({}) = {{{}, {}, {}, lc}};", point_id + 1, point.x, point.y, point.z)?;
+            writeln!(file, "Point({}) = {{{}, {}, {}, lc}};", point_id + 1, point.x * 1e-3, point.y * 1e-3, point.z * 1e-3)?;
         }
         writeln!(file)?;
 
