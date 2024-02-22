@@ -236,6 +236,13 @@ impl methods::MeshMethod for Method {
                     return Err(crate::io::IoError{file: output_path.to_string(), cause: error}.into());
                 },
             };
+            let txt_output_path = output_path.replace(".geo", &format!("_c{}.txt", coil_n));
+            match self.save_marie_txt(&vec![single_loop.clone()], &txt_output_path) {
+                Ok(_) => (),
+                Err(error) => {
+                    return Err(crate::io::IoError{file: output_path.to_string(), cause: error}.into());
+                },
+            };
 
             // Add the coil to the full set
             full_loops.push(single_loop);
@@ -249,10 +256,31 @@ impl methods::MeshMethod for Method {
                 return Err(crate::io::IoError{file: output_path.to_string(), cause: error}.into());
             },
         };
+        let txt_output_path = output_path.replace(".geo", ".txt");
+        match self.save_marie_txt(&full_loops, &txt_output_path) {
+            Ok(_) => (),
+            Err(error) => {
+                return Err(crate::io::IoError{file: output_path.to_string(), cause: error}.into());
+            },
+        };
 
         Ok(())
     }
 }
+
+const COL_POS : [usize; 11] = [
+    4,
+    14,
+    32,
+    54,
+    66,
+    70,
+    72,
+    74,
+    86,
+    98,
+    110,
+];
 
 impl Method {
     /// Save a GMSH .geo file
@@ -443,4 +471,50 @@ impl Method {
 
         Ok(())
     }
+
+    /// Save a MARIE .txt file for lumped elements and ports
+    fn save_marie_txt(&self, loop_vec: &Vec<Loop>, output_path: &str) -> std::io::Result<()> {
+        let file = OpenOptions::new().write(true).create(true).open(&output_path)?;
+        let break_count = self.method_args.break_count;
+
+        let mut file = LineWriter::new(file);
+
+        // Write the ports
+        for (loop_n, _) in loop_vec.iter().enumerate() {
+            let mut line_str = format!("{}", loop_n + 1);
+            line_str.push_str(&" ".repeat(COL_POS[0] - line_str.len()));
+
+            line_str.push_str(&"port");
+            line_str.push_str(&" ".repeat(COL_POS[1] - line_str.len()));
+
+            // TODO: Figure the rest out
+
+            writeln!(file, "{}", line_str)?;
+        }
+
+        // ... then initialize the physical line offsets...
+        let mut physical_line_offsets = vec![0 as usize; loop_vec.len()];
+        physical_line_offsets[0] = loop_vec.len() + 1;
+
+        // Write the lumped elements
+        for (loop_n, _) in loop_vec.iter().enumerate() {
+            for segment_n in 1..break_count {
+                let mut line_str = format!("{}", (segment_n - 1) + physical_line_offsets[loop_n]);
+                line_str.push_str(&" ".repeat(COL_POS[0] - line_str.len()));
+                
+                line_str.push_str(&"element");
+                line_str.push_str(&" ".repeat(COL_POS[1] - line_str.len()));
+
+                // TODO: Figure the rest out
+
+                writeln!(file, "{}", line_str)?;
+            }
+            if loop_n < loop_vec.len() - 1 {
+                physical_line_offsets[loop_n + 1] = physical_line_offsets[loop_n] + (break_count - 1);
+            }
+        }
+
+        Ok(())
+    }
+        
 }   
