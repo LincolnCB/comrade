@@ -56,14 +56,28 @@ impl MethodCfg {
 }
 
 /// GMSH Arc struct
+#[derive(Clone)]
 struct Arc {
     start: usize,
     center: usize,
     end: usize,
 }
 /// GMSH Spline struct
+#[derive(Clone)]
 struct Spline {
     points: Vec<usize>,
+}
+/// Collection of points, arcs, and splines for GMSH
+#[derive(Clone)]
+struct Loop {
+    points: Vec<Point>,
+    arcs: Vec<Arc>,
+    splines: Vec<Spline>,
+}
+impl Loop {
+    pub fn new() -> Self {
+        Loop{points: Vec::new(), arcs: Vec::new(), splines: Vec::new()}
+    }
 }
 
 impl methods::MeshMethod for Method {
@@ -94,13 +108,7 @@ impl methods::MeshMethod for Method {
             mesh::err_str("Break count must be at least 1")?;
         }
 
-        // Points
-        let mut full_points = Vec::<Point>::new();
-
-        let mut full_arcs = Vec::<Arc>::new();
-        
-        let mut full_splines = Vec::<Spline>::new();
-        
+        let mut full_loops = Vec::<Loop>::new();
         
         // Mesh each coil
         for (coil_n, coil) in layout.coils.iter().enumerate() {
@@ -109,16 +117,11 @@ impl methods::MeshMethod for Method {
             let radius = coil.wire_radius;
             
             if coil.vertices.len() < break_count {
-                mesh::err_str("Not enough points to clean by angle")?;
+                mesh::err_str(&format!("Not enough points ({}) for that many breaks ({})", coil.vertices.len(), break_count))?;
             }
 
             // Initialize the GMSH vectors
-            let mut points = Vec::<Point>::new();
-            let mut arcs = Vec::<Arc>::new();
-            let mut splines = Vec::<Spline>::new();
-
-            // Track offset for the full lists
-            let points_offset = full_points.len();
+            let mut single_loop = Loop::new();
             
             // Initialize the angle bins
             let angle_step: Angle = 2.0 * PI / break_count as Angle;
@@ -151,12 +154,10 @@ impl methods::MeshMethod for Method {
                 for i in 0..4 {
                     let theta = i as f32 * PI / 2.0;
                     let point = vertex.point + up_vec * radius * theta.cos() + out_vec * radius * theta.sin();
-                    points.push(point);
-                    full_points.push(point);
+                    single_loop.points.push(point);
                 }
                 // Add the wire point to the list (some may be unused)
-                points.push(vertex.point);
-                full_points.push(vertex.point);
+                single_loop.points.push(vertex.point);
                 
                 let mut angle = zero_theta_vec.angle_to(&out_vec);
 
@@ -178,7 +179,7 @@ impl methods::MeshMethod for Method {
 
             // Error if any bins are empty
             if binned_points.iter().any(|p| p.is_none()) {
-                mesh::err_str("Math error: Angle binning failed (no points within some bins)")?;
+                mesh::err_str(&format!("Math error: Angle binning (break count: {break_count}) failed (no points within some bins)"))?;
             }
 
             // Add the arcs
@@ -190,10 +191,7 @@ impl methods::MeshMethod for Method {
                     let start = point_id * 5 + i;
                     let center = point_id * 5 + 4;
                     let end = point_id * 5 + (i + 1) % 4;
-                    arcs.push(Arc{start, center, end});
-
-                    // Add the arc to the full list
-                    full_arcs.push(Arc{start: start + points_offset, center: center + points_offset, end: end + points_offset});
+                    single_loop.arcs.push(Arc{start, center, end});
                 }
             }
 
@@ -203,13 +201,10 @@ impl methods::MeshMethod for Method {
                 let point_id = id.unwrap();
                 for i in 0..4 {
                     let mut spline_points = Vec::<usize>::new();
-                    let mut spline_points_full = Vec::<usize>::new();
                     for j in prev_id..=point_id {
                         spline_points.push(j * 5 + i);
-                        spline_points_full.push(j * 5 + i + points_offset);
                     }
-                    splines.push(Spline{points: spline_points});
-                    full_splines.push(Spline{points: spline_points_full});
+                    single_loop.splines.push(Spline{points: spline_points});
                 }
                 prev_id = point_id;
             }
@@ -217,40 +212,38 @@ impl methods::MeshMethod for Method {
             let first_id = binned_points[0].unwrap();
             for i in 0..4 {
                 let mut spline_points = Vec::<usize>::new();
-                let mut spline_points_full = Vec::<usize>::new();
                 if first_id < prev_id {
                     for j in prev_id..coil.vertices.len() {
                         spline_points.push(j * 5 + i);
-                        spline_points_full.push(j * 5 + i + points_offset);
                     }
                     for j in 0..=first_id {
                         spline_points.push(j * 5 + i);
-                        spline_points_full.push(j * 5 + i + points_offset);
                     }
                 } else {
                     for j in prev_id..=first_id {
                         spline_points.push(j * 5 + i);
-                        spline_points_full.push(j * 5 + i + points_offset);
                     }
                 }
-                splines.push(Spline{points: spline_points});
-                full_splines.push(Spline{points: spline_points_full});
+                single_loop.splines.push(Spline{points: spline_points});
             }
 
             // Save each coil to a separate file
             let numbered_output_path = output_path.replace(".geo", &format!("_c{}.geo", coil_n));
             println!("Saving coil {} to {}...", coil_n, numbered_output_path);
-            match self.save_geo(&points, &arcs, &splines, &numbered_output_path) {
+            match self.save_geo(&vec![single_loop.clone()], &numbered_output_path) {
                 Ok(_) => (),
                 Err(error) => {
                     return Err(crate::io::IoError{file: output_path.to_string(), cause: error}.into());
                 },
             };
+
+            // Add the coil to the full set
+            full_loops.push(single_loop);
         }
 
         // Save a full set of coils (often just for visualization)
         println!("Saving full array to {}", output_path);
-        match self.save_geo(&full_points, &full_arcs, &full_splines, &output_path) {
+        match self.save_geo(&full_loops, &output_path) {
             Ok(_) => (),
             Err(error) => {
                 return Err(crate::io::IoError{file: output_path.to_string(), cause: error}.into());
@@ -263,89 +256,187 @@ impl methods::MeshMethod for Method {
 
 impl Method {
     /// Save a GMSH .geo file
-    fn save_geo(&self, points: &Vec<Point>, arcs: &Vec<Arc>, splines: &Vec<Spline>, output_path: &str) -> std::io::Result<()> {
+    fn save_geo(&self, loop_vec: &Vec<Loop>, output_path: &str) -> std::io::Result<()> {
         let file = OpenOptions::new().write(true).create(true).open(&output_path)?;
         let break_count = self.method_args.break_count;
-        let spline_offset = arcs.len();
 
         let mut file = LineWriter::new(file);
+
 
         // Write the lc
         writeln!(file, "lc = {};", self.method_args.lc)?;
         writeln!(file)?;
 
+
+        // Initialize the point offsets
+        let mut point_offsets = vec![0 as usize; loop_vec.len()];
+        point_offsets[0] = 1;
+
         // Write the points
-        for (point_id, point) in points.iter().enumerate() {
-            writeln!(file, "Point({}) = {{{}, {}, {}, lc}};", point_id + 1, point.x * 1e-3, point.y * 1e-3, point.z * 1e-3)?;
-        }
-        writeln!(file)?;
-
-
-        // Write the arcs
-        for (arc_id, arc) in arcs.iter().enumerate() {
-            writeln!(file, "Circle({}) = {{{}, {}, {}}};", arc_id + 1, arc.start + 1, arc.center + 1, arc.end + 1)?;
-        }
-        writeln!(file)?;
-
-        // Write the splines
-        for (spline_n, spline) in splines.iter().enumerate() {
-            let spline_id = spline_n + spline_offset;
-            let mut spline_str = format!("Spline({}) = {{", spline_id + 1);
-            for (point_n, point_id) in spline.points.iter().enumerate() {
-                spline_str.push_str(&(point_id + 1).to_string());
-                if point_n < spline.points.len() - 1 {
-                    spline_str.push_str(", ");
-                }
+        writeln!(file, "// Points")?;
+        writeln!(file, "// ------------------------------------------")?;
+        for (loop_n, single_loop) in loop_vec.iter().enumerate() {
+            writeln!(file, "// Coil {}", loop_n)?;
+            for (point_id, point) in single_loop.points.iter().enumerate() {
+                writeln!(file, "Point({}) = {{{}, {}, {}, lc}};", point_id + point_offsets[loop_n], point.x * 1e-3, point.y * 1e-3, point.z * 1e-3)?;
             }
-            spline_str.push_str("};");
-            writeln!(file, "{}", spline_str)?;
+            if loop_n < loop_vec.len() - 1 {
+                point_offsets[loop_n + 1] = point_offsets[loop_n] + single_loop.points.len();
+                writeln!(file)?; 
+            }
         }
+        writeln!(file, "// ------------------------------------------")?;
         writeln!(file)?;
+
+
+        // Initialize the arc and spline offsets
+        let mut arc_offsets = vec![0 as usize; loop_vec.len()];
+        arc_offsets[0] = 1;
+        let mut spline_offsets = vec![0 as usize; loop_vec.len()];
+        spline_offsets[0] = 1;
+
+        // Write the arcs and splines
+        writeln!(file, "// Arcs and Splines")?;
+        writeln!(file, "// ------------------------------------------")?;
+        for (loop_n, single_loop) in loop_vec.iter().enumerate() {
+            writeln!(file, "// Coil {}", loop_n)?;
+
+            // Write the arcs
+            for (arc_id, arc) in single_loop.arcs.iter().enumerate() {
+                writeln!(file, "Circle({}) = {{{}, {}, {}}};", arc_id + arc_offsets[loop_n], arc.start + point_offsets[loop_n], arc.center + point_offsets[loop_n], arc.end + point_offsets[loop_n])?;
+            }
+            spline_offsets[loop_n] = arc_offsets[loop_n] + single_loop.arcs.len();
+            writeln!(file)?;
+
+            // Write the splines
+            for (spline_id, spline) in single_loop.splines.iter().enumerate() {
+                let mut spline_str = format!("Spline({}) = {{", spline_id + spline_offsets[loop_n]);
+                for (point_n, point_id) in spline.points.iter().enumerate() {
+                    spline_str.push_str(&(point_id + point_offsets[loop_n]).to_string());
+                    if point_n < spline.points.len() - 1 {
+                        spline_str.push_str(", ");
+                    }
+                }
+                spline_str.push_str("};");
+                writeln!(file, "{}", spline_str)?;
+            }
+            if loop_n < loop_vec.len() - 1 {
+                arc_offsets[loop_n + 1] = spline_offsets[loop_n] + single_loop.splines.len();
+                writeln!(file)?;
+            }
+        }
+        writeln!(file, "// ------------------------------------------")?;
+        writeln!(file)?;
+
+        // Initialize the line loop offsets
+        let mut line_loop_offsets = vec![0 as usize; loop_vec.len()];
+        line_loop_offsets[0] = 1;
 
         // Write the line loops
-        let coil_count = arcs.len() / (4 * break_count);
-        for coil_n in 0..coil_count {
+        writeln!(file, "// Line Loops")?;
+        writeln!(file, "// ------------------------------------------")?;
+        for (loop_n, _) in loop_vec.iter().enumerate() {
+            writeln!(file, "// Coil {}", loop_n)?;
             for segment_n in 0..break_count {
                 for i in 0..4 {
-                    let first_arc_id = coil_n * break_count * 4 + segment_n * 4 + i;
-                    let second_arc_id = coil_n * break_count * 4 + ((segment_n + 1) % break_count) * 4 + i;
+                    let first_arc_id = segment_n * 4 + i + arc_offsets[loop_n];
+                    let second_arc_id = segment_n * 4 + (i + 1) % 4 + arc_offsets[loop_n];
                     
-                    let first_spline_id = first_arc_id + spline_offset;
-                    let second_spline_id = coil_n * break_count * 4 + segment_n * 4 + (i + 1) % 4 + spline_offset;
+                    let first_spline_id = segment_n * 4 + i + spline_offsets[loop_n];
+                    let second_spline_id = segment_n * 4 + (i + 1) % 4 + spline_offsets[loop_n];
 
-                    let loop_id = first_arc_id;
+                    let loop_id = segment_n * 4 + i + line_loop_offsets[loop_n];
+                    
                     writeln!(file, "Line Loop({}) = {{-{}, {}, {}, -{}}};", 
-                        loop_id + 1, first_arc_id + 1, first_spline_id + 1, second_arc_id + 1, second_spline_id + 1)?;
+                        loop_id, first_arc_id, first_spline_id, second_arc_id, second_spline_id)?;
                 }
             }
+            if loop_n < loop_vec.len() - 1 {
+                line_loop_offsets[loop_n + 1] = line_loop_offsets[loop_n] + break_count * 4;
+                writeln!(file)?;
+            }
         }
+        writeln!(file, "// ------------------------------------------")?;
         writeln!(file)?;
 
         // Write the ruled surfaces
-        for id in 0..(coil_count * break_count * 4) {
-            writeln!(file, "Ruled Surface({}) = {{{}}};", id + 1, id + 1)?;
+        writeln!(file, "// Ruled Surfaces")?;
+        writeln!(file, "// ------------------------------------------")?;
+        for (loop_n, _) in loop_vec.iter().enumerate() {
+            writeln!(file, "// Coil {}", loop_n)?;
+            for segment_n in 0..break_count {
+                let surface_id = segment_n + line_loop_offsets[loop_n];
+                writeln!(file, "Ruled Surface({}) = {{{}}}", surface_id, surface_id)?;
+            }
+            if loop_n < loop_vec.len() - 1 {
+                writeln!(file)?;
+            }
         }
+        writeln!(file, "// ------------------------------------------")?;
         writeln!(file)?;
 
-        // Write the physical lines (four arcs)
-        for (line_id, _) in arcs.iter().step_by(4).enumerate() {
+        
+        // Write the physical lines for the ports first (first break in each loop, made of four arcs)...
+        writeln!(file, "// Ports")?;
+        writeln!(file, "// ------------------------------------------")?;
+        for (loop_n, _) in loop_vec.iter().enumerate() {
+            writeln!(file, "// Coil {}", loop_n)?;
+            let arc_ids = (0..4).map(|i| i + arc_offsets[loop_n]).collect::<Vec<usize>>();
             writeln!(file, "Physical Line({}) = {{{}, {}, {}, {}}};", 
-                line_id + 1, line_id * 4 + 1, line_id * 4 + 2, line_id * 4 + 3, line_id * 4 + 4)?;
+                loop_n + 1, arc_ids[0], arc_ids[1], arc_ids[2], arc_ids[3])?;
+            if loop_n < loop_vec.len() - 1 {
+                writeln!(file)?;
+            }
         }
+        writeln!(file, "// ------------------------------------------")?;
+        writeln!(file)?;
+            
+        // ... then initialize the physical line offsets...
+        let mut physical_line_offsets = vec![0 as usize; loop_vec.len()];
+        physical_line_offsets[0] = loop_vec.len() + 1;
+
+
+        // ... then write the lumped element physical lines (other breaks in each loop, made of four arcs)
+        writeln!(file, "// Lumped Elements")?;
+        writeln!(file, "// ------------------------------------------")?;
+        for (loop_n, _) in loop_vec.iter().enumerate() {
+            writeln!(file, "// Coil {}", loop_n)?;
+            for segment_n in 1..break_count {
+                let arc_ids = (0..4).map(|i| i + segment_n * 4 + arc_offsets[loop_n]).collect::<Vec<usize>>();
+                let line_id = (segment_n - 1) + physical_line_offsets[loop_n];
+                writeln!(file, "Physical Line({}) = {{{}, {}, {}, {}}};", 
+                    line_id, arc_ids[0], arc_ids[1], arc_ids[2], arc_ids[3])?;
+            }
+            if loop_n < loop_vec.len() - 1 {
+                physical_line_offsets[loop_n + 1] = physical_line_offsets[loop_n] + (break_count - 1);
+                writeln!(file)?;
+            }
+        }
+        writeln!(file, "// ------------------------------------------")?;
         writeln!(file)?;
 
         // Write the physical surfaces (one coil)
-        for coil_n in 0..coil_count {
-            let mut surface_str = format!("Physical Surface({}) = {{", coil_n);
-            for surface_id in coil_n * break_count * 4..(coil_n + 1) * break_count * 4 {
-                surface_str.push_str(&(surface_id + 1).to_string());
-                if surface_id < (coil_n + 1) * break_count * 4 - 1 {
-                    surface_str.push_str(", ");
+        writeln!(file, "// Physical Surfaces")?;
+        writeln!(file, "// ------------------------------------------")?;
+        for (loop_n, _) in loop_vec.iter().enumerate() {
+            writeln!(file, "// Coil {}", loop_n)?;
+            let mut physical_surface_str = format!("Physical Surface({}) = {{", loop_n + 1);
+            for segment_n in 0..break_count {
+                for i in 0..4 {
+                    let surface_id = segment_n * 4 + i + line_loop_offsets[loop_n];
+                    physical_surface_str.push_str(&surface_id.to_string());
+                    if segment_n < break_count - 1 || i < 3 {
+                        physical_surface_str.push_str(", ");
+                    }
                 }
             }
-            surface_str.push_str("};");
-            writeln!(file, "{}", surface_str)?;
+            physical_surface_str.push_str("};");
+            writeln!(file, "{}", physical_surface_str)?;
+            if loop_n < loop_vec.len() - 1 {
+                writeln!(file)?;
+            }
         }
+        writeln!(file, "// ------------------------------------------")?;
         writeln!(file)?;
 
         writeln!(file, "Coherence Mesh;")?;
