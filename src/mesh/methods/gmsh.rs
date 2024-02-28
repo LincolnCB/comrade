@@ -472,7 +472,7 @@ impl Method {
         Ok(())
     }
 
-    /// Save a MARIE .txt file for lumped elements and ports
+    /// Save a MARIE .txt file for ports and lumped elements
     fn save_marie_txt(&self, loop_vec: &Vec<Loop>, output_path: &str) -> std::io::Result<()> {
         let file = OpenOptions::new().write(true).create(true).open(&output_path)?;
         let break_count = self.method_args.break_count;
@@ -496,7 +496,7 @@ impl Method {
         let mut physical_line_offsets = vec![0 as usize; loop_vec.len()];
         physical_line_offsets[0] = loop_vec.len() + 1;
 
-        // Write the lumped elements
+        // ... then write the lumped elements
         for (loop_n, _) in loop_vec.iter().enumerate() {
             for segment_n in 1..break_count {
                 let mut line_str = format!("{}", (segment_n - 1) + physical_line_offsets[loop_n]);

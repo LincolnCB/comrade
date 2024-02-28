@@ -29,6 +29,7 @@ pub mod helper;
 // Source files for the layout methods
 mod single_circle;
 mod manual_circles;
+mod iterative_circles;
 
 /// Layout methods enum.
 /// To add a new method:
@@ -42,6 +43,8 @@ pub enum LayoutChoice {
     SingleCircle(single_circle::Method),
     /// Manual circles layout, for specifying multiple circles by hand.
     ManualCircles(manual_circles::Method),
+    /// Iterative circles layout, for specifying multiple circles by hand and doing local optimization.
+    IterativeCircles(iterative_circles::Method),
 }
 
 /// Layout construction array -- Written out in once place for easy modification.
@@ -60,6 +63,11 @@ const LAYOUT_TARGET_CONSTRUCTION: &[LayoutConstructor] = &[
     LayoutConstructor{
         arg_name: "manual_circles", 
         constructor: || {Ok(LayoutChoice::ManualCircles(manual_circles::Method::new()?))},
+    },
+    // Iterative Circles layout constructor.
+    LayoutConstructor{
+        arg_name: "iterative_circles", 
+        constructor: || {Ok(LayoutChoice::IterativeCircles(iterative_circles::Method::new()?))},
     },
 ];
 
