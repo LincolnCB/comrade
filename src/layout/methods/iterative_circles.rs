@@ -302,7 +302,7 @@ impl Method {
                                 start,
                                 end,
                                 length,
-                                wire_crossings: vec![length * 0.5],
+                                wire_crossings: vec![],
                             });
                             start = p;
                         }
@@ -313,9 +313,53 @@ impl Method {
                         start,
                         end,
                         length,
-                        wire_crossings: vec![length * 0.5],
+                        wire_crossings: vec![],
                     });
                 }
+
+                // Update wire crossings
+                let other_center = self.method_args.circles[other_id].center;
+                let distance_to_other_coil = |p: usize| -> f32 {
+                    let point = coil.vertices[p].point;
+                    let vec_to_center = point - other_center;
+                    vec_to_center.mag()
+                };
+                let inside_other_coil = |p: usize| -> bool {
+                    distance_to_other_coil(p) < self.method_args.circles[other_id].coil_radius
+                };
+                for segment in segments.iter_mut() {
+                    let mut p_prev = segment.start;
+                    let mut p = segment.start + 1 % coil.vertices.len();
+
+                    let in_segment = |x: usize| -> bool {
+                        if segment.end < segment.start {
+                            x > segment.start || x <= segment.end
+                        } else {
+                            x > segment.start && x <= segment.end
+                        }
+                    };
+
+                    while in_segment(p) {
+                        if inside_other_coil(p) != inside_other_coil(p_prev) {
+                            let length = point_distance(p_prev, p);
+
+                            let d1 = distance_to_other_coil(p_prev).abs();
+                            let d2 = distance_to_other_coil(p).abs();
+
+                            let crossing_delta = d1 / (d1 + d2) * length;
+
+                            segment.wire_crossings.push(
+                                point_distance(
+                                    (segment.start + coil.vertices.len() - 1) % coil.vertices.len(),
+                                    p_prev
+                                ) + crossing_delta
+                            );
+                        }
+                        p_prev = p;
+                        p = (p + 1) % coil.vertices.len();   
+                    }
+                }
+                        
             }
             if !any_intersections {
                 continue;
