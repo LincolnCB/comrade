@@ -53,6 +53,68 @@ impl Point {
 
         (dx*dx + dy*dy + dz*dz).sqrt()
     }
+    
+    /// Get the index of the nearest point on the surface to this point.
+    pub fn nearest_point_idx(&self, surface: &Surface) -> usize {
+        let mut min_dist = std::f32::MAX;
+        let mut min_point_idx = 0;
+        for i in 0..surface.points.len() {
+            let dist = self.distance(&surface.points[i]);
+            if dist < min_dist {
+                min_dist = dist;
+                min_point_idx = i;
+            }
+        }
+        min_point_idx
+    }
+    
+    /// Get the closest point on the surface to this point.
+    pub fn nearest_point(&self, surface: &Surface) -> Point {
+        surface.points[self.nearest_point_idx(surface)]
+    }
+
+    /// Project this point onto the nearest face of the surface.
+    pub fn project_to_surface_face(&self, surface: &Surface) -> Point {
+        let min_point_idx = self.nearest_point_idx(surface);
+
+        // Get the point normal and the distance rejection vector
+        let min_point = surface.points[min_point_idx];
+        let min_point_normal = surface.point_normals[min_point_idx];
+        let vec_to_point = *self - min_point;
+        let rej = vec_to_point.rej_onto(&min_point_normal).normalize();
+
+        // Find the two adjacent points most aligned with the rejection vector
+        let mut max_dot_1 = std::f32::MIN;
+        let mut max_dot_2 = std::f32::MIN;
+        let mut adj_point_1_idx = 0;
+        let mut adj_point_2_idx = 0;
+        for i in 0..surface.adj[min_point_idx].len() {
+            let adj_point = surface.points[surface.adj[min_point_idx][i]];
+            let adj_vec = adj_point - min_point;
+            let dot = adj_vec.rej_onto(&min_point_normal).normalize().dot(&rej);
+            if dot > max_dot_1 {
+                max_dot_2 = max_dot_1;
+                adj_point_2_idx = adj_point_1_idx;
+                max_dot_1 = dot;
+                adj_point_1_idx = i;
+            }
+            else if dot > max_dot_2 {
+                max_dot_2 = dot;
+                adj_point_2_idx = i;
+            }
+        }
+
+        // Get the face normal
+        let adj_point_1 = surface.points[surface.adj[min_point_idx][adj_point_1_idx]];
+        let adj_point_2 = surface.points[surface.adj[min_point_idx][adj_point_2_idx]];
+        let side_1 = adj_point_1 - min_point;
+        let side_2 = adj_point_2 - min_point;
+        let face_normal = side_1.cross(&side_2).normalize();
+
+        // Project the point onto the face
+        *self - vec_to_point.proj_onto(&face_normal)
+    }
+
 }
 impl fmt::Display for Point {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
