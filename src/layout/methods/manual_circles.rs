@@ -33,6 +33,12 @@ struct MethodCfg {
     circles: Vec<CircleArgs>,
     #[serde(default = "MethodCfg::default_clearance")]
     clearance: f32,
+    #[serde(default = "MethodCfg::default_wire_radius")]
+    wire_radius: f32,
+    #[serde(default = "MethodCfg::default_epsilon")]
+    epsilon: f32,
+    #[serde(default = "MethodCfg::default_pre_shift")]
+    pre_shift: bool,
     #[serde(default = "MethodCfg::default_verbose")]
     verbose: bool,
 }
@@ -41,6 +47,9 @@ impl MethodCfg {
         MethodCfg{
             circles: vec![CircleArgs::default()],
             clearance: Self::default_clearance(),
+            epsilon: Self::default_epsilon(),
+            wire_radius: Self::default_wire_radius(),
+            pre_shift: Self::default_pre_shift(),
             verbose: Self::default_verbose(),
         }
     }
@@ -50,34 +59,6 @@ impl MethodCfg {
     pub fn default_verbose() -> bool {
         false
     }
-}
-
-/// Single element arguments
-#[derive(Debug, Serialize, Deserialize)]
-struct CircleArgs {
-    center: Point,
-    #[serde(default = "CircleArgs::default_coil_radius", alias = "radius")]
-    coil_radius: f32,
-    #[serde(default = "CircleArgs::default_wire_radius")]
-    wire_radius: f32,
-    #[serde(default = "CircleArgs::default_epsilon")]
-    epsilon: f32,
-    #[serde(default = "CircleArgs::default_pre_shift")]
-    pre_shift: bool,
-}
-impl CircleArgs {
-    pub fn default() -> Self {
-        CircleArgs{
-            coil_radius: Self::default_coil_radius(),
-            wire_radius: Self::default_wire_radius(),
-            epsilon: Self::default_epsilon(),
-            pre_shift: Self::default_pre_shift(),
-            center: Self::default_center(),
-        }
-    }
-    pub fn default_coil_radius() -> f32 {
-        5.0
-    }
     pub fn default_wire_radius() -> f32 {
         0.645
     }
@@ -86,6 +67,25 @@ impl CircleArgs {
     }
     pub fn default_pre_shift() -> bool {
         true
+    }
+}
+
+/// Single element arguments
+#[derive(Debug, Serialize, Deserialize)]
+struct CircleArgs {
+    center: Point,
+    #[serde(default = "CircleArgs::default_coil_radius", alias = "radius")]
+    coil_radius: f32,
+}
+impl CircleArgs {
+    pub fn default() -> Self {
+        CircleArgs{
+            coil_radius: Self::default_coil_radius(),
+            center: Self::default_center(),
+        }
+    }
+    pub fn default_coil_radius() -> f32 {
+        5.0
     }
     pub fn default_center() -> Point {
         Point::new(0.0, 0.0, 0.0)
@@ -111,15 +111,15 @@ impl methods::LayoutMethod for Method {
 
         // Iterate through the circles
         let circles = &self.method_args.circles;
+        let wire_radius = self.method_args.wire_radius;
+        let epsilon = self.method_args.epsilon;
+        let pre_shift = self.method_args.pre_shift;
 
         for (coil_num, circle_args) in circles.iter().enumerate() {
             println!("Coil {}/{}...", (coil_num + 1), circles.len());
             
             // Grab arguments from the circle arguments
             let coil_radius = circle_args.coil_radius;
-            let wire_radius = circle_args.wire_radius;
-            let epsilon = circle_args.epsilon;
-            let pre_shift = circle_args.pre_shift;
             let center = circle_args.center;
 
             // Create the circle through surface intersection with sphere
