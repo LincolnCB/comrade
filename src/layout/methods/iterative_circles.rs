@@ -358,6 +358,9 @@ impl Method {
                         p_prev = p;
                         p = (p + 1) % coil.vertices.len();   
                     }
+
+                    segment.wire_crossings.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                    segment.wire_crossings.dedup();
                 }
                         
             }
