@@ -321,35 +321,44 @@ impl Method {
                 continue;
             }
 
+            // Closure for merging the length of two segments
             let merge_length_offset = |start: usize, end: usize| -> f32 {
                 let start_anchor = (start + coil.vertices.len() - 1) % coil.vertices.len();
                 let end_anchor = (end + coil.vertices.len() - 1) % coil.vertices.len();
                 point_distance(start_anchor, end_anchor)
             };
+
+            // Enum for which segment to use
+            #[derive(PartialEq)]
+            enum Which {
+                First,
+                Second,
+            }
             
             // Closure for merging segments
             let merge_segments = |first_seg: &IntersectionSegment, second_seg: &IntersectionSegment| -> Option<IntersectionSegment> {
-                let (start_segment, end_segment) = match (first_seg.end < first_seg.start, second_seg.end < second_seg.start) {
+                
+                let (which_for_start, which_for_end) = match (first_seg.end < first_seg.start, second_seg.end < second_seg.start) {
                     (true, true) => { // Both wrap
                         match (first_seg.start < second_seg.start, first_seg.end < second_seg.end) {
-                            (true, true) => (first_seg, second_seg),
-                            (true, false) => (first_seg, first_seg),
-                            (false, true) => (second_seg, second_seg),
-                            (false, false) => (second_seg, first_seg),
+                            (true, true) => (Which::First, Which::Second),
+                            (true, false) => (Which::First, Which::First),
+                            (false, true) => (Which::Second, Which::Second),
+                            (false, false) => (Which::Second, Which::First),
                         }
                     },
                     (true, false) => { // First wraps
                         if first_seg.start < second_seg.start {
-                            (first_seg, first_seg)
+                            (Which::First, Which::First)
                         }
                         else if first_seg.end > second_seg.end {
-                            (first_seg, first_seg)
+                            (Which::First, Which::First)
                         }
                         else if first_seg.end > second_seg.start {
-                            (first_seg, second_seg)
+                            (Which::First, Which::Second)
                         }
                         else if first_seg.start < second_seg.end {
-                            (second_seg, first_seg)
+                            (Which::Second, Which::First)
                         }
                         else {
                             return None; // No intersection
@@ -357,16 +366,16 @@ impl Method {
                     },
                     (false, true) => { // Second wraps
                         if second_seg.start < first_seg.start {
-                            (second_seg, second_seg)
+                            (Which::Second, Which::Second)
                         }
                         else if second_seg.end > first_seg.end {
-                            (second_seg, second_seg)
+                            (Which::Second, Which::Second)
                         }
                         else if second_seg.end > first_seg.start {
-                            (second_seg, first_seg)
+                            (Which::Second, Which::First)
                         }
                         else if second_seg.start < first_seg.end {
-                            (first_seg, second_seg)
+                            (Which::First, Which::Second)
                         }
                         else {
                             return None; // No intersection
@@ -378,10 +387,10 @@ impl Method {
                                 return None; // No intersection
                             }
                             else if first_seg.end < second_seg.end {
-                                (first_seg, second_seg)
+                                (Which::First, Which::Second)
                             }
                             else {
-                                (first_seg, first_seg)
+                                (Which::First, Which::First)
                             }
                         }
                         else {
@@ -389,25 +398,43 @@ impl Method {
                                 return None; // No intersection
                             }
                             else if second_seg.end < first_seg.end {
-                                (second_seg, first_seg)
+                                (Which::Second, Which::First)
                             }
                             else {
-                                (second_seg, second_seg)
+                                (Which::Second, Which::Second)
                             }
                         }
                     },
                 };
 
-                let mut length_offset = merge_length_offset(start_segment.start, end_segment.start);
+                let start_segment = match which_for_start {
+                    Which::First => first_seg,
+                    Which::Second => second_seg,
+                };
+                let end_segment = match which_for_end {
+                    Which::First => first_seg,
+                    Which::Second => second_seg,
+                };
 
                 let start = start_segment.start;
                 let end = end_segment.end;
-                let length = padded_segment_length(start, end);
 
+                let length = padded_segment_length(start, end);
+                
                 let mut wire_crossings = start_segment.wire_crossings.clone();
                 let mut end_wire_crossings = end_segment.wire_crossings.clone();
-
-                // Offset the end wire crossings by the overlapping length -- make sure to account for padding!
+                
+                // Offset the end wire crossings by the overlapping length -- merge_length_offset accounts for padding!
+                let length_offset = match which_for_start == which_for_end {
+                    false => merge_length_offset(start_segment.start, end_segment.start),
+                    true => {
+                        let other_segment = match which_for_start {
+                            Which::First => second_seg,
+                            Which::Second => first_seg,
+                        };
+                        merge_length_offset(start_segment.start, other_segment.start)
+                    }
+                };
                 for crossing in end_wire_crossings.iter_mut() {
                     *crossing += length_offset;
                 }
