@@ -262,7 +262,7 @@ impl Method {
             };
     
             // Closure for calculating the length of a segment (adds an extra point to the start and end)
-            let segment_length = |start: usize, end: usize| -> f32 {
+            let padded_segment_length = |start: usize, end: usize| -> f32 {
                 let start_anchor = (start + coil.vertices.len() - 1) % coil.vertices.len();
                 let end_anchor = (end + 1) % coil.vertices.len();
                 point_distance(start_anchor, end_anchor)
@@ -297,7 +297,7 @@ impl Method {
                         let prev_p = other_intersection[i - 1];
                         if p > prev_p + 1 {
                             end = prev_p;
-                            let length = segment_length(start, end);
+                            let length = padded_segment_length(start, end);
                             segments.push(IntersectionSegment{
                                 start,
                                 end,
@@ -308,7 +308,7 @@ impl Method {
                         }
                     }
                     end = other_intersection[i_max - 1];
-                    let length = segment_length(start, end);
+                    let length = padded_segment_length(start, end);
                     segments.push(IntersectionSegment{
                         start,
                         end,
@@ -321,29 +321,35 @@ impl Method {
                 continue;
             }
 
+            let merge_length_offset = |start: usize, end: usize| -> f32 {
+                let start_anchor = (start + coil.vertices.len() - 1) % coil.vertices.len();
+                let end_anchor = (end + coil.vertices.len() - 1) % coil.vertices.len();
+                point_distance(start_anchor, end_anchor)
+            };
+            
             // Closure for merging segments
             let merge_segments = |first_seg: &IntersectionSegment, second_seg: &IntersectionSegment| -> Option<IntersectionSegment> {
-                let (start, end) = match (first_seg.end < first_seg.start, second_seg.end < second_seg.start) {
+                let (start_segment, end_segment) = match (first_seg.end < first_seg.start, second_seg.end < second_seg.start) {
                     (true, true) => { // Both wrap
                         match (first_seg.start < second_seg.start, first_seg.end < second_seg.end) {
-                            (true, true) => (first_seg.start, second_seg.end),
-                            (true, false) => (first_seg.start, first_seg.end),
-                            (false, true) => (second_seg.start, second_seg.end),
-                            (false, false) => (second_seg.start, first_seg.end),
+                            (true, true) => (first_seg, second_seg),
+                            (true, false) => (first_seg, first_seg),
+                            (false, true) => (second_seg, second_seg),
+                            (false, false) => (second_seg, first_seg),
                         }
                     },
                     (true, false) => { // First wraps
                         if first_seg.start < second_seg.start {
-                            (first_seg.start, first_seg.end)
+                            (first_seg, first_seg)
                         }
                         else if first_seg.end > second_seg.end {
-                            (first_seg.start, first_seg.end)
+                            (first_seg, first_seg)
                         }
                         else if first_seg.end > second_seg.start {
-                            (first_seg.start, second_seg.end)
+                            (first_seg, second_seg)
                         }
                         else if first_seg.start < second_seg.end {
-                            (second_seg.start, first_seg.end)
+                            (second_seg, first_seg)
                         }
                         else {
                             return None; // No intersection
@@ -351,16 +357,16 @@ impl Method {
                     },
                     (false, true) => { // Second wraps
                         if second_seg.start < first_seg.start {
-                            (second_seg.start, second_seg.end)
+                            (second_seg, second_seg)
                         }
                         else if second_seg.end > first_seg.end {
-                            (second_seg.start, second_seg.end)
+                            (second_seg, second_seg)
                         }
                         else if second_seg.end > first_seg.start {
-                            (second_seg.start, first_seg.end)
+                            (second_seg, first_seg)
                         }
                         else if second_seg.start < first_seg.end {
-                            (first_seg.start, second_seg.end)
+                            (first_seg, second_seg)
                         }
                         else {
                             return None; // No intersection
@@ -372,10 +378,10 @@ impl Method {
                                 return None; // No intersection
                             }
                             else if first_seg.end < second_seg.end {
-                                (first_seg.start, second_seg.end)
+                                (first_seg, second_seg)
                             }
                             else {
-                                (first_seg.start, first_seg.end)
+                                (first_seg, first_seg)
                             }
                         }
                         else {
@@ -383,17 +389,30 @@ impl Method {
                                 return None; // No intersection
                             }
                             else if second_seg.end < first_seg.end {
-                                (second_seg.start, first_seg.end)
+                                (second_seg, first_seg)
                             }
                             else {
-                                (second_seg.start, second_seg.end)
+                                (second_seg, second_seg)
                             }
                         }
                     },
-                };  
-                let length = segment_length(start, end);
-                let mut wire_crossings = first_seg.wire_crossings.clone();
-                wire_crossings.append(&mut second_seg.wire_crossings.clone());
+                };
+
+                let mut length_offset = merge_length_offset(start_segment.start, end_segment.start);
+
+                let start = start_segment.start;
+                let end = end_segment.end;
+                let length = padded_segment_length(start, end);
+
+                let mut wire_crossings = start_segment.wire_crossings.clone();
+                let mut end_wire_crossings = end_segment.wire_crossings.clone();
+
+                // Offset the end wire crossings by the overlapping length -- make sure to account for padding!
+                for crossing in end_wire_crossings.iter_mut() {
+                    *crossing += length_offset;
+                }
+
+                wire_crossings.append(&mut end_wire_crossings);
                 wire_crossings.sort_by(|a, b| a.partial_cmp(b).unwrap());
                 wire_crossings.dedup();
                 Some(IntersectionSegment{
@@ -448,8 +467,8 @@ impl Method {
                         } else {
                             s * (1.0 - 2.0_f32.sqrt() + (1.0 - 2.0 * (1.0 - l_ratio) * (1.0 - l_ratio)).sqrt())
                         }
-                    } else if l_ratio > end_tail {
-                        let l_ratio = 1.0 - (l_ratio - end_tail) / (1.0 - end_tail);
+                    } else if l_ratio > (1.0 - end_tail) {
+                        let l_ratio = 1.0 - (l_ratio - (1.0 - end_tail)) / (end_tail);
                         if l_ratio < 0.5 {
                             s * (1.0 - (1.0 - 2.0 * l_ratio * l_ratio).sqrt())
                         } else {
@@ -469,8 +488,8 @@ impl Method {
                         } else {
                             (1.0 - l_ratio).asin()
                         }
-                    } else if l_ratio > end_tail {
-                        let l_ratio = 1.0 - (l_ratio - end_tail) / (1.0 - end_tail);
+                    } else if l_ratio > (1.0 - end_tail) {
+                        let l_ratio = 1.0 - (l_ratio - (1.0 - end_tail)) / (end_tail);
                         if l_ratio < 0.5 {
                             -l_ratio.asin()
                         } else {
