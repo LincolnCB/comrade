@@ -164,6 +164,11 @@ impl Coil {
         // Multiply by the constant factor of mu0/4pi. mu0 is already in units of nH/mm.
         MU0 * lambda / (4.0 * PI)
     }
+
+    /// Calculate the coupling factor between two coils.
+    pub fn coupling_factor(&self, other: &Coil, dl: f32) -> f32 {
+        self.mutual_inductance(other, dl) / (self.self_inductance(dl) * other.self_inductance(dl)).sqrt()
+    }
 }
 
 /// A point on a coil (includes adjacency and surface vectors).

@@ -87,7 +87,7 @@ impl MethodCfg {
         false
     }
     pub fn default_iterations() -> usize {
-        0
+        1
     }
     pub fn default_radius_freedom() -> f32 {
         0.2
@@ -174,14 +174,14 @@ impl Method {
             
             // Grab arguments from the circle arguments
             let coil_radius = circle_args.coil_radius;
+            
             // Snap the center to the surface
             let vec_to_surface = &circle_args.center - surface;
             let center = circle_args.center - vec_to_surface;
-            let coil_normal = vec_to_surface.normalize();
 
             // Create the circle through surface intersection with sphere
-            let (_, points, point_normals) =
-                sphere_intersect(surface, center, coil_radius, epsilon);
+            let (cid, points, point_normals) = sphere_intersect(surface, center, coil_radius, epsilon);
+            let coil_normal = surface.point_normals[cid];
 
             if verbose { println!("Uncleaned point count: {}", points.len()) };
 
@@ -401,15 +401,18 @@ impl Method {
             for seg in segments.into_iter().skip(1) {
                 if let Some(merged) = merge_segments(&current_segment, &seg) {
                     current_segment = merged;
-                }
-                else {
+                } else {
                     merged_segments.push(current_segment);
                     current_segment = seg;
                 }
             }
             // Handle wrapping
-            if let Some(merged) = merge_segments(&current_segment, &merged_segments[0]) {
-                merged_segments[0] = merged;
+            if merged_segments.len() > 0 {
+                if let Some(merged) = merge_segments(&current_segment, &merged_segments[0]) {
+                    merged_segments[0] = merged;
+                } else {
+                    merged_segments.push(current_segment);
+                }
             } else {
                 merged_segments.push(current_segment);
             }
