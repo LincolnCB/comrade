@@ -124,9 +124,11 @@ pub fn run_process(targets: Targets) -> ComradeResult<()> {
     // 2.1 Run the layout process
     let layout_out = match targets.layout_target {
         Some(layout_target) => {
+            println!();
             println!("#################");
             println!("Running layout...");
             println!("#################");
+            println!();
             let layout_out = layout::do_layout(&layout_target)?;
 
             if layout_target.layout_args.save {
@@ -139,15 +141,17 @@ pub fn run_process(targets: Targets) -> ComradeResult<()> {
 
     // 2.2 Run the mesh process
     if let Some(mesh_target) = targets.mesh_target {
+        println!();
         println!("################");
         println!("Running mesh...");
         println!("################");
+        println!();
         let layout_in = match layout_out {
             Some(layout_out) => layout_out,
             None => {
                 let input_path = match mesh_target.mesh_args.input_path.as_ref() {
                     Some(input_path) => input_path,
-                    None => mesh::err_str("BUG: Running the meshing, but missing input path! Should've been checked!")?,
+                    None => panic!("BUG: Running the meshing, but missing input path! Should've been checked!"),
                 };
                 layout::load_layout(input_path)?
             }
@@ -157,17 +161,21 @@ pub fn run_process(targets: Targets) -> ComradeResult<()> {
 
     // 2.3 Run the simulation process
     if let Some(sim_target) = targets.sim_target {
+        println!();
         println!("####################");
         println!("Running simulation...");
         println!("####################");
+        println!();
         sim::err_str("Simulation not yet implemented!!!")?;
     }
 
     // 2.4 Run the matching process
     if let Some(matching_target) = targets.matching_target {
+        println!();
         println!("##################");
         println!("Running matching...");
         println!("##################");
+        println!();
         matching::err_str("Matching not yet implemented!!!")?;
     }
 

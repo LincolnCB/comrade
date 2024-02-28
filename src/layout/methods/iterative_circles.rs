@@ -137,16 +137,30 @@ impl methods::LayoutMethod for Method {
 
         // Do inductance estimates
         if self.method_args.verbose {
+            println!();
+            println!("Inductance estimates (nH):");
             for (coil_id, coil) in layout_out.coils.iter().enumerate() {
                 println!("Coil {} self-inductance: {:.2} nH", coil_id, coil.self_inductance(1.0));
             }
 
+            println!();
             println!("Mutual inductance estimate:");
             for (coil_id, coil) in layout_out.coils.iter().enumerate() {
                 for (other_coil_id, other_coil) in layout_out.coils.iter().enumerate() {
                     if coil_id < other_coil_id {
                         let inductance = coil.mutual_inductance(other_coil, 1.0);
                         println!("Coil {} to Coil {}: {:.2} nH", coil_id, other_coil_id, inductance);
+                    }
+                }
+            }
+
+            println!();
+            println!("Coupling factor estimates:");
+            for (coil_id, coil) in layout_out.coils.iter().enumerate() {
+                for (other_coil_id, other_coil) in layout_out.coils.iter().enumerate() {
+                    if coil_id < other_coil_id {
+                        let coupling = coil.coupling_factor(other_coil, 1.0);
+                        println!("Coil {} to Coil {}: {}", coil_id, other_coil_id, coupling);
                     }
                 }
             }

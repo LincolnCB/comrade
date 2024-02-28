@@ -73,7 +73,7 @@ impl methods::MeshMethod for Method {
 
         // Mesh each coil
         for (coil_n, coil) in layout.coils.iter().enumerate() {
-            println!("Coil {}...", coil_n);
+            println!("Coil {}/{}...", (coil_n + 1), layout.coils.len());
 
             let radius = coil.wire_radius + self.method_args.radius_offset;
 
@@ -107,8 +107,8 @@ impl methods::MeshMethod for Method {
                 let next_slice = &corner_slices[next_slice_id];
 
                 if slice.len() != next_slice.len() {
-                    mesh::err_str(&format!("BUG: Coil corner {0} has a different number of points ({1}) than the next {2} ({3})", 
-                        slice_id, slice.len(), next_slice_id, next_slice.len()))?;
+                    panic!("BUG: Coil corner {0} has a different number of points ({1}) than the next {2} ({3})", 
+                        slice_id, slice.len(), next_slice_id, next_slice.len());
                 }
                 
                 for (i, v0) in slice.iter().enumerate() {
@@ -130,7 +130,6 @@ impl methods::MeshMethod for Method {
 
             // Save each coil to a separate file
             let numbered_output_path = output_path.replace(".stl", &format!("_c{}.stl", coil_n));
-            println!("Saving coil {} to {}...", coil_n, numbered_output_path);
             save_stl(&triangles, &numbered_output_path)?;
         }
 

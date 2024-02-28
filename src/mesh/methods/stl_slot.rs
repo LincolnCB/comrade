@@ -130,8 +130,8 @@ impl methods::MeshMethod for Method {
                 let next_slice = &corner_slices[next_slice_id];
 
                 if slice.len() != next_slice.len() {
-                    mesh::err_str(&format!("BUG: Coil corner {0} has a different number of points ({1}) than the next {2} ({3})", 
-                        slice_id, slice.len(), next_slice_id, next_slice.len()))?;
+                    panic!("BUG: Coil corner {0} has a different number of points ({1}) than the next {2} ({3})", 
+                        slice_id, slice.len(), next_slice_id, next_slice.len());
                 }
                 
                 for (i, v0) in slice.iter().enumerate() {

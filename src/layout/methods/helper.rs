@@ -180,8 +180,8 @@ pub fn clean_coil_by_angle(
             
             let test_point = *point + r_err * radial_tangent / angle.cos();
             if test_point.x.is_nan() || test_point.y.is_nan() || test_point.z.is_nan() {
-                layout::err_str(&format!("BUG! Point {} {} shifted to NaN (centered at {}, normal {}, angle {}).",
-                    point_id, point, center, normal, angle))?;
+                panic!("BUG! Point {} {} shifted to NaN (centered at {}, normal {}, angle {}).",
+                    point_id, point, center, normal, angle);
                 }
                 
                 *point += r_err * radial_tangent / angle.cos();
@@ -458,11 +458,11 @@ pub fn clean_coil_by_angle(
 
         // NaN check
         if point.x.is_nan() || point.y.is_nan() || point.z.is_nan() {
-            layout::err_str(&format!("BUG! helper::clean_coil_by_angle \
+            panic!("BUG! helper::clean_coil_by_angle \
                 Point {} {} (originally point {}) \
                 constructed as NaN (centered at {}, normal {}, angles [{}, {}]).",
                 new_point_id, point, angle_pair.point_id, 
-                center, normal, theta, phi))?;
+                center, normal, theta, phi);
         }
         
         points.push(point);
