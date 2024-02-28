@@ -132,7 +132,12 @@ pub fn run_process(targets: Targets) -> ComradeResult<()> {
             let layout_out = layout::do_layout(&layout_target)?;
 
             if layout_target.layout_args.save {
-                layout::save_layout(&layout_out, &layout_target.layout_args.output_path.unwrap())?;
+                let output_path = match layout_target.layout_args.output_path.as_ref() {
+                    Some(output_path) => output_path,
+                    None => panic!("BUG: Running the layout, but missing output path! Should've been checked!"),
+                };
+                println!("Saving layout to {}...", output_path);
+                layout::save_layout(&layout_out, output_path)?;
             }
             Some(layout_out)
         },
@@ -153,6 +158,7 @@ pub fn run_process(targets: Targets) -> ComradeResult<()> {
                     Some(input_path) => input_path,
                     None => panic!("BUG: Running the meshing, but missing input path! Should've been checked!"),
                 };
+                println!("Loading layout from {}...", input_path);
                 layout::load_layout(input_path)?
             }
         };

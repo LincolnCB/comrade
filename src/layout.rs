@@ -203,14 +203,12 @@ pub fn do_layout(layout_target: &LayoutTarget) -> ProcResult<Layout> {
 }
 
 pub fn save_layout(layout: &Layout, output_path: &str) -> ProcResult<()> {
-    println!("Saving layout to {}...", output_path);
     let f = crate::io::create(output_path)?;
     serde_json::to_writer_pretty(f, layout)?;
     Ok(())
 }
 
 pub fn load_layout(input_path: &str) -> ProcResult<Layout> {
-    println!("Loading layout from {}...", input_path);
     let f = crate::io::open(input_path)?;
     let layout: Layout = serde_json::from_reader(f)?;
     Ok(layout)

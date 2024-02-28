@@ -137,14 +137,13 @@ impl methods::LayoutMethod for Method {
 
         // Do inductance estimates
         if self.method_args.verbose {
-            println!();
             println!("Inductance estimates (nH):");
             for (coil_id, coil) in layout_out.coils.iter().enumerate() {
                 println!("Coil {} self-inductance: {:.2} nH", coil_id, coil.self_inductance(1.0));
             }
-
             println!();
-            println!("Mutual inductance estimate:");
+
+            println!("Mutual inductance estimate (nH):");
             for (coil_id, coil) in layout_out.coils.iter().enumerate() {
                 for (other_coil_id, other_coil) in layout_out.coils.iter().enumerate() {
                     if coil_id < other_coil_id {
@@ -153,8 +152,8 @@ impl methods::LayoutMethod for Method {
                     }
                 }
             }
-
             println!();
+
             println!("Coupling factor estimates:");
             for (coil_id, coil) in layout_out.coils.iter().enumerate() {
                 for (other_coil_id, other_coil) in layout_out.coils.iter().enumerate() {
@@ -164,6 +163,7 @@ impl methods::LayoutMethod for Method {
                     }
                 }
             }
+            println!();
         }
         
         Ok(layout_out)
@@ -197,22 +197,20 @@ impl Method {
             let (cid, points, point_normals) = sphere_intersect(surface, center, coil_radius, epsilon);
             let coil_normal = surface.point_normals[cid];
 
-            if verbose { println!("Uncleaned point count: {}", points.len()) };
-
             let coil = clean_coil_by_angle(
                 center, coil_normal,
                 coil_radius, wire_radius,
                 points, point_normals,
                 pre_shift, verbose
             )?;
-    
-            if verbose { println!("Cleaned point count: {}", coil.vertices.len()) };
-    
+
             layout_out.coils.push(coil);
         }
 
         // Do overlaps
         self.mousehole_overlap(&mut layout_out);
+
+        if verbose { println!() };
 
         Ok(layout_out)
     }
