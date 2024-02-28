@@ -133,6 +133,33 @@ impl methods::LayoutMethod for Method {
     }
 
     fn do_layout(&self, surface: &Surface) -> layout::ProcResult<layout::Layout> {
+        let mut layout_out = self.single_pass(surface)?;
+
+        // Do inductance estimates
+        if self.method_args.verbose {
+            for (coil_id, coil) in layout_out.coils.iter().enumerate() {
+                println!("Coil {} self-inductance: {:.2} nH", coil_id, coil.self_inductance(1.0));
+            }
+
+            println!("Mutual inductance estimate:");
+            for (coil_id, coil) in layout_out.coils.iter().enumerate() {
+                for (other_coil_id, other_coil) in layout_out.coils.iter().enumerate() {
+                    if coil_id < other_coil_id {
+                        let inductance = coil.mutual_inductance(other_coil, 1.0);
+                        println!("Coil {} to Coil {}: {:.2} nH", coil_id, other_coil_id, inductance);
+                    }
+                }
+            }
+        }
+        
+        Ok(layout_out)
+    }
+}
+
+impl Method {
+
+    /// Do a single pass of the iterative circles method
+    pub fn single_pass(&self, surface: &Surface) -> layout::ProcResult<layout::Layout> {
         let mut layout_out = layout::Layout::new();
         let verbose = self.method_args.verbose;
 
@@ -171,28 +198,21 @@ impl methods::LayoutMethod for Method {
         // Do overlaps
         self.mousehole_overlap(&mut layout_out);
 
-        // Do inductance estimates
-        if verbose {
-            for (coil_id, coil) in layout_out.coils.iter().enumerate() {
-                println!("Coil {} self-inductance: {:.2} nH", coil_id, coil.self_inductance(1.0));
-            }
+        Ok(layout_out)
+    }
 
-            println!("Mutual inductance estimate:");
-            for (coil_id, coil) in layout_out.coils.iter().enumerate() {
-                for (other_coil_id, other_coil) in layout_out.coils.iter().enumerate() {
-                    if coil_id < other_coil_id {
-                        let inductance = coil.mutual_inductance(other_coil, 1.0);
-                        println!("Coil {} to Coil {}: {:.2} nH", coil_id, other_coil_id, inductance);
-                    }
+    /// Get the energy of the mutual inductance
+    pub fn mutual_inductance_energy(&self, layout_out: &layout::Layout) -> f32 {
+        let mut energy = 0.0;
+        for (i, coil) in layout_out.coils.iter().enumerate() {
+            for (j, other_coil) in layout_out.coils.iter().enumerate() {
+                if i < j {
+                    energy += coil.mutual_inductance(other_coil, 1.0).powi(2);
                 }
             }
         }
-        
-        Ok(layout_out)
+        energy
     }
-}
-
-impl Method {
 
     /// Do overlaps between the coils
     fn mousehole_overlap(&self, layout_out: &mut layout::Layout) {
