@@ -174,12 +174,14 @@ impl Method {
             
             // Grab arguments from the circle arguments
             let coil_radius = circle_args.coil_radius;
-            let center = circle_args.center;
+            // Snap the center to the surface
+            let vec_to_surface = &circle_args.center - surface;
+            let center = circle_args.center - vec_to_surface;
+            let coil_normal = vec_to_surface.normalize();
 
             // Create the circle through surface intersection with sphere
-            let (cid, points, point_normals) =
+            let (_, points, point_normals) =
                 sphere_intersect(surface, center, coil_radius, epsilon);
-            let coil_normal = surface.point_normals[cid].normalize();
 
             if verbose { println!("Uncleaned point count: {}", points.len()) };
 
