@@ -201,7 +201,7 @@ impl Method {
             };
     
             // Closure for calculating the length of a segment (adds an extra point to the start and end)
-            let segment_length = |start: usize, end: usize| -> f32 {
+            let padded_segment_length = |start: usize, end: usize| -> f32 {
                 let start_anchor = (start + coil.vertices.len() - 1) % coil.vertices.len();
                 let end_anchor = (end + 1) % coil.vertices.len();
                 point_distance(start_anchor, end_anchor)
@@ -236,53 +236,115 @@ impl Method {
                         let prev_p = other_intersection[i - 1];
                         if p > prev_p + 1 {
                             end = prev_p;
-                            let length = segment_length(start, end);
+                            let length = padded_segment_length(start, end);
                             segments.push(IntersectionSegment{
                                 start,
                                 end,
                                 length,
-                                wire_crossings: vec![length * 0.5],
+                                wire_crossings: vec![],
                             });
                             start = p;
                         }
                     }
                     end = other_intersection[i_max - 1];
-                    let length = segment_length(start, end);
+                    let length = padded_segment_length(start, end);
                     segments.push(IntersectionSegment{
                         start,
                         end,
                         length,
-                        wire_crossings: vec![length * 0.5],
+                        wire_crossings: vec![],
                     });
                 }
+
+                // Update wire crossings
+                let other_center = self.method_args.circles[other_id].center;
+                let distance_to_other_coil = |p: usize| -> f32 {
+                    let point = coil.vertices[p].point;
+                    let vec_to_center = point - other_center;
+                    vec_to_center.mag()
+                };
+                let inside_other_coil = |p: usize| -> bool {
+                    distance_to_other_coil(p) < self.method_args.circles[other_id].coil_radius
+                };
+                for segment in segments.iter_mut() {
+                    let mut p_prev = segment.start;
+                    let mut p = segment.start + 1 % coil.vertices.len();
+
+                    let in_segment = |x: usize| -> bool {
+                        if segment.end < segment.start {
+                            x > segment.start || x <= segment.end
+                        } else {
+                            x > segment.start && x <= segment.end
+                        }
+                    };
+
+                    while in_segment(p) {
+                        if inside_other_coil(p) != inside_other_coil(p_prev) {
+                            let length = point_distance(p_prev, p);
+
+                            let d1 = distance_to_other_coil(p_prev).abs();
+                            let d2 = distance_to_other_coil(p).abs();
+
+                            let crossing_delta = d1 / (d1 + d2) * length;
+
+                            segment.wire_crossings.push(
+                                point_distance(
+                                    (segment.start + coil.vertices.len() - 1) % coil.vertices.len(),
+                                    p_prev
+                                ) + crossing_delta
+                            );
+                        }
+                        p_prev = p;
+                        p = (p + 1) % coil.vertices.len();   
+                    }
+
+                    segment.wire_crossings.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                    segment.wire_crossings.dedup();
+                }
+                        
             }
             if !any_intersections {
                 continue;
             }
 
+            // Closure for merging the length of two segments
+            let merge_length_offset = |start: usize, end: usize| -> f32 {
+                let start_anchor = (start + coil.vertices.len() - 1) % coil.vertices.len();
+                let end_anchor = (end + coil.vertices.len() - 1) % coil.vertices.len();
+                point_distance(start_anchor, end_anchor)
+            };
+
+            // Enum for which segment to use
+            #[derive(PartialEq)]
+            enum Which {
+                First,
+                Second,
+            }
+            
             // Closure for merging segments
             let merge_segments = |first_seg: &IntersectionSegment, second_seg: &IntersectionSegment| -> Option<IntersectionSegment> {
-                let (start, end) = match (first_seg.end < first_seg.start, second_seg.end < second_seg.start) {
+                
+                let (which_for_start, which_for_end) = match (first_seg.end < first_seg.start, second_seg.end < second_seg.start) {
                     (true, true) => { // Both wrap
                         match (first_seg.start < second_seg.start, first_seg.end < second_seg.end) {
-                            (true, true) => (first_seg.start, second_seg.end),
-                            (true, false) => (first_seg.start, first_seg.end),
-                            (false, true) => (second_seg.start, second_seg.end),
-                            (false, false) => (second_seg.start, first_seg.end),
+                            (true, true) => (Which::First, Which::Second),
+                            (true, false) => (Which::First, Which::First),
+                            (false, true) => (Which::Second, Which::Second),
+                            (false, false) => (Which::Second, Which::First),
                         }
                     },
                     (true, false) => { // First wraps
                         if first_seg.start < second_seg.start {
-                            (first_seg.start, first_seg.end)
+                            (Which::First, Which::First)
                         }
                         else if first_seg.end > second_seg.end {
-                            (first_seg.start, first_seg.end)
+                            (Which::First, Which::First)
                         }
                         else if first_seg.end > second_seg.start {
-                            (first_seg.start, second_seg.end)
+                            (Which::First, Which::Second)
                         }
                         else if first_seg.start < second_seg.end {
-                            (second_seg.start, first_seg.end)
+                            (Which::Second, Which::First)
                         }
                         else {
                             return None; // No intersection
@@ -290,16 +352,16 @@ impl Method {
                     },
                     (false, true) => { // Second wraps
                         if second_seg.start < first_seg.start {
-                            (second_seg.start, second_seg.end)
+                            (Which::Second, Which::Second)
                         }
                         else if second_seg.end > first_seg.end {
-                            (second_seg.start, second_seg.end)
+                            (Which::Second, Which::Second)
                         }
                         else if second_seg.end > first_seg.start {
-                            (second_seg.start, first_seg.end)
+                            (Which::Second, Which::First)
                         }
                         else if second_seg.start < first_seg.end {
-                            (first_seg.start, second_seg.end)
+                            (Which::First, Which::Second)
                         }
                         else {
                             return None; // No intersection
@@ -311,10 +373,10 @@ impl Method {
                                 return None; // No intersection
                             }
                             else if first_seg.end < second_seg.end {
-                                (first_seg.start, second_seg.end)
+                                (Which::First, Which::Second)
                             }
                             else {
-                                (first_seg.start, first_seg.end)
+                                (Which::First, Which::First)
                             }
                         }
                         else {
@@ -322,17 +384,48 @@ impl Method {
                                 return None; // No intersection
                             }
                             else if second_seg.end < first_seg.end {
-                                (second_seg.start, first_seg.end)
+                                (Which::Second, Which::First)
                             }
                             else {
-                                (second_seg.start, second_seg.end)
+                                (Which::Second, Which::Second)
                             }
                         }
                     },
-                };  
-                let length = segment_length(start, end);
-                let mut wire_crossings = first_seg.wire_crossings.clone();
-                wire_crossings.append(&mut second_seg.wire_crossings.clone());
+                };
+
+                let start_segment = match which_for_start {
+                    Which::First => first_seg,
+                    Which::Second => second_seg,
+                };
+                let end_segment = match which_for_end {
+                    Which::First => first_seg,
+                    Which::Second => second_seg,
+                };
+
+                let start = start_segment.start;
+                let end = end_segment.end;
+
+                let length = padded_segment_length(start, end);
+                
+                let mut wire_crossings = start_segment.wire_crossings.clone();
+                let mut end_wire_crossings = end_segment.wire_crossings.clone();
+                
+                // Offset the end wire crossings by the overlapping length -- merge_length_offset accounts for padding!
+                let length_offset = match which_for_start == which_for_end {
+                    false => merge_length_offset(start_segment.start, end_segment.start),
+                    true => {
+                        let other_segment = match which_for_start {
+                            Which::First => second_seg,
+                            Which::Second => first_seg,
+                        };
+                        merge_length_offset(start_segment.start, other_segment.start)
+                    }
+                };
+                for crossing in end_wire_crossings.iter_mut() {
+                    *crossing += length_offset;
+                }
+
+                wire_crossings.append(&mut end_wire_crossings);
                 wire_crossings.sort_by(|a, b| a.partial_cmp(b).unwrap());
                 wire_crossings.dedup();
                 Some(IntersectionSegment{
@@ -352,15 +445,18 @@ impl Method {
             for seg in segments.into_iter().skip(1) {
                 if let Some(merged) = merge_segments(&current_segment, &seg) {
                     current_segment = merged;
-                }
-                else {
+                } else {
                     merged_segments.push(current_segment);
                     current_segment = seg;
                 }
             }
             // Handle wrapping
-            if let Some(merged) = merge_segments(&current_segment, &merged_segments[0]) {
-                merged_segments[0] = merged;
+            if merged_segments.len() > 0 {
+                if let Some(merged) = merge_segments(&current_segment, &merged_segments[0]) {
+                    merged_segments[0] = merged;
+                } else {
+                    merged_segments.push(current_segment);
+                }
             } else {
                 merged_segments.push(current_segment);
             }
@@ -384,8 +480,8 @@ impl Method {
                         } else {
                             s * (1.0 - 2.0_f32.sqrt() + (1.0 - 2.0 * (1.0 - l_ratio) * (1.0 - l_ratio)).sqrt())
                         }
-                    } else if l_ratio > end_tail {
-                        let l_ratio = 1.0 - (l_ratio - end_tail) / (1.0 - end_tail);
+                    } else if l_ratio > (1.0 - end_tail) {
+                        let l_ratio = 1.0 - (l_ratio - (1.0 - end_tail)) / (end_tail);
                         if l_ratio < 0.5 {
                             s * (1.0 - (1.0 - 2.0 * l_ratio * l_ratio).sqrt())
                         } else {
@@ -405,8 +501,8 @@ impl Method {
                         } else {
                             (1.0 - l_ratio).asin()
                         }
-                    } else if l_ratio > end_tail {
-                        let l_ratio = 1.0 - (l_ratio - end_tail) / (1.0 - end_tail);
+                    } else if l_ratio > (1.0 - end_tail) {
+                        let l_ratio = 1.0 - (l_ratio - (1.0 - end_tail)) / (end_tail);
                         if l_ratio < 0.5 {
                             -l_ratio.asin()
                         } else {
