@@ -164,6 +164,17 @@ impl methods::LayoutMethod for Method {
                 }
             }
             println!();
+
+            println!("Center distances (mm):");
+            for (coil_id, coil) in layout_out.coils.iter().enumerate() {
+                for (other_coil_id, other_coil) in layout_out.coils.iter().enumerate() {
+                    if coil_id < other_coil_id {
+                        let distance = (coil.center - other_coil.center).mag();
+                        println!("Coil {} to Coil {}: {:.2}", coil_id, other_coil_id, distance);
+                    }
+                }
+            }
+            println!();
         }
         
         Ok(layout_out)
