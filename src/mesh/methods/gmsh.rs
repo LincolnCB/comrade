@@ -368,7 +368,7 @@ impl Method {
             for segment_n in 0..break_count {
                 for i in 0..4 {
                     let first_arc_id = segment_n * 4 + i + arc_offsets[loop_n];
-                    let second_arc_id = segment_n * 4 + (i + 1) % 4 + arc_offsets[loop_n];
+                    let second_arc_id = ((segment_n + 1) % break_count) * 4 + i + arc_offsets[loop_n];
                     
                     let first_spline_id = segment_n * 4 + i + spline_offsets[loop_n];
                     let second_spline_id = segment_n * 4 + (i + 1) % 4 + spline_offsets[loop_n];
@@ -393,8 +393,10 @@ impl Method {
         for (loop_n, _) in loop_vec.iter().enumerate() {
             writeln!(file, "// Coil {}", loop_n)?;
             for segment_n in 0..break_count {
-                let surface_id = segment_n + line_loop_offsets[loop_n];
-                writeln!(file, "Ruled Surface({}) = {{{}}}", surface_id, surface_id)?;
+                for i in 0..4 {
+                    let surface_id = segment_n * 4 + i + line_loop_offsets[loop_n];
+                    writeln!(file, "Ruled Surface({}) = {{{}}};", surface_id, surface_id)?;
+                }
             }
             if loop_n < loop_vec.len() - 1 {
                 writeln!(file)?;

@@ -175,6 +175,13 @@ impl methods::LayoutMethod for Method {
                 }
             }
             println!();
+
+            println!("TESTING:");
+            let m = layout_out.coils[0].mutual_inductance(&layout_out.coils[1], 1.0);
+            let k = layout_out.coils[0].coupling_factor(&layout_out.coils[1], 1.0);
+            let d = (layout_out.coils[0].center - layout_out.coils[1].center).mag();
+            let dr = d / (self.method_args.circles[0].coil_radius + self.method_args.circles[1].coil_radius);
+            println!("{d}, {dr}, {k}, {m}");
         }
         
         Ok(layout_out)
@@ -284,6 +291,12 @@ impl Method {
             let mut any_intersections = false;
             for other_id in coil_id+1..self.method_args.circles.len() {
                 let other_intersection = &intersections[coil_id][other_id];
+
+                // Ignore loops entirely contained within other loops
+                if coil.vertices.len() - other_intersection.len() < 2 {
+                    continue;
+                }
+
                 if other_intersection.len() > 0 {
                     any_intersections = true;
                     
@@ -340,7 +353,7 @@ impl Method {
                 };
                 for segment in segments.iter_mut() {
                     let mut p_prev = segment.start;
-                    let mut p = segment.start + 1 % coil.vertices.len();
+                    let mut p = (segment.start + 1) % coil.vertices.len();
 
                     let in_segment = |x: usize| -> bool {
                         if segment.end < segment.start {
@@ -372,6 +385,10 @@ impl Method {
 
                     segment.wire_crossings.sort_by(|a, b| a.partial_cmp(b).unwrap());
                     segment.wire_crossings.dedup();
+
+                    if segment.wire_crossings.len() == 0 {
+                        segment.wire_crossings.push(segment.length * 0.5);
+                    }
                 }
                         
             }

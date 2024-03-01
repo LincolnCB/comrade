@@ -212,6 +212,12 @@ impl Method {
             let mut any_intersections = false;
             for other_id in coil_id+1..self.method_args.circles.len() {
                 let other_intersection = &intersections[coil_id][other_id];
+
+                // Ignore loops entirely contained within other loops
+                if coil.vertices.len() - other_intersection.len() < 2 {
+                    continue;
+                }
+
                 if other_intersection.len() > 0 {
                     any_intersections = true;
                     
