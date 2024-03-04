@@ -169,7 +169,7 @@ impl methods::LayoutMethod for Method {
             for (coil_id, coil) in layout_out.coils.iter().enumerate() {
                 for (other_coil_id, other_coil) in layout_out.coils.iter().enumerate() {
                     if coil_id < other_coil_id {
-                        let distance = (coil.center - other_coil.center).mag();
+                        let distance = (coil.center - other_coil.center).norm();
                         println!("Coil {} to Coil {}: {:.2}", coil_id, other_coil_id, distance);
                     }
                 }
@@ -179,7 +179,7 @@ impl methods::LayoutMethod for Method {
             println!("TESTING:");
             let m = layout_out.coils[0].mutual_inductance(&layout_out.coils[1], 1.0);
             let k = layout_out.coils[0].coupling_factor(&layout_out.coils[1], 1.0);
-            let d = (layout_out.coils[0].center - layout_out.coils[1].center).mag();
+            let d = (layout_out.coils[0].center - layout_out.coils[1].center).norm();
             let dr = d / (self.method_args.circles[0].coil_radius + self.method_args.circles[1].coil_radius);
             println!("{d}, {dr}, {k}, {m}");
         }
@@ -265,9 +265,9 @@ impl Method {
             // Get the length of the coil and the distance around of each point
             let mut point_lengths = vec![0.0; coil.vertices.len()];
             for p in 1..coil.vertices.len() {
-                point_lengths[p] = point_lengths[p - 1] + (coil.vertices[p].point - coil.vertices[p - 1].point).mag();
+                point_lengths[p] = point_lengths[p - 1] + (coil.vertices[p].point - coil.vertices[p - 1].point).norm();
             }
-            let coil_length = point_lengths[coil.vertices.len() - 1] + (coil.vertices[0].point - coil.vertices[coil.vertices.len() - 1].point).mag();
+            let coil_length = point_lengths[coil.vertices.len() - 1] + (coil.vertices[0].point - coil.vertices[coil.vertices.len() - 1].point).norm();
     
             // Closure for calculating the distance between two points (wrapping around the coil if necessary)
             let point_distance = |start: usize, end: usize| -> f32 {
@@ -346,7 +346,7 @@ impl Method {
                 let distance_to_other_coil = |p: usize| -> f32 {
                     let point = coil.vertices[p].point;
                     let vec_to_center = point - other_center;
-                    vec_to_center.mag()
+                    vec_to_center.norm()
                 };
                 let inside_other_coil = |p: usize| -> bool {
                     distance_to_other_coil(p) < self.method_args.circles[other_id].coil_radius
@@ -631,12 +631,12 @@ impl Method {
             for (i, circle) in self.method_args.circles.iter().enumerate() {
                 let center = &circle.center;
                 let radius = circle.coil_radius;
-                if (point - center).mag() < radius {
+                if (point - center).norm() < radius {
                     for (j, other_circle) in self.method_args.circles.iter().enumerate() {
                         if i != j {
                             let other_center = &other_circle.center;
                             let other_radius = other_circle.coil_radius;
-                            if (point - other_center).mag() < other_radius {
+                            if (point - other_center).norm() < other_radius {
                                 adjacency[i][j] = true;
                                 adjacency[j][i] = true;
                             }
@@ -656,7 +656,7 @@ impl Method {
             for (j, other_coil) in intersecting_layout.coils.iter().enumerate() {
                 if i != j {
                     for (k, vertex) in coil.vertices.iter().enumerate() {
-                        if ((vertex.point - other_coil.center).mag() - self.method_args.circles[j].coil_radius).abs() < 
+                        if ((vertex.point - other_coil.center).norm() - self.method_args.circles[j].coil_radius).abs() < 
                             (coil.wire_radius + other_coil.wire_radius + self.method_args.clearance) * clearance_scale {
                             
                             intersections[i][j].push(k);

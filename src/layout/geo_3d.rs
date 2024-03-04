@@ -203,7 +203,7 @@ impl GeoVector {
 
     /// Normailze in place
     pub fn normalize(&self) -> Self {
-        let mag = self.mag();
+        let mag = self.norm();
         GeoVector{
             x: self.x / mag,
             y: self.y / mag,
@@ -226,14 +226,14 @@ impl GeoVector {
     }
 
     /// Get the magnitude of the vector.
-    pub fn mag(&self) -> f32 {
+    pub fn norm(&self) -> f32 {
         (self.x*self.x + self.y*self.y + self.z*self.z).sqrt()
     }
 
     /// Get the angle between two vectors.
     pub fn angle_to(&self, other: &GeoVector) -> Angle {
         let dot = self.dot(other);
-        let mag = self.mag() * other.mag();
+        let mag = self.norm() * other.norm();
         // Catch float errors when vectors are exactly aligned
         if (dot / mag) > 1.0 {
             return 0.0;
@@ -247,7 +247,7 @@ impl GeoVector {
     /// Get the vector projection of `self` onto `other`.
     pub fn proj_onto(&self, other: &GeoVector) -> GeoVector {
         let dot = self.dot(other);
-        let mag = other.mag();
+        let mag = other.norm();
         GeoVector{
             x: dot * other.x / mag,
             y: dot * other.y / mag,

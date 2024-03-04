@@ -141,6 +141,7 @@ impl methods::MeshMethod for Method {
             };
             
             // Convert each point to an angle and bin them
+            // Also add the radial points used in the splines, while we're iterating
             let center = coil.center;
             for (point_id, vertex) in coil.vertices.iter().enumerate() {
                 let point = &vertex.point;
@@ -182,49 +183,73 @@ impl methods::MeshMethod for Method {
                 mesh::err_str(&format!("Math error: Angle binning (break count: {break_count}) failed (no points within some bins)"))?;
             }
 
-            // Add the arcs
-            for id in binned_points.iter() {
-                let point_id = id.unwrap();
+            // Add two capacitor breaks on either side of the first binned break (the port)
+            // Position them at the first points in either direction from the port that are at least 2*lc away
+            let port_id = binned_points[0].unwrap();
 
-                // Add the four arcs
+            // Upper side capacitor break:
+            let mut upper_capacitor_break_id = port_id;
+            let mut distance = 0.0;
+            while distance < 2.0 * self.method_args.lc {
+                let previously_checked_id = upper_capacitor_break_id;
+                upper_capacitor_break_id = coil.vertices[upper_capacitor_break_id].next_id;
+                distance += (coil.vertices[upper_capacitor_break_id].point - coil.vertices[previously_checked_id].point).norm();
+                if upper_capacitor_break_id == binned_points[1].unwrap() {
+                    mesh::err_str("Math error: Nearby capacitor break (positive idx direction) not found before first break")?;
+                }
+            }
+            
+            // Lower side capacitor break:
+            let mut lower_capacitor_break_id = port_id;
+            let mut distance = 0.0;
+            while distance < 2.0 * self.method_args.lc {
+                let previously_checked_id = lower_capacitor_break_id;
+                lower_capacitor_break_id = coil.vertices[lower_capacitor_break_id].prev_id;
+                distance += (coil.vertices[lower_capacitor_break_id].point - coil.vertices[previously_checked_id].point).norm();
+                if lower_capacitor_break_id == binned_points[break_count - 1].unwrap() {
+                    mesh::err_str("Math error: Nearby capacitor break (negative idx direction) not found before last break")?;
+                }
+            }
+
+            let mut break_points = vec![port_id, upper_capacitor_break_id];
+            break_points.extend(binned_points.iter().skip(1).map(|p| p.unwrap()));
+            break_points.push(lower_capacitor_break_id);
+
+            // Add the arcs
+            for id in break_points.iter() {
+                // Add the four arcs per point
                 for i in 0..4 {
-                    let start = point_id * 5 + i;
-                    let center = point_id * 5 + 4;
-                    let end = point_id * 5 + (i + 1) % 4;
+                    let start = id * 5 + i;
+                    let center = id * 5 + 4;
+                    let end = id * 5 + (i + 1) % 4;
                     single_loop.arcs.push(Arc{start, center, end});
                 }
             }
 
-            // Add the splines
-            let mut prev_id = binned_points[0].unwrap();
-            for id in binned_points.iter().skip(1) {
-                let point_id = id.unwrap();
+            // Add the splines.
+            for break_number in 0..break_points.len() {
+                
+                let id = break_points[break_number];
+                let next_id = break_points[(break_number + 1) % break_points.len()];
+                // Add the four splines per point
                 for i in 0..4 {
                     let mut spline_points = Vec::<usize>::new();
-                    for j in prev_id..=point_id {
-                        spline_points.push(j * 5 + i);
+
+                    // Handle potential wraparound
+                    if next_id < id {
+                        for j in id..coil.vertices.len() {
+                            spline_points.push(j * 5 + i);
+                        }
+                        for j in 0..=next_id {
+                            spline_points.push(j * 5 + i);
+                        }
+                    } else {
+                        for j in id..=next_id {
+                            spline_points.push(j * 5 + i);
+                        }
                     }
                     single_loop.splines.push(Spline{points: spline_points});
                 }
-                prev_id = point_id;
-            }
-            // Get the last (possibly wrap-around) spline
-            let first_id = binned_points[0].unwrap();
-            for i in 0..4 {
-                let mut spline_points = Vec::<usize>::new();
-                if first_id < prev_id {
-                    for j in prev_id..coil.vertices.len() {
-                        spline_points.push(j * 5 + i);
-                    }
-                    for j in 0..=first_id {
-                        spline_points.push(j * 5 + i);
-                    }
-                } else {
-                    for j in prev_id..=first_id {
-                        spline_points.push(j * 5 + i);
-                    }
-                }
-                single_loop.splines.push(Spline{points: spline_points});
             }
 
             // Save each coil to a separate file
@@ -286,7 +311,6 @@ impl Method {
     /// Save a GMSH .geo file
     fn save_geo(&self, loop_vec: &Vec<Loop>, output_path: &str) -> std::io::Result<()> {
         let file = OpenOptions::new().write(true).create(true).open(&output_path)?;
-        let break_count = self.method_args.break_count;
 
         let mut file = LineWriter::new(file);
 
@@ -363,8 +387,9 @@ impl Method {
         // Write the line loops
         writeln!(file, "// Line Loops")?;
         writeln!(file, "// ------------------------------------------")?;
-        for (loop_n, _) in loop_vec.iter().enumerate() {
+        for (loop_n, single_loop) in loop_vec.iter().enumerate() {
             writeln!(file, "// Coil {}", loop_n)?;
+            let break_count = single_loop.arcs.len() / 4;
             for segment_n in 0..break_count {
                 for i in 0..4 {
                     let first_arc_id = segment_n * 4 + i + arc_offsets[loop_n];
@@ -390,8 +415,9 @@ impl Method {
         // Write the ruled surfaces
         writeln!(file, "// Ruled Surfaces")?;
         writeln!(file, "// ------------------------------------------")?;
-        for (loop_n, _) in loop_vec.iter().enumerate() {
+        for (loop_n, single_loop) in loop_vec.iter().enumerate() {
             writeln!(file, "// Coil {}", loop_n)?;
+            let break_count = single_loop.arcs.len() / 4;
             for segment_n in 0..break_count {
                 for i in 0..4 {
                     let surface_id = segment_n * 4 + i + line_loop_offsets[loop_n];
@@ -429,8 +455,9 @@ impl Method {
         // ... then write the lumped element physical lines (other breaks in each loop, made of four arcs)
         writeln!(file, "// Lumped Elements")?;
         writeln!(file, "// ------------------------------------------")?;
-        for (loop_n, _) in loop_vec.iter().enumerate() {
+        for (loop_n, single_loop) in loop_vec.iter().enumerate() {
             writeln!(file, "// Coil {}", loop_n)?;
+            let break_count = single_loop.arcs.len() / 4;
             for segment_n in 1..break_count {
                 let arc_ids = (0..4).map(|i| i + segment_n * 4 + arc_offsets[loop_n]).collect::<Vec<usize>>();
                 let line_id = (segment_n - 1) + physical_line_offsets[loop_n];
@@ -448,8 +475,9 @@ impl Method {
         // Write the physical surfaces (one coil)
         writeln!(file, "// Physical Surfaces")?;
         writeln!(file, "// ------------------------------------------")?;
-        for (loop_n, _) in loop_vec.iter().enumerate() {
+        for (loop_n, single_loop) in loop_vec.iter().enumerate() {
             writeln!(file, "// Coil {}", loop_n)?;
+            let break_count = single_loop.arcs.len() / 4;
             let mut physical_surface_str = format!("Physical Surface({}) = {{", loop_n + 1);
             for segment_n in 0..break_count {
                 for i in 0..4 {
@@ -477,7 +505,6 @@ impl Method {
     /// Save a MARIE .txt file for ports and lumped elements
     fn save_marie_txt(&self, loop_vec: &Vec<Loop>, output_path: &str) -> std::io::Result<()> {
         let file = OpenOptions::new().write(true).create(true).open(&output_path)?;
-        let break_count = self.method_args.break_count;
 
         let mut file = LineWriter::new(file);
 
@@ -499,7 +526,8 @@ impl Method {
         physical_line_offsets[0] = loop_vec.len() + 1;
 
         // ... then write the lumped elements
-        for (loop_n, _) in loop_vec.iter().enumerate() {
+        for (loop_n, single_loop) in loop_vec.iter().enumerate() {
+            let break_count = single_loop.arcs.len() / 4;
             for segment_n in 1..break_count {
                 let mut line_str = format!("{}", (segment_n - 1) + physical_line_offsets[loop_n]);
                 line_str.push_str(&" ".repeat(COL_POS[0] - line_str.len()));
