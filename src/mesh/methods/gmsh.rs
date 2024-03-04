@@ -73,10 +73,11 @@ struct Loop {
     points: Vec<Point>,
     arcs: Vec<Arc>,
     splines: Vec<Spline>,
+    self_inductance: f32,
 }
 impl Loop {
     pub fn new() -> Self {
-        Loop{points: Vec::new(), arcs: Vec::new(), splines: Vec::new()}
+        Loop{points: Vec::new(), arcs: Vec::new(), splines: Vec::new(), self_inductance: 0.0}
     }
 }
 
@@ -122,6 +123,7 @@ impl methods::MeshMethod for Method {
 
             // Initialize the GMSH vectors
             let mut single_loop = Loop::new();
+            single_loop.self_inductance = coil.self_inductance(1.0);
             
             // Initialize the angle bins
             let angle_step: Angle = 2.0 * PI / break_count as Angle;
@@ -528,6 +530,7 @@ impl Method {
         // ... then write the lumped elements
         for (loop_n, single_loop) in loop_vec.iter().enumerate() {
             let break_count = single_loop.arcs.len() / 4;
+            let capacitor_count = break_count - 2;
             for segment_n in 1..break_count {
                 let mut line_str = format!("{}", (segment_n - 1) + physical_line_offsets[loop_n]);
                 line_str.push_str(&" ".repeat(COL_POS[0] - line_str.len()));

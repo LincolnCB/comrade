@@ -90,9 +90,10 @@ impl std::fmt::Display for RunStage {
 /// Shared arguments, used in all commands. Compiled with clap.
 #[derive(Debug, Args)]
 pub struct SharedArgs {
-    #[arg(short, long = "larmor")]
-    /// REQUIRED. Larmor frequency in MHz.
-    pub larmor_mhz: f64,
+
+    // #[arg(short, long = "larmor")]
+    // /// REQUIRED. Larmor frequency in MHz.
+    // pub larmor_mhz: f64,
 }
 
 /// Re-export clap CLI parse method.
