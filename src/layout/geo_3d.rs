@@ -45,6 +45,11 @@ impl Point {
         Point{x, y, z}
     }
 
+    /// Create a new zero point.
+    pub fn zero() -> Self {
+        Point{x: 0.0, y: 0.0, z: 0.0}
+    }
+
     /// Get the distance between two points.
     pub fn distance(&self, other: &Point) -> f32 {
         let dx = self.x - other.x;
@@ -199,6 +204,11 @@ impl GeoVector {
     /// Create a new vector.
     pub fn new(x: f32, y: f32, z: f32) -> Self {
         GeoVector{x, y, z}
+    }
+
+    /// Create a new zero vector.
+    pub fn zero() -> Self {
+        GeoVector{x: 0.0, y: 0.0, z: 0.0}
     }
 
     /// Normailze in place

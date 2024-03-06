@@ -37,6 +37,8 @@ struct MethodCfg {
     lc: f32,
     #[serde(default = "MethodCfg::default_larmor_mhz")]
     larmor_mhz: f32,
+    #[serde(default = "GeoVector::zero")]
+    origin_offset: GeoVector,
 }
 impl MethodCfg {
     pub fn default_break_count() -> usize {
@@ -57,6 +59,7 @@ impl MethodCfg {
             angle_shift: Self::default_angle_shift(),
             lc: Self::default_lc(),
             larmor_mhz: Self::default_larmor_mhz(),
+            origin_offset: GeoVector::zero(),
         }
     }
 }
@@ -163,10 +166,10 @@ impl methods::MeshMethod for Method {
                 for i in 0..4 {
                     let theta = i as f32 * PI / 2.0;
                     let point = vertex.point + up_vec * radius * theta.cos() + out_vec * radius * theta.sin();
-                    single_loop.points.push(point);
+                    single_loop.points.push(point + self.method_args.origin_offset);
                 }
                 // Add the wire point to the list (some may be unused)
-                single_loop.points.push(vertex.point);
+                single_loop.points.push(vertex.point + self.method_args.origin_offset);
                 
                 let mut angle = zero_theta_vec.angle_to(&out_vec);
 
