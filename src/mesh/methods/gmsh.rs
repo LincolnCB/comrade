@@ -35,6 +35,8 @@ struct MethodCfg {
     angle_shift: f32,
     #[serde(default = "MethodCfg::default_lc")]
     lc: f32,
+    #[serde(default = "MethodCfg::default_larmor_mhz")]
+    larmor_mhz: f32,
 }
 impl MethodCfg {
     pub fn default_break_count() -> usize {
@@ -46,11 +48,15 @@ impl MethodCfg {
     pub fn default_lc() -> f32 {
         0.002
     }
+    pub fn default_larmor_mhz() -> f32 {
+        127.73
+    }
     pub fn default() -> Self {
         MethodCfg{
             break_count: Self::default_break_count(),
             angle_shift: Self::default_angle_shift(),
             lc: Self::default_lc(),
+            larmor_mhz: Self::default_larmor_mhz(),
         }
     }
 }
@@ -73,11 +79,11 @@ struct Loop {
     points: Vec<Point>,
     arcs: Vec<Arc>,
     splines: Vec<Spline>,
-    self_inductance: f32,
+    self_inductance_nh: f32,
 }
 impl Loop {
     pub fn new() -> Self {
-        Loop{points: Vec::new(), arcs: Vec::new(), splines: Vec::new(), self_inductance: 0.0}
+        Loop{points: Vec::new(), arcs: Vec::new(), splines: Vec::new(), self_inductance_nh: 0.0}
     }
 }
 
@@ -123,7 +129,7 @@ impl methods::MeshMethod for Method {
 
             // Initialize the GMSH vectors
             let mut single_loop = Loop::new();
-            single_loop.self_inductance = coil.self_inductance(1.0);
+            single_loop.self_inductance_nh = coil.self_inductance(1.0);
             
             // Initialize the angle bins
             let angle_step: Angle = 2.0 * PI / break_count as Angle;
@@ -295,18 +301,18 @@ impl methods::MeshMethod for Method {
     }
 }
 
-const COL_POS : [usize; 11] = [
+const COL_WIDTH : [usize; 11] = [
     4,
-    14,
-    32,
-    54,
-    66,
-    70,
-    72,
-    74,
-    86,
-    98,
-    110,
+    8,
+    10,
+    12,
+    3,
+    3,
+    2,
+    2,
+    6,
+    6,
+    8,
 ];
 
 impl Method {
@@ -507,18 +513,30 @@ impl Method {
     /// Save a MARIE .txt file for ports and lumped elements
     fn save_marie_txt(&self, loop_vec: &Vec<Loop>, output_path: &str) -> std::io::Result<()> {
         let file = OpenOptions::new().write(true).create(true).open(&output_path)?;
+        let push_column = |line_str: &mut String, input: &str, col_width: usize| {
+            line_str.push_str(input);
+            if input.len() < col_width {
+                line_str.push_str(&" ".repeat(col_width - input.len()));
+            };
+        };
 
         let mut file = LineWriter::new(file);
 
         // Write the ports
         for (loop_n, _) in loop_vec.iter().enumerate() {
-            let mut line_str = format!("{}", loop_n + 1);
-            line_str.push_str(&" ".repeat(COL_POS[0] - line_str.len()));
-
-            line_str.push_str(&"port");
-            line_str.push_str(&" ".repeat(COL_POS[1] - line_str.len()));
-
-            // TODO: Figure the rest out
+            let mut line_str = "".to_string();
+            push_column(&mut line_str, &format!("{}", loop_n + 1), COL_WIDTH[0]);
+            push_column(&mut line_str, "port", COL_WIDTH[1]);
+            push_column(&mut line_str, "resistor", COL_WIDTH[2]);
+            push_column(&mut line_str, "0", COL_WIDTH[3]);
+            push_column(&mut line_str, "[]", COL_WIDTH[4]);
+            push_column(&mut line_str, "[]", COL_WIDTH[5]);
+            push_column(&mut line_str, "0", COL_WIDTH[6]);
+            push_column(&mut line_str, "0", COL_WIDTH[7]);
+            push_column(&mut line_str, "1e-12", COL_WIDTH[8]);
+            push_column(&mut line_str, "1e-12", COL_WIDTH[9]);
+            push_column(&mut line_str, "150e-12", COL_WIDTH[10]);
+            line_str.push_str(&format!("{}", loop_n + 1));
 
             writeln!(file, "{}", line_str)?;
         }
@@ -531,14 +549,30 @@ impl Method {
         for (loop_n, single_loop) in loop_vec.iter().enumerate() {
             let break_count = single_loop.arcs.len() / 4;
             let capacitor_count = break_count - 2;
+            let break_cap_pf = capacitor_count as f32 * 1.0e9 / ((2.0 * PI * self.method_args.larmor_mhz).powi(2) * single_loop.self_inductance_nh);
             for segment_n in 1..break_count {
-                let mut line_str = format!("{}", (segment_n - 1) + physical_line_offsets[loop_n]);
-                line_str.push_str(&" ".repeat(COL_POS[0] - line_str.len()));
-                
-                line_str.push_str(&"element");
-                line_str.push_str(&" ".repeat(COL_POS[1] - line_str.len()));
 
-                // TODO: Figure the rest out
+                let mut line_str = "".to_string();
+                push_column(&mut line_str, &format!("{}", segment_n - 1 + physical_line_offsets[loop_n]), COL_WIDTH[0]);
+                push_column(&mut line_str, "element", COL_WIDTH[1]);
+                push_column(&mut line_str, "capacitor", COL_WIDTH[2]);
+                if segment_n == 1 || segment_n == break_count - 1 {
+                    push_column(&mut line_str, &format!("{:.2}e-12", (2.0 * break_cap_pf)), COL_WIDTH[3]);
+                } else {
+                    push_column(&mut line_str, &format!("{:.2}e-12", break_cap_pf), COL_WIDTH[3]);
+                }
+                push_column(&mut line_str, "[]", COL_WIDTH[4]);
+                push_column(&mut line_str, "[]", COL_WIDTH[5]);
+                push_column(&mut line_str, "0", COL_WIDTH[6]);
+                push_column(&mut line_str, "0", COL_WIDTH[7]);
+                push_column(&mut line_str, "1e-12", COL_WIDTH[8]);
+                push_column(&mut line_str, "1e-12", COL_WIDTH[9]);
+                push_column(&mut line_str, "150e-12", COL_WIDTH[10]);
+                if segment_n == 1 || segment_n == break_count - 1 {
+                    line_str.push_str(&format!("{}", loop_vec.len() + 2 * loop_n + 1));
+                } else {
+                    line_str.push_str(&format!("{}", loop_vec.len() + 2 * loop_n + 2));
+                }
 
                 writeln!(file, "{}", line_str)?;
             }
