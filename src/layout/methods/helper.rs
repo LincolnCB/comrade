@@ -171,11 +171,8 @@ pub fn clean_coil_by_angle(
             
             let angle = radial_tangent.angle_to(&vec_to_point);
             
-            if (angle - PI / 2.0).abs() < 0.1 {
+            if (angle - PI / 2.0).abs() < (PI / 8.0) {
                 continue;
-                // layout::err_str(&format!("Point {} {} is at too harsh an angle relative to the coil normal \
-                //     (centered at {}, normal {}). Try setting pre_shift to false.",
-                //     point_id, point, center, normal))?;
             }
             
             let test_point = *point + r_err * radial_tangent / angle.cos();
@@ -281,16 +278,16 @@ pub fn clean_coil_by_angle(
     // Merge edges
     if edges.len() > 1 {
         if verbose { println!("Merging edges...") };
+
         let mut merged_edges = Vec::<[usize; 2]>::new();
         let mut edge = edges[0].clone();
         for i in 0..edges.len() {
             if i < edges.len() - 1 {
                 let next_edge = edges[i + 1].clone();
-                if edge[1] > next_edge[0] {
-                    edge[1] = next_edge[1];
-                    continue;
-                }
-                else {
+                if let Some((first_starts, first_ends)) = merge_segments(edge[0], edge[1], next_edge[0], next_edge[1]) {
+                    edge[0] = if first_starts {edge[0]} else {next_edge[0]};
+                    edge[1] = if first_ends {edge[1]} else {next_edge[1]};
+                } else {
                     merged_edges.push(edge);
                     edge = next_edge;
                 }
@@ -302,7 +299,7 @@ pub fn clean_coil_by_angle(
         edges = merged_edges;
     }
     // Handle the case where the last edge wraps around
-    if edges.len() > 0 {
+    if edges.len() > 1 {
         let first_edge = edges[0];
         let last_edge = edges[edges.len() - 1];
         if last_edge[1] < last_edge[0] {
@@ -469,6 +466,82 @@ pub fn clean_coil_by_angle(
     }
 
     Ok(layout::Coil::new(center, normal, points, wire_radius, new_normals)?)
+}
+
+/// Merge two segments of a coil
+/// Returns whether the first segment is used for the start and the end, respectively
+pub fn merge_segments(first_start: usize, first_end: usize, second_start: usize, second_end: usize) -> Option::<(bool, bool)> {
+
+    Some(
+        match (first_end < first_start, second_end < second_start) {
+            (true, true) => { // Both wrap
+                match (first_start <= second_start, first_end <= second_end) {
+                    (true, true) => (true, false),
+                    (true, false) => (true, true),
+                    (false, true) => (false, false),
+                    (false, false) => (false, true),
+                }
+            },
+            (true, false) => { // First wraps
+                if first_start <= second_start {
+                    (true, true)
+                }
+                else if first_end >= second_end {
+                    (true, true)
+                }
+                else if first_end >= second_start {
+                    (true, false)
+                }
+                else if first_start <= second_end {
+                    (false, true)
+                }
+                else {
+                    return None; // No intersection
+                }
+            },
+            (false, true) => { // Second wraps
+                if second_start <= first_start {
+                    (false, false)
+                }
+                else if second_end >= first_end {
+                    (false, false)
+                }
+                else if second_end >= first_start {
+                    (false, true)
+                }
+                else if second_start <= first_end {
+                    (true, false)
+                }
+                else {
+                    return None; // No intersection
+                }
+            },
+            (false, false) => { // Neither wrap
+                if first_start <= second_start {
+                    if first_end < second_start {
+                        return None; // No intersection
+                    }
+                    else if first_end <= second_end {
+                        (true, false)
+                    }
+                    else {
+                        (true, true)
+                    }
+                }
+                else {
+                    if second_end < first_start {
+                        return None; // No intersection
+                    }
+                    else if second_end <= first_end {
+                        (false, true)
+                    }
+                    else {
+                        (false, false)
+                    }
+                }
+            },
+        }
+    )
 }
 
 mod debug {

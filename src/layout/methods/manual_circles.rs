@@ -274,7 +274,7 @@ impl Method {
                 };
                 for segment in segments.iter_mut() {
                     let mut p_prev = segment.start;
-                    let mut p = segment.start + 1 % coil.vertices.len();
+                    let mut p = (segment.start + 1) % coil.vertices.len();
 
                     let in_segment = |x: usize| -> bool {
                         if segment.end < segment.start {
@@ -301,11 +301,15 @@ impl Method {
                             );
                         }
                         p_prev = p;
-                        p = (p + 1) % coil.vertices.len();   
+                        p = (p + 1) % coil.vertices.len();
                     }
 
                     segment.wire_crossings.sort_by(|a, b| a.partial_cmp(b).unwrap());
                     segment.wire_crossings.dedup();
+
+                    if segment.wire_crossings.len() == 0 {
+                        segment.wire_crossings.push(segment.length * 0.5);
+                    }
                 }
                         
             }

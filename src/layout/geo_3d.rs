@@ -185,7 +185,16 @@ impl Sub<&Surface> for &Point {
         let adj_point_2 = surface.points[surface.adj[min_point_idx][adj_point_2_idx]];
         let side_1 = adj_point_1 - min_point;
         let side_2 = adj_point_2 - min_point;
-        let face_normal = side_1.cross(&side_2).normalize();
+
+        let mut face_normal = side_1.cross(&side_2);
+
+        face_normal = if face_normal.norm() > 0.001 {
+            face_normal.normalize()
+        }
+        else {
+            min_point_normal.normalize()
+        };
+
 
         vec_to_point.proj_onto(&face_normal)
     }

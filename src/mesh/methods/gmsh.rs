@@ -321,7 +321,7 @@ const COL_WIDTH : [usize; 11] = [
 impl Method {
     /// Save a GMSH .geo file
     fn save_geo(&self, loop_vec: &Vec<Loop>, output_path: &str) -> std::io::Result<()> {
-        let file = OpenOptions::new().write(true).create(true).open(&output_path)?;
+        let file = OpenOptions::new().write(true).create(true).truncate(true).open(&output_path)?;
 
         let mut file = LineWriter::new(file);
 
@@ -515,7 +515,7 @@ impl Method {
 
     /// Save a MARIE .txt file for ports and lumped elements
     fn save_marie_txt(&self, loop_vec: &Vec<Loop>, output_path: &str) -> std::io::Result<()> {
-        let file = OpenOptions::new().write(true).create(true).open(&output_path)?;
+        let file = OpenOptions::new().write(true).create(true).truncate(true).open(&output_path)?;
         let push_column = |line_str: &mut String, input: &str, col_width: usize| {
             line_str.push_str(input);
             if input.len() < col_width {
