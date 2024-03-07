@@ -10,7 +10,7 @@ use crate::{
 };
 use layout::methods;
 use layout::geo_3d::*;
-use methods::helper::{sphere_intersect, clean_coil_by_angle};
+use methods::helper::{sphere_intersect, clean_coil_by_angle, merge_segments};
 
 use serde::{Serialize, Deserialize};
 
@@ -142,7 +142,7 @@ impl methods::LayoutMethod for Method {
         }
 
         // Do overlaps
-        self.mousehole_overlap(&mut layout_out);
+        self.mousehole_overlap(&mut layout_out, &self.method_args.circles);
 
         // Do inductance estimates
         if verbose {
@@ -168,8 +168,8 @@ impl methods::LayoutMethod for Method {
 impl Method {
 
     /// Do overlaps between the coils
-    fn mousehole_overlap(&self, layout_out: &mut layout::Layout) {
-        let intersections = self.get_intersections(layout_out, 2.0);
+    fn mousehole_overlap(&self, layout_out: &mut layout::Layout, circles: &Vec::<CircleArgs>) {
+        let intersections = self.get_intersections(layout_out, 2.0, circles);
         
         // Structure for managing intersecting segments
         #[derive(Clone)]
@@ -210,7 +210,7 @@ impl Method {
             
             // Get all the intersections between a coil and a coil of higher coil id than it. 
             let mut any_intersections = false;
-            for other_id in coil_id+1..self.method_args.circles.len() {
+            for other_id in coil_id+1..circles.len() {
                 let other_intersection = &intersections[coil_id][other_id];
 
                 // Ignore loops entirely contained within other loops
@@ -263,14 +263,14 @@ impl Method {
                 }
 
                 // Update wire crossings
-                let other_center = self.method_args.circles[other_id].center;
+                let other_center = circles[other_id].center;
                 let distance_to_other_coil = |p: usize| -> f32 {
                     let point = coil.vertices[p].point;
                     let vec_to_center = point - other_center;
                     vec_to_center.norm()
                 };
                 let inside_other_coil = |p: usize| -> bool {
-                    distance_to_other_coil(p) < self.method_args.circles[other_id].coil_radius
+                    distance_to_other_coil(p) < circles[other_id].coil_radius
                 };
                 for segment in segments.iter_mut() {
                     let mut p_prev = segment.start;
@@ -323,94 +323,14 @@ impl Method {
                 let end_anchor = (end + coil.vertices.len() - 1) % coil.vertices.len();
                 point_distance(start_anchor, end_anchor)
             };
-
-            // Enum for which segment to use
-            #[derive(PartialEq)]
-            enum Which {
-                First,
-                Second,
-            }
             
             // Closure for merging segments
-            let merge_segments = |first_seg: &IntersectionSegment, second_seg: &IntersectionSegment| -> Option<IntersectionSegment> {
+            let merge_overlap_segments = |first_seg: &IntersectionSegment, second_seg: &IntersectionSegment| -> Option<IntersectionSegment> {
                 
-                let (which_for_start, which_for_end) = match (first_seg.end < first_seg.start, second_seg.end < second_seg.start) {
-                    (true, true) => { // Both wrap
-                        match (first_seg.start < second_seg.start, first_seg.end < second_seg.end) {
-                            (true, true) => (Which::First, Which::Second),
-                            (true, false) => (Which::First, Which::First),
-                            (false, true) => (Which::Second, Which::Second),
-                            (false, false) => (Which::Second, Which::First),
-                        }
-                    },
-                    (true, false) => { // First wraps
-                        if first_seg.start < second_seg.start {
-                            (Which::First, Which::First)
-                        }
-                        else if first_seg.end > second_seg.end {
-                            (Which::First, Which::First)
-                        }
-                        else if first_seg.end > second_seg.start {
-                            (Which::First, Which::Second)
-                        }
-                        else if first_seg.start < second_seg.end {
-                            (Which::Second, Which::First)
-                        }
-                        else {
-                            return None; // No intersection
-                        }
-                    },
-                    (false, true) => { // Second wraps
-                        if second_seg.start < first_seg.start {
-                            (Which::Second, Which::Second)
-                        }
-                        else if second_seg.end > first_seg.end {
-                            (Which::Second, Which::Second)
-                        }
-                        else if second_seg.end > first_seg.start {
-                            (Which::Second, Which::First)
-                        }
-                        else if second_seg.start < first_seg.end {
-                            (Which::First, Which::Second)
-                        }
-                        else {
-                            return None; // No intersection
-                        }
-                    },
-                    (false, false) => { // Neither wrap
-                        if first_seg.start < second_seg.start {
-                            if first_seg.end < second_seg.start {
-                                return None; // No intersection
-                            }
-                            else if first_seg.end < second_seg.end {
-                                (Which::First, Which::Second)
-                            }
-                            else {
-                                (Which::First, Which::First)
-                            }
-                        }
-                        else {
-                            if second_seg.end < first_seg.start {
-                                return None; // No intersection
-                            }
-                            else if second_seg.end < first_seg.end {
-                                (Which::Second, Which::First)
-                            }
-                            else {
-                                (Which::Second, Which::Second)
-                            }
-                        }
-                    },
-                };
+                let (first_starts, first_ends) = merge_segments(first_seg.start, first_seg.end, second_seg.start, second_seg.end)?;
 
-                let start_segment = match which_for_start {
-                    Which::First => first_seg,
-                    Which::Second => second_seg,
-                };
-                let end_segment = match which_for_end {
-                    Which::First => first_seg,
-                    Which::Second => second_seg,
-                };
+                let start_segment = if first_starts { first_seg } else { second_seg };
+                let end_segment = if first_ends { first_seg } else { second_seg };
 
                 let start = start_segment.start;
                 let end = end_segment.end;
@@ -421,13 +341,10 @@ impl Method {
                 let mut end_wire_crossings = end_segment.wire_crossings.clone();
                 
                 // Offset the end wire crossings by the overlapping length -- merge_length_offset accounts for padding!
-                let length_offset = match which_for_start == which_for_end {
+                let length_offset = match first_starts == first_ends {
                     false => merge_length_offset(start_segment.start, end_segment.start),
                     true => {
-                        let other_segment = match which_for_start {
-                            Which::First => second_seg,
-                            Which::Second => first_seg,
-                        };
+                        let other_segment = if first_starts { second_seg } else { first_seg };
                         merge_length_offset(start_segment.start, other_segment.start)
                     }
                 };
@@ -453,7 +370,7 @@ impl Method {
             let mut merged_segments = Vec::<IntersectionSegment>::new();
             let mut current_segment = segments[0].clone();
             for seg in segments.into_iter().skip(1) {
-                if let Some(merged) = merge_segments(&current_segment, &seg) {
+                if let Some(merged) = merge_overlap_segments(&current_segment, &seg) {
                     current_segment = merged;
                 } else {
                     merged_segments.push(current_segment);
@@ -462,7 +379,7 @@ impl Method {
             }
             // Handle wrapping
             if merged_segments.len() > 0 {
-                if let Some(merged) = merge_segments(&current_segment, &merged_segments[0]) {
+                if let Some(merged) = merge_overlap_segments(&current_segment, &merged_segments[0]) {
                     merged_segments[0] = merged;
                 } else {
                     merged_segments.push(current_segment);
@@ -546,14 +463,14 @@ impl Method {
 
     /// Get the adjacency matrix for the circles laid out on the surface
     #[allow(dead_code)]
-    fn get_adjacency(&self, surface: &Surface) -> Vec<Vec<bool>> {
-        let mut adjacency: Vec<Vec<bool>> = vec![vec![false; self.method_args.circles.len()]; self.method_args.circles.len()];
+    fn get_adjacency(&self, surface: &Surface, circles: &Vec::<CircleArgs>) -> Vec<Vec<bool>> {
+        let mut adjacency: Vec<Vec<bool>> = vec![vec![false; circles.len()]; circles.len()];
         for point in surface.points.iter() {
-            for (i, circle) in self.method_args.circles.iter().enumerate() {
+            for (i, circle) in circles.iter().enumerate() {
                 let center = &circle.center;
                 let radius = circle.coil_radius;
                 if (point - center).norm() < radius {
-                    for (j, other_circle) in self.method_args.circles.iter().enumerate() {
+                    for (j, other_circle) in circles.iter().enumerate() {
                         if i != j {
                             let other_center = &other_circle.center;
                             let other_radius = other_circle.coil_radius;
@@ -571,13 +488,13 @@ impl Method {
 
     /// Get a matrix of vectors of intersection points between cleaned coils
     #[allow(dead_code)]
-    fn get_intersections(&self, intersecting_layout: &layout::Layout, clearance_scale: f32) -> Vec<Vec<Vec<usize>>> {
-        let mut intersections: Vec<Vec<Vec<usize>>> = vec![vec![vec![]; self.method_args.circles.len()]; self.method_args.circles.len()];
+    fn get_intersections(&self, intersecting_layout: &layout::Layout, clearance_scale: f32, circles: &Vec::<CircleArgs>) -> Vec<Vec<Vec<usize>>> {
+        let mut intersections: Vec<Vec<Vec<usize>>> = vec![vec![vec![]; circles.len()]; circles.len()];
         for (i, coil) in intersecting_layout.coils.iter().enumerate() {
             for (j, other_coil) in intersecting_layout.coils.iter().enumerate() {
                 if i != j {
                     for (k, vertex) in coil.vertices.iter().enumerate() {
-                        if ((vertex.point - other_coil.center).norm() - self.method_args.circles[j].coil_radius).abs() < 
+                        if ((vertex.point - other_coil.center).norm() - circles[j].coil_radius).abs() < 
                             (coil.wire_radius + other_coil.wire_radius + self.method_args.clearance) * clearance_scale {
                             
                             intersections[i][j].push(k);
