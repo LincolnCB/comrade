@@ -41,16 +41,14 @@ struct MethodCfg {
     pre_shift: bool,
     #[serde(default = "MethodCfg::default_iterations")]
     iterations: usize,
-    // #[serde(default = "MethodCfg::default_inductive_force")]
-    // inductance_force: f32,
+    #[serde(default = "MethodCfg::default_coupling_force")]
+    coupling_force: f32,
     #[serde(default = "MethodCfg::default_radius_freedom")]
     radius_freedom: f32,
-    // #[serde(default = "MethodCfg::default_radius_force")]
-    // radius_force: f32,
+    #[serde(default = "MethodCfg::default_radius_force")]
+    radius_force: f32,
     #[serde(default = "MethodCfg::default_center_freedom")]
     center_freedom: f32,
-    // #[serde(default = "MethodCfg::default_center_force")]
-    // center_force: f32,
     #[serde(default = "MethodCfg::default_verbose")]
     verbose: bool,
 }
@@ -63,11 +61,10 @@ impl MethodCfg {
             epsilon: Self::default_epsilon(),
             pre_shift: Self::default_pre_shift(),
             iterations: Self::default_iterations(),
-            // inductance_force: Self::default_inductive_force(),
-            radius_freedom: Self::default_radius_freedom(),
-            // radius_force: Self::default_radius_force(),
             center_freedom: Self::default_center_freedom(),
-            // center_force: Self::default_center_force(),
+            radius_freedom: Self::default_radius_freedom(),
+            coupling_force: Self::default_coupling_force(),
+            radius_force: Self::default_radius_force(),
             verbose: Self::default_verbose(),
         }
     }
@@ -89,10 +86,16 @@ impl MethodCfg {
     pub fn default_iterations() -> usize {
         1
     }
-    pub fn default_radius_freedom() -> f32 {
-        0.2
-    }
     pub fn default_center_freedom() -> f32 {
+        0.5
+    }
+    pub fn default_radius_freedom() -> f32 {
+        0.1
+    }
+    pub fn default_coupling_force() -> f32 {
+        0.6
+    }
+    pub fn default_radius_force() -> f32 {
         0.5
     }
 }
@@ -154,27 +157,67 @@ impl methods::LayoutMethod for Method {
                 }
                 println!();
             }
+
+            let step_size = 1.0 - (i as f32) / (iterations as f32) * 0.5;
+
             // Adjust the centers of the coils
             for (coil_id, coil) in layout_out.coils.iter().enumerate() {
                 let mut center = coil.center;
-                let mut delta = GeoVector::zero();
+                let mut forces = Vec::<GeoVector>::new();
+                let mut force_directions = Vec::<f32>::new();
                 for (other_id, other_coil) in layout_out.coils.iter().enumerate() {
                     if coil_id != other_id {
                         let vector_between = center - other_coil.center;
                         let distance_scale = new_circles[coil_id].coil_radius + new_circles[other_id].coil_radius;
                         let d_rel = vector_between.norm() / distance_scale;
-                        // TODO: This is all heuristic!
+                        // Changes to the heuristic should be done below
                         if d_rel < 1.1 {
-                            let d_rel_err = -0.3 * coil.coupling_factor(other_coil, 1.0);
-                            delta = delta - vector_between.normalize() * (d_rel_err * distance_scale) * (1.0 - (i as f32) / (iterations as f32) * 0.5);
-                        } else if d_rel < 1.3 {
-                            let d_rel_err = 0.1 * coil.coupling_factor(other_coil, 1.0);
-                            delta = delta + vector_between.normalize() * (d_rel_err * distance_scale) * (1.0 - (i as f32) / (iterations as f32) * 0.5);
+                            let k = coil.coupling_factor(other_coil, 1.0);
+                            let d_rel_err = (self.method_args.coupling_force * 0.5) * k;
+                            forces.push(vector_between.normalize() * (d_rel_err * distance_scale) * step_size);
+                            force_directions.push(-k.signum())
+                        } else if d_rel < 1.2 {
+                            let k = coil.coupling_factor(other_coil, 1.0);
+                            let d_rel_err = -(self.method_args.coupling_force * 0.2) * k;
+                            forces.push(vector_between.normalize() * (d_rel_err * distance_scale) * step_size);
+                            force_directions.push(-1.0)
                         }
                     }
                 }
-                center = center + (delta.rej_onto(&coil.normal));
+                
+                // Find center delta
+                let mut delta_c = GeoVector::zero();
+                for force in forces.iter() {
+                    delta_c = delta_c + *force;
+                }
+
+                // Update the center
+                let center_bound = self.method_args.center_freedom * self.method_args.circles[coil_id].coil_radius;
+                let original_center = self.method_args.circles[coil_id].center;
+                let total_delta = center + (delta_c.rej_onto(&coil.normal)) - original_center;
+                if total_delta.norm() > center_bound {
+                    delta_c += total_delta.normalize() * (center_bound - total_delta.norm());
+                }
+                center = center + (delta_c.rej_onto(&coil.normal));
+                    
+
+                // Calculate a heuristic radial force
+                let mut radial_force = 0.0;
+                let original_radius = self.method_args.circles[coil_id].coil_radius;
+                for (force_num, force) in forces.iter().enumerate() {
+                    let reduced_force = *force - delta_c.proj_onto(&force);
+                    let force_direction = force_directions[force_num];
+                    radial_force += (reduced_force).norm() * force_direction * (reduced_force.dot(force).signum());
+                }
+                let mut new_radius = new_circles[coil_id].coil_radius + self.method_args.radius_force * radial_force;
+                if new_radius > (1.0 + self.method_args.radius_freedom) * original_radius {
+                    new_radius = (1.0 + self.method_args.radius_freedom) * original_radius;
+                } else if new_radius < (1.0 - self.method_args.radius_freedom) * original_radius {
+                    new_radius = (1.0 - self.method_args.radius_freedom) * original_radius;
+                }
+
                 new_circles[coil_id].center = center - (&center - surface);
+                new_circles[coil_id].coil_radius = new_radius;
             }         
             layout_out = self.single_pass(surface, &new_circles)?;
         }
@@ -182,6 +225,18 @@ impl methods::LayoutMethod for Method {
 
         // Do inductance estimates
         if self.method_args.verbose {
+
+            println!("Distances:");
+            for (coil_id, coil) in layout_out.coils.iter().enumerate() {
+                for (other_coil_id, other_coil) in layout_out.coils.iter().enumerate() {
+                    if coil_id < other_coil_id {
+                        let distance = (coil.center - other_coil.center).norm();
+                        let d_rel = distance / (new_circles[coil_id].coil_radius + new_circles[other_coil_id].coil_radius);
+                        println!("Coil {} to Coil {}: {:.2} mm ({:.3} relative)", coil_id, other_coil_id, distance, d_rel);
+                    }
+                }
+            }
+            println!();
 
             println!("Coupling factor estimates:");
             for (coil_id, coil) in layout_out.coils.iter().enumerate() {
@@ -194,9 +249,9 @@ impl methods::LayoutMethod for Method {
             }
             println!();
 
-            println!("Centers:");
+            println!("Final Coils:");
             for (coil_id, coil) in layout_out.coils.iter().enumerate() {
-                println!("Coil {}: {}", coil_id, coil.center);
+                println!("Coil {}: Radius {}, Center {}", coil_id, new_circles[coil_id].coil_radius, coil.center);
             }
             println!();
 
