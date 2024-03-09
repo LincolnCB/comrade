@@ -183,23 +183,49 @@ impl methods::LayoutMethod for Method {
         // Run a single pass
         let mut layout_out = self.single_pass(surface, &original_circles)?;
 
+        // Print initial statistics
+        if self.method_args.verbose {
+            println!("Initial Statistics:");
+            println!();
+
+            println!("Distances:");
+            for (coil_id, coil) in layout_out.coils.iter().enumerate() {
+                for (other_coil_id, other_coil) in layout_out.coils.iter().enumerate() {
+                    if coil_id < other_coil_id {
+                        let distance = (coil.center - other_coil.center).norm();
+                        let d_rel = distance / (new_circles[coil_id].coil_radius + new_circles[other_coil_id].coil_radius);
+                        println!("Coil {} to Coil {}: {:.2} mm ({:.3} relative)", coil_id, other_coil_id, distance, d_rel);
+                    }
+                }
+            }
+            println!();
+
+            println!("Coupling factor estimates:");
+            for (coil_id, coil) in layout_out.coils.iter().enumerate() {
+                for (other_coil_id, other_coil) in layout_out.coils.iter().enumerate() {
+                    if coil_id < other_coil_id {
+                        let coupling = coil.coupling_factor(other_coil, 1.0);
+                        print!("Coil {} to Coil {}:", coil_id, other_coil_id);
+                        if coupling.signum() > 0.0 {
+                            println!("  {:.3}", coupling);
+                        } else {
+                            println!(" {:.3}", coupling);
+                        }
+                    }
+                }
+            }
+            println!();
+
+            println!("Coils:");
+            for (coil_id, coil) in layout_out.coils.iter().enumerate() {
+                println!("Coil {}: Radius {:.2}, Center {}", coil_id, new_circles[coil_id].coil_radius, coil.center);
+            }
+            println!();
+        }
+
         for (i, _) in (0..iterations).enumerate() {
             println!("Iteration {}/{}...", (i + 1), iterations);
             assert!(new_circles.len() == layout_out.coils.len());
-
-            // if self.method_args.verbose {
-
-            //     println!("Coupling factor estimates:");
-            //     for (coil_id, coil) in layout_out.coils.iter().enumerate() {
-            //         for (other_coil_id, other_coil) in layout_out.coils.iter().enumerate() {
-            //             if coil_id < other_coil_id {
-            //                 let coupling = coil.coupling_factor(other_coil, 1.0);
-            //                 println!("Coil {} to Coil {}: {}", coil_id, other_coil_id, coupling);
-            //             }
-            //         }
-            //     }
-            //     println!();
-            // }
 
             let step_size = 1.0 - (i as f32) / (iterations as f32) * 0.5;
 
@@ -295,7 +321,7 @@ impl methods::LayoutMethod for Method {
         }
 
 
-        // Do inductance estimates
+        // Print statistics
         if self.method_args.verbose {
 
             println!("Distances:");
@@ -315,7 +341,12 @@ impl methods::LayoutMethod for Method {
                 for (other_coil_id, other_coil) in layout_out.coils.iter().enumerate() {
                     if coil_id < other_coil_id {
                         let coupling = coil.coupling_factor(other_coil, 1.0);
-                        println!("Coil {} to Coil {}: {:.4}", coil_id, other_coil_id, coupling);
+                        print!("Coil {} to Coil {}:", coil_id, other_coil_id);
+                        if coupling.signum() > 0.0 {
+                            println!("  {:.3}", coupling);
+                        } else {
+                            println!(" {:.3}", coupling);
+                        }
                     }
                 }
             }
