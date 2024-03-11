@@ -298,28 +298,17 @@ pub fn clean_coil_by_angle(
         }
         edges = merged_edges;
     }
-    // Handle the case where the last edge wraps around
+    // Handle the last edge -- merge if needed, and move it to the front if it wraps around
     if edges.len() > 1 {
         let first_edge = edges[0];
         let last_edge = edges[edges.len() - 1];
-        if last_edge[1] < last_edge[0] {
-            let unwrapped_last_end = last_edge[1] + angles.len();
-            let unwrapped_first_start = 
-                if first_edge[0] > first_edge[1] {
-                    first_edge[0]
-                }
-                else {
-                    first_edge[0] + angles.len()
-                };
-            if unwrapped_last_end > unwrapped_first_start {
-                if edges.len() == 1 {
-                    layout::err_str("Angle edge detection failed: one edge that fills the entire list.")?;
-                }
-                edges[0] = [last_edge[0], first_edge[1]];
-            }
-            else {
-                edges.insert(0, last_edge);
-            }
+
+        if let Some((first_starts, first_ends)) = merge_segments(first_edge[0], first_edge[1], last_edge[0], last_edge[1]) {
+            let new_edge = [if first_starts {first_edge[0]} else {last_edge[0]}, if first_ends {first_edge[1]} else {last_edge[1]}];
+            edges[0] = new_edge;
+            edges.pop();
+        } else if last_edge[1] < last_edge[0] {
+            edges.insert(0, last_edge);
             edges.pop();
         }
     }
