@@ -64,6 +64,10 @@ struct MethodCfg {
     // Verbosity
     #[serde(default = "MethodCfg::default_verbose")]
     verbose: bool,
+
+    // Save final cfg output
+    #[serde(default = "MethodCfg::default_final_cfg_output")]
+    final_cfg_output: Option<String>,
 }
 impl MethodCfg {
     pub fn default() -> Self {
@@ -85,6 +89,7 @@ impl MethodCfg {
             external_pressure_scale: Self::default_external_pressure_scale(),
 
             verbose: Self::default_verbose(),
+            final_cfg_output: Self::default_final_cfg_output(),
         }
     }
     pub fn default_epsilon() -> f32 {
@@ -128,6 +133,9 @@ impl MethodCfg {
 
     pub fn default_verbose() -> bool {
         false
+    }
+    pub fn default_final_cfg_output() -> Option<String> {
+        None
     }
 }
 
@@ -364,6 +372,12 @@ impl methods::LayoutMethod for Method {
             // let d = (layout_out.coils[0].center - layout_out.coils[1].center).norm();
             // let dr = d / (new_circles[0].coil_radius + new_circles[1].coil_radius);
             // println!("{d}, {dr}, {k}, {m}");
+        }
+
+        if self.method_args.final_cfg_output.is_some() {
+            println!("Writing final cfg...");
+            let f = crate::io::create(&self.method_args.final_cfg_output.as_ref().unwrap())?;
+            serde_yaml::to_writer(f, &new_circles)?;
         }
         
         Ok(layout_out)

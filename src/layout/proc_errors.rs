@@ -5,6 +5,8 @@ pub enum LayoutError {
     IoError(crate::io::IoError),
     /// Serde JSON error.
     SerdeJsonError(serde_json::Error),
+    /// Serde YAML error.
+    SerdeYamlError(serde_yaml::Error),
     /// StringOnly error.
     StringOnly(String),
 }
@@ -13,6 +15,7 @@ impl std::fmt::Display for LayoutError {
         match self {
             LayoutError::IoError(error) => write!(f, "- IO Error:\n{}", error),
             LayoutError::SerdeJsonError(error) => write!(f, "- JSON Serialization/Deserialization Error:\n{}", error),
+            LayoutError::SerdeYamlError(error) => write!(f, "- YAML Serialization/Deserialization Error:\n{}", error),
             LayoutError::StringOnly(error) => write!(f, "- {}", error),
         }
     }
@@ -25,6 +28,11 @@ impl From<crate::io::IoError> for LayoutError {
 impl From<serde_json::Error> for LayoutError {
     fn from(error: serde_json::Error) -> Self {
         LayoutError::SerdeJsonError(error)
+    }
+}
+impl From<serde_yaml::Error> for LayoutError {
+    fn from(error: serde_yaml::Error) -> Self {
+        LayoutError::SerdeYamlError(error)
     }
 }
 impl From<String> for LayoutError {
