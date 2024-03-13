@@ -33,6 +33,10 @@ struct MethodCfg {
     break_count: usize,
     #[serde(default = "MethodCfg::default_angle_shift", alias = "angle")]
     angle_shift: f32,
+    #[serde(default = "MethodCfg::default_single_surface")]
+    single_surface: bool,
+    #[serde(default = "MethodCfg::default_poly_count", alias = "spline_count")]
+    poly_count: usize,
     #[serde(default = "MethodCfg::default_lc")]
     lc: f32,
     #[serde(default = "MethodCfg::default_larmor_mhz")]
@@ -47,6 +51,12 @@ impl MethodCfg {
     pub fn default_angle_shift() -> f32 {
         0.0
     }
+    pub fn default_single_surface() -> bool {
+        true
+    }
+    pub fn default_poly_count() -> usize {
+        4
+    }
     pub fn default_lc() -> f32 {
         0.002
     }
@@ -57,6 +67,8 @@ impl MethodCfg {
         MethodCfg{
             break_count: Self::default_break_count(),
             angle_shift: Self::default_angle_shift(),
+            single_surface: Self::default_single_surface(),
+            poly_count: Self::default_poly_count(),
             lc: Self::default_lc(),
             larmor_mhz: Self::default_larmor_mhz(),
             origin_offset: GeoVector::zero(),
@@ -114,6 +126,7 @@ impl methods::MeshMethod for Method {
         let output_path = output_path.to_string() + ".geo";
 
         let break_count = self.method_args.break_count;
+        let poly_count = self.method_args.poly_count;
         if break_count < 1 {
             mesh::err_str("Break count must be at least 1")?;
         }
@@ -162,9 +175,9 @@ impl methods::MeshMethod for Method {
                 let up_vec = vertex.wire_radius_normal;
                 let out_vec = vec_to_point.rej_onto(&up_vec).normalize();
                 
-                // Add the four wire spline points to the list
-                for i in 0..4 {
-                    let theta = i as f32 * PI / 2.0;
+                // Add the spline points to the list
+                for i in 0..poly_count {
+                    let theta = i as f32 * 2.0 * PI / poly_count as f32;
                     let point = vertex.point + up_vec * radius * theta.cos() + out_vec * radius * theta.sin();
                     single_loop.points.push(point + self.method_args.origin_offset);
                 }
@@ -228,11 +241,11 @@ impl methods::MeshMethod for Method {
 
             // Add the arcs
             for id in break_points.iter() {
-                // Add the four arcs per point
-                for i in 0..4 {
-                    let start = id * 5 + i;
-                    let center = id * 5 + 4;
-                    let end = id * 5 + (i + 1) % 4;
+                // Add the arcs per point (equal to spline poly count, 4 by default)
+                for i in 0..poly_count {
+                    let start = id * (poly_count + 1) + i;
+                    let center = id * (poly_count + 1) + poly_count;
+                    let end = id * (poly_count + 1) + (i + 1) % poly_count;
                     single_loop.arcs.push(Arc{start, center, end});
                 }
             }
@@ -242,21 +255,21 @@ impl methods::MeshMethod for Method {
                 
                 let id = break_points[break_number];
                 let next_id = break_points[(break_number + 1) % break_points.len()];
-                // Add the four splines per point
-                for i in 0..4 {
+                // Add the splines per layout point
+                for i in 0..poly_count {
                     let mut spline_points = Vec::<usize>::new();
 
                     // Handle potential wraparound
                     if next_id < id {
                         for j in id..coil.vertices.len() {
-                            spline_points.push(j * 5 + i);
+                            spline_points.push(j * (poly_count + 1) + i);
                         }
                         for j in 0..=next_id {
-                            spline_points.push(j * 5 + i);
+                            spline_points.push(j * (poly_count + 1) + i);
                         }
                     } else {
                         for j in id..=next_id {
-                            spline_points.push(j * 5 + i);
+                            spline_points.push(j * (poly_count + 1) + i);
                         }
                     }
                     single_loop.splines.push(Spline{points: spline_points});
@@ -325,6 +338,7 @@ impl Method {
 
         let mut file = LineWriter::new(file);
 
+        let poly_count = self.method_args.poly_count;
 
         // Write the lc
         writeln!(file, "lc = {};", self.method_args.lc)?;
@@ -400,23 +414,23 @@ impl Method {
         writeln!(file, "// ------------------------------------------")?;
         for (loop_n, single_loop) in loop_vec.iter().enumerate() {
             writeln!(file, "// Coil {}", loop_n)?;
-            let break_count = single_loop.arcs.len() / 4;
+            let break_count = single_loop.arcs.len() / poly_count;
             for segment_n in 0..break_count {
-                for i in 0..4 {
-                    let first_arc_id = segment_n * 4 + i + arc_offsets[loop_n];
-                    let second_arc_id = ((segment_n + 1) % break_count) * 4 + i + arc_offsets[loop_n];
+                for i in 0..poly_count {
+                    let first_arc_id = segment_n * poly_count + i + arc_offsets[loop_n];
+                    let second_arc_id = ((segment_n + 1) % break_count) * poly_count + i + arc_offsets[loop_n];
                     
-                    let first_spline_id = segment_n * 4 + i + spline_offsets[loop_n];
-                    let second_spline_id = segment_n * 4 + (i + 1) % 4 + spline_offsets[loop_n];
+                    let first_spline_id = segment_n * poly_count + i + spline_offsets[loop_n];
+                    let second_spline_id = segment_n * poly_count + (i + 1) % poly_count + spline_offsets[loop_n];
 
-                    let loop_id = segment_n * 4 + i + line_loop_offsets[loop_n];
+                    let loop_id = segment_n * poly_count + i + line_loop_offsets[loop_n];
                     
                     writeln!(file, "Line Loop({}) = {{-{}, {}, {}, -{}}};", 
                         loop_id, first_arc_id, first_spline_id, second_arc_id, second_spline_id)?;
                 }
             }
             if loop_n < loop_vec.len() - 1 {
-                line_loop_offsets[loop_n + 1] = line_loop_offsets[loop_n] + break_count * 4;
+                line_loop_offsets[loop_n + 1] = line_loop_offsets[loop_n] + break_count * poly_count;
                 writeln!(file)?;
             }
         }
@@ -428,10 +442,10 @@ impl Method {
         writeln!(file, "// ------------------------------------------")?;
         for (loop_n, single_loop) in loop_vec.iter().enumerate() {
             writeln!(file, "// Coil {}", loop_n)?;
-            let break_count = single_loop.arcs.len() / 4;
+            let break_count = single_loop.arcs.len() / poly_count;
             for segment_n in 0..break_count {
-                for i in 0..4 {
-                    let surface_id = segment_n * 4 + i + line_loop_offsets[loop_n];
+                for i in 0..poly_count {
+                    let surface_id = segment_n * poly_count + i + line_loop_offsets[loop_n];
                     writeln!(file, "Ruled Surface({}) = {{{}}};", surface_id, surface_id)?;
                 }
             }
@@ -443,14 +457,21 @@ impl Method {
         writeln!(file)?;
 
         
-        // Write the physical lines for the ports first (first break in each loop, made of four arcs)...
+        // Write the physical lines for the ports first (first break in each loop, made of arcs)...
         writeln!(file, "// Ports")?;
         writeln!(file, "// ------------------------------------------")?;
         for (loop_n, _) in loop_vec.iter().enumerate() {
             writeln!(file, "// Coil {}", loop_n)?;
-            let arc_ids = (0..4).map(|i| i + arc_offsets[loop_n]).collect::<Vec<usize>>();
-            writeln!(file, "Physical Line({}) = {{{}, {}, {}, {}}};", 
-                loop_n + 1, arc_ids[0], arc_ids[1], arc_ids[2], arc_ids[3])?;
+            let arc_ids = (0..poly_count).map(|i| i + arc_offsets[loop_n]).collect::<Vec<usize>>();
+            let mut physical_line_str = format!("Physical Line({}) = {{", loop_n + 1);
+            for (i, arc_id) in arc_ids.iter().enumerate() {
+                physical_line_str.push_str(&arc_id.to_string());
+                if i < arc_ids.len() - 1 {
+                    physical_line_str.push_str(", ");
+                }
+            }
+            physical_line_str.push_str("};");
+            writeln!(file, "{}", physical_line_str)?;
             if loop_n < loop_vec.len() - 1 {
                 writeln!(file)?;
             }
@@ -463,17 +484,24 @@ impl Method {
         physical_line_offsets[0] = loop_vec.len() + 1;
 
 
-        // ... then write the lumped element physical lines (other breaks in each loop, made of four arcs)
+        // ... then write the lumped element physical lines (other breaks in each loop, made of arcs)
         writeln!(file, "// Lumped Elements")?;
         writeln!(file, "// ------------------------------------------")?;
         for (loop_n, single_loop) in loop_vec.iter().enumerate() {
             writeln!(file, "// Coil {}", loop_n)?;
-            let break_count = single_loop.arcs.len() / 4;
+            let break_count = single_loop.arcs.len() / poly_count;
             for segment_n in 1..break_count {
-                let arc_ids = (0..4).map(|i| i + segment_n * 4 + arc_offsets[loop_n]).collect::<Vec<usize>>();
+                let arc_ids = (0..poly_count).map(|i| i + segment_n * poly_count + arc_offsets[loop_n]).collect::<Vec<usize>>();
                 let line_id = (segment_n - 1) + physical_line_offsets[loop_n];
-                writeln!(file, "Physical Line({}) = {{{}, {}, {}, {}}};", 
-                    line_id, arc_ids[0], arc_ids[1], arc_ids[2], arc_ids[3])?;
+                let mut physical_line_str = format!("Physical Line({}) = {{", line_id);
+                for (i, arc_id) in arc_ids.iter().enumerate() {
+                    physical_line_str.push_str(&arc_id.to_string());
+                    if i < arc_ids.len() - 1 {
+                        physical_line_str.push_str(", ");
+                    }
+                }
+                physical_line_str.push_str("};");
+                writeln!(file, "{}", physical_line_str)?;
             }
             if loop_n < loop_vec.len() - 1 {
                 physical_line_offsets[loop_n + 1] = physical_line_offsets[loop_n] + (break_count - 1);
@@ -486,23 +514,31 @@ impl Method {
         // Write the physical surfaces (one coil)
         writeln!(file, "// Physical Surfaces")?;
         writeln!(file, "// ------------------------------------------")?;
+        let single_surface = self.method_args.single_surface;
+        let mut physical_surface_str = "".to_string();
         for (loop_n, single_loop) in loop_vec.iter().enumerate() {
-            writeln!(file, "// Coil {}", loop_n)?;
-            let break_count = single_loop.arcs.len() / 4;
-            let mut physical_surface_str = format!("Physical Surface({}) = {{", loop_n + 1);
+            let break_count = single_loop.arcs.len() / poly_count;
+            if !single_surface || loop_n == 0 {
+                if single_surface { writeln!(file, "// Single Surface")?; } else { writeln!(file, "// Coil {}", loop_n)?; }
+                physical_surface_str = format!("Physical Surface({}) = {{", loop_n + 1);
+            }
             for segment_n in 0..break_count {
-                for i in 0..4 {
-                    let surface_id = segment_n * 4 + i + line_loop_offsets[loop_n];
+                for i in 0..poly_count {
+                    let surface_id = segment_n * poly_count + i + line_loop_offsets[loop_n];
                     physical_surface_str.push_str(&surface_id.to_string());
-                    if segment_n < break_count - 1 || i < 3 {
+                    if segment_n < break_count - 1 || i < (poly_count - 1) {
                         physical_surface_str.push_str(", ");
                     }
                 }
             }
-            physical_surface_str.push_str("};");
-            writeln!(file, "{}", physical_surface_str)?;
-            if loop_n < loop_vec.len() - 1 {
-                writeln!(file)?;
+            if !single_surface || loop_n == loop_vec.len() - 1 {
+                physical_surface_str.push_str("};");
+                writeln!(file, "{}", physical_surface_str)?;
+                if loop_n < loop_vec.len() - 1 {
+                    writeln!(file)?;
+                }
+            } else {
+                physical_surface_str.push_str(", ");
             }
         }
         writeln!(file, "// ------------------------------------------")?;
@@ -524,6 +560,8 @@ impl Method {
         };
 
         let mut file = LineWriter::new(file);
+
+        let poly_count = self.method_args.poly_count;
 
         // Write the ports
         for (loop_n, _) in loop_vec.iter().enumerate() {
@@ -550,7 +588,7 @@ impl Method {
 
         // ... then write the lumped elements
         for (loop_n, single_loop) in loop_vec.iter().enumerate() {
-            let break_count = single_loop.arcs.len() / 4;
+            let break_count = single_loop.arcs.len() / poly_count;
             let capacitor_count = break_count - 2;
             let break_cap_pf = capacitor_count as f32 * 1.0e9 / ((2.0 * PI * self.method_args.larmor_mhz).powi(2) * single_loop.self_inductance_nh);
             for segment_n in 1..break_count {
