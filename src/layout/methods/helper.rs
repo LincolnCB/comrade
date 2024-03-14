@@ -43,93 +43,6 @@ pub fn sphere_intersect(
     (cid, new_points, new_normals)
 }
 
-/// Clean a set of points by angle.
-#[allow(dead_code)]
-pub fn clean_coil_by_bins(
-    center: Point,
-    normal: GeoVector,
-    wire_radius: f32,
-    points: Vec<Point>,
-    point_normals: Vec<GeoVector>,
-    split_count: u32,
-) -> layout::ProcResult<layout::Coil> {
-    
-    if split_count < 3 {
-        layout::err_str("Split count must be at least 3")?;
-    }
-    if points.len() < 3 {
-        layout::err_str("Not enough points to clean by angle")?;
-    }
-
-    // Check that the point lists are the correct length
-    if points.len() != point_normals.len() {
-        layout::err_str(&format!("clean_coil_by_angle: Point list (length: {0}) must be the same length as the normal list ({1})",
-            points.len(), point_normals.len()))?;
-    }
-
-    // Initialize the angle bins
-    let angle_step: Angle = 2.0 * PI / split_count as Angle;
-    let mut bin_error: Vec<Angle> = vec![angle_step; split_count as usize];
-    let mut binned_points: Vec<Option<usize>> = vec![None as Option<usize>; split_count as usize];
-
-    let angle_to_normal = |point: &Point| {
-        let angle = normal.angle_to(&(*point - center));
-        (PI / 2.0 - angle.abs()).abs()
-    };
-
-    // Pick a starting zero-angle direction by finding the point most perpendicular to the normal
-    let zero_angle_vector =         
-        *match points.iter().min_by(|a, b| {angle_to_normal(a).total_cmp(&angle_to_normal(b))}) {
-            Some(point) => point,
-            None => layout::err_str("Math error: clean_coil_by_angle, no minimum point found")?,
-        } - center;
-
-    // Iteratively bin the points
-    for (point_id, point) in points.iter().enumerate() {
-        // Find the angle of the point relative to the zero-angle direction
-        let vector_to_point = *point - center;
-        let flattened_vector = vector_to_point.rej_onto(&normal).normalize();
-        let mut angle = zero_angle_vector.angle_to(&flattened_vector);
-
-        // Check if the angle is in the correct direction
-        if flattened_vector.cross(&zero_angle_vector).dot(&normal) < 0.0 {
-            angle = (2.0 * PI) - angle;
-        }
-
-        // Bin the point
-        let bin_id = (angle / angle_step) as usize;
-        if bin_id >= split_count as usize {
-            layout::err_str("Math error: Angle bin out of range")?;
-        }
-        let error = (angle - bin_id as Angle * angle_step).abs();
-        if error < bin_error[bin_id] {
-            bin_error[bin_id] = error;
-            binned_points[bin_id] = Some(point_id);
-        }
-
-        // Optional debug: print the bins
-        // tests::print_bins(&binned_points);
-    }
-
-    // Error if any bins are empty
-    if binned_points.iter().any(|p| p.is_none()) {
-        layout::err_str("Math error: Angle binning failed (no points within some bins)")?;
-    }
-
-    // Unwrap the points
-    let mut out_points = Vec::<Point>::new();
-    let mut out_normals = Vec::<GeoVector>::new();
-
-    for id in binned_points.iter() {
-        let point_id = id.unwrap();
-        out_points.push(points[point_id]);
-        out_normals.push(point_normals[point_id]);
-    }
-
-    // Construct and output the coil
-    Ok(layout::Coil::new(center, normal, out_points, wire_radius, out_normals)?)
-}
-
 #[derive(Debug, Clone, Copy)]
 struct AngleFormat {
     theta: Angle,
@@ -455,6 +368,77 @@ pub fn clean_coil_by_angle(
     }
 
     Ok(layout::Coil::new(center, normal, points, wire_radius, new_normals)?)
+}
+
+/// Add evenly distributed breaks to a coil by angle
+#[allow(dead_code)]
+pub fn add_even_breaks_by_angle(
+    coil: &mut layout::Coil,
+    break_count: usize,
+    zero_angle_vec: GeoVector,
+) -> layout::ProcResult<()> {
+    let center = coil.center;
+    let axis = coil.normal;
+    let points = &coil.vertices.iter().map(|v| v.point).collect::<Vec<Point>>();
+    let binned_points = bin_by_angle(points, break_count, center, axis, zero_angle_vec)?;
+
+    coil.breaks = Vec::<usize>::new();
+    coil.port = Some(binned_points[0]);
+    coil.breaks.extend(binned_points[1..binned_points.len() - 1].iter().cloned());
+
+    Ok(())
+}
+
+/// Bin points by angle
+pub fn bin_by_angle(points: &Vec::<Point>, bin_count: usize, center: Point, axis: GeoVector, zero_angle_vec: GeoVector) -> layout::ProcResult<Vec::<usize>> {
+
+    // Initialize the angle bins
+    let angle_step: Angle = 2.0 * PI / bin_count as Angle;
+    let mut bin_error: Vec<Angle> = vec![angle_step; bin_count as usize];
+    let mut binned_points: Vec<Option<usize>> = vec![None as Option<usize>; bin_count as usize];
+
+    let zero_angle_vec = zero_angle_vec.rej_onto(&axis).normalize();
+    if zero_angle_vec.has_nan() {
+        layout::err_str("Math error: zero_angle_vec is NaN after rejection and normalizing")?;
+    }
+
+    // Iterate through points to bin
+    for (point_id, point) in points.iter().enumerate() {
+        if points.len() < bin_count {
+            layout::err_str(&format!("Not enough points ({}) for that many breaks ({})", points.len(), bin_count))?;
+        }
+        
+        // Calculate the angles
+
+        // Get the relevant vectors
+        let vec_to_point = *point - center;
+        let out_vec = vec_to_point.rej_onto(&axis).normalize();
+        
+        let mut angle = zero_angle_vec.angle_to(&out_vec);
+
+        if out_vec.cross(&zero_angle_vec).dot(&axis) < 0.0 {
+            angle = (2.0 * PI) - angle;
+        }
+
+        // Bin the point
+        let bin_id = (angle / angle_step) as usize;
+        if bin_id >= bin_count as usize {
+            layout::err_str("Math error: Angle bin out of range")?;
+        }
+        let error = (angle - bin_id as Angle * angle_step).abs();
+        if error < bin_error[bin_id] {
+            bin_error[bin_id] = error;
+            binned_points[bin_id] = Some(point_id);
+        }
+    }
+
+    // Error if any bins are empty
+    if binned_points.iter().any(|id| id.is_none()) {
+        layout::err_str(&format!("Math error: Angle binning (break count: {bin_count}) failed (no points within some bins)"))?;
+    }
+
+    // Unwrap the points
+    Ok(binned_points.iter().map(|id| id.unwrap()).collect())
 }
 
 /// Merge two segments of a coil

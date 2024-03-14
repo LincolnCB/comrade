@@ -145,6 +145,7 @@ impl methods::MeshMethod for Method {
 
             let radius = coil.wire_radius;
             
+            // TODO chop
             if coil.vertices.len() < break_count {
                 mesh::err_str(&format!("Not enough points ({}) for that many breaks ({})", coil.vertices.len(), break_count))?;
             }
@@ -244,6 +245,7 @@ impl methods::MeshMethod for Method {
             let mut break_points = vec![port_id, upper_capacitor_break_id];
             break_points.extend(binned_points.iter().skip(1).map(|p| p.unwrap()));
             break_points.push(lower_capacitor_break_id);
+            // TODO chop
 
             // Add the arcs
             for id in break_points.iter() {
