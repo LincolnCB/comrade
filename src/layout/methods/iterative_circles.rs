@@ -42,6 +42,10 @@ struct MethodCfg {
     clearance: f32,
     #[serde(default = "MethodCfg::default_wire_radius")]
     wire_radius: f32,
+    #[serde(default = "MethodCfg::default_zero_angle_vector")]
+    zero_angle_vector: GeoVector,
+    #[serde(default = "MethodCfg::default_backup_zero_angle_vector")]
+    backup_zero_angle_vector: GeoVector,
 
     // Iteration parameters
     #[serde(default = "MethodCfg::default_iterations")]
@@ -78,6 +82,8 @@ impl MethodCfg {
 
             clearance: Self::default_clearance(),
             wire_radius: Self::default_wire_radius(),
+            zero_angle_vector: Self::default_zero_angle_vector(),
+            backup_zero_angle_vector: Self::default_backup_zero_angle_vector(),
 
             iterations: Self::default_iterations(),
             center_freedom: Self::default_center_freedom(),
@@ -104,6 +110,12 @@ impl MethodCfg {
     }
     pub fn default_wire_radius() -> f32 {
         0.645
+    }
+    pub fn default_zero_angle_vector() -> GeoVector {
+        GeoVector::zhat()
+    }
+    pub fn default_backup_zero_angle_vector() -> GeoVector {
+        GeoVector::xhat()
     }
 
     pub fn default_iterations() -> usize {
@@ -145,12 +157,18 @@ struct CircleArgs {
     center: Point,
     #[serde(default = "CircleArgs::default_coil_radius", alias = "radius")]
     coil_radius: f32,
+    #[serde(default = "CircleArgs::default_break_count", alias = "breaks")]
+    break_count: usize,
+    #[serde(default = "CircleArgs::default_break_angle_offset", alias = "angle")]
+    break_angle_offset: f32,
 }
 impl CircleArgs {
     pub fn default() -> Self {
         CircleArgs{
             coil_radius: Self::default_coil_radius(),
             center: Self::default_center(),
+            break_count: Self::default_break_count(),
+            break_angle_offset: Self::default_break_angle_offset(),
         }
     }
     pub fn default_coil_radius() -> f32 {
@@ -158,6 +176,12 @@ impl CircleArgs {
     }
     pub fn default_center() -> Point {
         Point::new(0.0, 0.0, 0.0)
+    }
+    pub fn default_break_count() -> usize {
+        4
+    }
+    pub fn default_break_angle_offset() -> f32 {
+        0.0
     }
 }
 
@@ -379,6 +403,8 @@ impl methods::LayoutMethod for Method {
             let f = crate::io::create(&self.method_args.final_cfg_output.as_ref().unwrap())?;
             serde_yaml::to_writer(f, &new_circles)?;
         }
+
+        
         
         Ok(layout_out)
     }
