@@ -35,6 +35,8 @@ struct MethodCfg {
     angle_shift: f32,
     #[serde(default = "MethodCfg::default_single_surface")]
     single_surface: bool,
+    #[serde(default = "MethodCfg::default_polygonal")]
+    polygonal: bool,
     #[serde(default = "MethodCfg::default_poly_count", alias = "spline_count")]
     poly_count: usize,
     #[serde(default = "MethodCfg::default_lc")]
@@ -54,6 +56,9 @@ impl MethodCfg {
     pub fn default_single_surface() -> bool {
         true
     }
+    pub fn default_polygonal() -> bool {
+        false
+    }
     pub fn default_poly_count() -> usize {
         4
     }
@@ -68,6 +73,7 @@ impl MethodCfg {
             break_count: Self::default_break_count(),
             angle_shift: Self::default_angle_shift(),
             single_surface: Self::default_single_surface(),
+            polygonal: Self::default_polygonal(),
             poly_count: Self::default_poly_count(),
             lc: Self::default_lc(),
             larmor_mhz: Self::default_larmor_mhz(),
@@ -177,7 +183,7 @@ impl methods::MeshMethod for Method {
                 
                 // Add the spline points to the list
                 for i in 0..poly_count {
-                    let theta = i as f32 * 2.0 * PI / poly_count as f32;
+                    let theta = (i as f32 - 0.5) * 2.0 * PI / poly_count as f32; // -0.5 gives a flat bottom
                     let point = vertex.point + up_vec * radius * theta.cos() + out_vec * radius * theta.sin();
                     single_loop.points.push(point + self.method_args.origin_offset);
                 }
@@ -380,7 +386,11 @@ impl Method {
 
             // Write the arcs
             for (arc_id, arc) in single_loop.arcs.iter().enumerate() {
-                writeln!(file, "Circle({}) = {{{}, {}, {}}};", arc_id + arc_offsets[loop_n], arc.start + point_offsets[loop_n], arc.center + point_offsets[loop_n], arc.end + point_offsets[loop_n])?;
+                if self.method_args.polygonal {
+                    writeln!(file, "Line({}) = {{{}, {}}};", arc_id + arc_offsets[loop_n], arc.start + point_offsets[loop_n], arc.end + point_offsets[loop_n])?;
+                } else {
+                    writeln!(file, "Circle({}) = {{{}, {}, {}}};", arc_id + arc_offsets[loop_n], arc.start + point_offsets[loop_n], arc.center + point_offsets[loop_n], arc.end + point_offsets[loop_n])?;
+                }
             }
             spline_offsets[loop_n] = arc_offsets[loop_n] + single_loop.arcs.len();
             writeln!(file)?;

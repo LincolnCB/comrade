@@ -51,6 +51,8 @@ pub struct Coil {
     pub normal: GeoVector,
     pub wire_radius: f32,
     pub vertices: Vec<CoilVertex>,
+    pub port: Option<usize>,
+    pub breaks: Vec<usize>,
 }
 impl Coil {
     /// Create a new coil.
@@ -90,7 +92,7 @@ impl Coil {
             });
         }
 
-        Ok(Coil{center, normal, wire_radius, vertices: coil_vertices})
+        Ok(Coil{center, normal, wire_radius, vertices: coil_vertices, port: None, breaks: Vec::new()})
     }
 
     /// Calculate the self-inductance of the coil, in nH.
