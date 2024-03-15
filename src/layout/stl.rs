@@ -1,10 +1,15 @@
 use stl_io;
 
 use crate::layout;
+use crate::io;
 use layout::geo_3d::{
     Surface,
     Point,
     GeoVector,
+    NEWSurface,
+    SurfaceVertex,
+    SurfaceEdge,
+    SurfaceFace,
 };
 
 /// Load a STL file from the inut path.
@@ -78,6 +83,117 @@ pub fn load_stl(filename: &str) -> layout::ProcResult<Surface>{
     for adj_list in surface.adj.iter_mut() {
         adj_list.sort();
         adj_list.dedup();
+    }
+
+    Ok(surface)
+}
+
+// TODO: Update the STL loading to use the new Surface struct
+// /// Load a STL file from the inut path.
+// /// Uses the `stl_io` crate.
+// /// Returns a `ProcResult` with the `Surface` or an `Err`
+pub fn load_stl_new(filename: &str) -> layout::ProcResult<NEWSurface>{
+    let mut file = io::open(filename)?;
+    let stl = match stl_io::read_stl(&mut file)
+    {
+        Ok(stl) => stl,
+        Err(error) => {
+            return Err(io::IoError{file: filename.to_string(), cause: error}.into());
+        },
+    };
+
+    // Initialize the surface struct
+    let mut surface = NEWSurface::empty();
+
+    // First, create vertices for each point
+    for vertex in stl.vertices.into_iter() {
+        surface.vertices.push(SurfaceVertex::new_from_point(
+            Point{
+                x: vertex[0],
+                y: vertex[1],
+                z: vertex[2],
+            }
+        ));
+    }
+
+    let mut edges = Vec::<SurfaceEdge>::new();
+
+    // First, initialize all edges from the faces
+    for tri_face in stl.faces.iter() {
+        for i in 0..3 {
+            let pid1 = tri_face.vertices[i];
+            let pid2 = tri_face.vertices[(i + 1) % 3];
+            let edge = SurfaceEdge::new([pid1, pid2]);
+            edges.push(edge);
+        }
+    }
+
+    // Sort and dedup them
+    edges.sort_by(|a, b| a.vertices[0].cmp(&b.vertices[0]).then(a.vertices[1].cmp(&b.vertices[1])));
+    edges.dedup();
+
+    // Create a hashmap for the edge indices, so the faces and points can easily access them
+    let mut edge_indices = std::collections::HashMap::<(usize, usize), usize>::new();
+    for (i, edge) in edges.iter().enumerate() {
+        edge_indices.insert((edge.vertices[0], edge.vertices[1]), i);
+    }
+
+    // Add faces to the surface, and add the faces to the edges
+    for (face_id, tri_face) in stl.faces.into_iter().enumerate() {
+        let mut face_vertices = Vec::<usize>::new();
+        let mut face_edges = Vec::<usize>::new();
+        for i in 0..3 {
+            let pid1 = tri_face.vertices[i];
+            face_vertices.push(pid1);
+            let pid2 = tri_face.vertices[(i + 1) % 3];
+            let edge_index = edge_indices.get(&(pid1, pid2)).unwrap();
+            face_edges.push(*edge_index);
+            if edges[*edge_index].adj_faces[0] == None {
+                edges[*edge_index].adj_faces[0] = Some(face_id);
+            } else if edges[*edge_index].adj_faces[1] == None {
+                edges[*edge_index].adj_faces[1] = Some(face_id);
+            } else {
+                panic!("Edge {:?} has more than 2 faces!", edges[*edge_index]);
+            }
+        }
+        let face_normal = GeoVector::new(tri_face.normal[0], tri_face.normal[1], tri_face.normal[2]).normalize();
+
+        // Calculate the face area using Heron's formula
+        let p1 = &surface.vertices[face_vertices[0]].point;
+        let p2 = &surface.vertices[face_vertices[1]].point;
+        let p3 = &surface.vertices[face_vertices[2]].point;
+        let a = p1.distance(p2);
+        let b = p2.distance(p3);
+        let c = p3.distance(p1);
+        let s = (a + b + c) / 2.0;
+        let area = (s * (s - a) * (s - b) * (s - c)).sqrt();
+
+        surface.faces.push(
+            SurfaceFace{
+                vertices: face_vertices,
+                edges: face_edges,
+                normal: face_normal,
+                area,
+            }
+        );
+    }
+
+    // Add adjacent edges to the vertices
+    for edge_index in 0..edges.len() {
+        let edge = &edges[edge_index];
+        for vid in 0..2 {
+            let vertex = &mut surface.vertices[edge.vertices[vid]];
+            vertex.adj_edges.push(edge_index);
+        }
+    }
+    for vertex in surface.vertices.iter_mut() {
+        vertex.adj_edges.sort();
+        vertex.adj_edges.dedup();
+    }
+
+    // Add edges to the surface
+    for edge in edges.into_iter() {
+        surface.edges.push(edge);
     }
 
     Ok(surface)

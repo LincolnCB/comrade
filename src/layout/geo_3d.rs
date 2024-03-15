@@ -7,26 +7,6 @@ use std::ops::{
 use std::fmt;
 use serde::{Serialize, Deserialize};
 
-/// The substrate surface.
-/// Contains a list of points.
-#[derive(Debug)]
-pub struct Surface {
-    pub points: Vec<Point>,
-    pub adj: Vec<Vec<usize>>,
-    pub area: f32,
-    pub point_normals: Vec<GeoVector>,
-}
-impl Surface {
-    pub fn empty() -> Self {
-        Surface{
-            points: Vec::new(),
-            adj: Vec::new(),
-            area: 0.0,
-            point_normals: Vec::new(),
-        }
-    }
-}
-
 /// Angle type (alias for f32).
 pub type Angle = f32;
 
@@ -406,4 +386,85 @@ impl fmt::Display for GeoVector {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "({}, {}, {})", self.x, self.y, self.z)
     }
+}
+
+/// The substrate surface.
+/// Contains a list of points.
+#[derive(Debug)]
+pub struct Surface {
+    pub points: Vec<Point>,
+    pub adj: Vec<Vec<usize>>,
+    pub area: f32,
+    pub point_normals: Vec<GeoVector>,
+}
+impl Surface {
+    pub fn empty() -> Self {
+        Surface{
+            points: Vec::new(),
+            adj: Vec::new(),
+            area: 0.0,
+            point_normals: Vec::new(),
+        }
+    }
+}
+
+/// An updated surface
+// TODO: expand docs
+#[derive(Debug)]
+pub struct NEWSurface {
+    pub vertices: Vec<SurfaceVertex>,
+    pub edges: Vec<SurfaceEdge>,
+    pub faces: Vec<SurfaceFace>,
+}
+impl NEWSurface {
+    pub fn empty() -> Self {
+        NEWSurface{
+            vertices: Vec::new(),
+            edges: Vec::new(),
+            faces: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct SurfaceVertex {
+    pub point: Point,
+    pub normal: GeoVector,
+    pub adj_edges: Vec<usize>,
+    pub adj_faces: Vec<usize>,
+}
+impl SurfaceVertex {
+    pub fn new_from_point(point: Point) -> Self {
+        SurfaceVertex{
+            point,
+            normal: GeoVector::zero(),
+            adj_edges: Vec::new(),
+            adj_faces: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct SurfaceEdge {
+    pub vertices: [usize; 2],
+    pub adj_faces: [Option::<usize>; 2],
+}
+impl SurfaceEdge {
+    pub fn new(vertices: [usize; 2]) -> Self {
+        let mut vertices = vertices;
+        vertices.sort();
+        assert!(vertices[0] != vertices[1]);
+        SurfaceEdge{    
+            vertices,
+            adj_faces: [None, None],
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct SurfaceFace {
+    pub vertices: Vec<usize>,
+    pub edges: Vec<usize>,
+    pub normal: GeoVector,
+    pub area: f32,
 }
