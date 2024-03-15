@@ -10,7 +10,7 @@ use crate::{
 };
 use layout::methods;
 use layout::geo_3d::*;
-use methods::helper::{sphere_intersect, clean_coil_by_angle, merge_segments};
+use methods::helper::{sphere_intersect, clean_coil_by_angle, merge_segments, add_even_breaks_by_angle};
 
 use serde::{Serialize, Deserialize};
 
@@ -39,6 +39,10 @@ struct MethodCfg {
     epsilon: f32,
     #[serde(default = "MethodCfg::default_pre_shift")]
     pre_shift: bool,
+    #[serde(default = "MethodCfg::default_zero_angle_vector")]
+    zero_angle_vector: GeoVector,
+    #[serde(default = "MethodCfg::default_backup_zero_angle_vector")]
+    backup_zero_angle_vector: GeoVector,
     #[serde(default = "MethodCfg::default_verbose")]
     verbose: bool,
 }
@@ -50,6 +54,8 @@ impl MethodCfg {
             epsilon: Self::default_epsilon(),
             wire_radius: Self::default_wire_radius(),
             pre_shift: Self::default_pre_shift(),
+            zero_angle_vector: Self::default_zero_angle_vector(),
+            backup_zero_angle_vector: Self::default_backup_zero_angle_vector(),
             verbose: Self::default_verbose(),
         }
     }
@@ -68,20 +74,32 @@ impl MethodCfg {
     pub fn default_pre_shift() -> bool {
         true
     }
+    pub fn default_zero_angle_vector() -> GeoVector {
+        GeoVector::zhat()
+    }
+    pub fn default_backup_zero_angle_vector() -> GeoVector {
+        GeoVector::yhat()
+    }
 }
 
 /// Single element arguments
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 struct CircleArgs {
     center: Point,
     #[serde(default = "CircleArgs::default_coil_radius", alias = "radius")]
     coil_radius: f32,
+    #[serde(default = "CircleArgs::default_break_count", alias = "breaks")]
+    break_count: usize,
+    #[serde(default = "CircleArgs::default_break_angle_offset", alias = "angle")]
+    break_angle_offset: f32,
 }
 impl CircleArgs {
     pub fn default() -> Self {
         CircleArgs{
             coil_radius: Self::default_coil_radius(),
             center: Self::default_center(),
+            break_count: Self::default_break_count(),
+            break_angle_offset: Self::default_break_angle_offset(),
         }
     }
     pub fn default_coil_radius() -> f32 {
@@ -89,6 +107,12 @@ impl CircleArgs {
     }
     pub fn default_center() -> Point {
         Point::new(0.0, 0.0, 0.0)
+    }
+    pub fn default_break_count() -> usize {
+        4
+    }
+    pub fn default_break_angle_offset() -> f32 {
+        0.0
     }
 }
 
@@ -159,6 +183,21 @@ impl methods::LayoutMethod for Method {
                     }
                 }
             }
+        }
+
+        // Add breaks
+        for (coil_id, coil) in layout_out.coils.iter_mut().enumerate() {
+            let break_count = circles[coil_id].break_count;
+            let break_angle_offset = circles[coil_id].break_angle_offset;
+            let zero_angle_vector = {
+                if coil.normal.normalize().dot(&self.method_args.zero_angle_vector.normalize()) < 0.95 {
+                    self.method_args.zero_angle_vector
+                } else {
+                    self.method_args.backup_zero_angle_vector
+                }
+            }.normalize();
+
+            add_even_breaks_by_angle(coil, break_count, break_angle_offset, zero_angle_vector)?;
         }
         
         Ok(layout_out)

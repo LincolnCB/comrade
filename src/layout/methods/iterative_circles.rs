@@ -10,7 +10,7 @@ use crate::{
 };
 use layout::methods;
 use layout::geo_3d::*;
-use methods::helper::{sphere_intersect, clean_coil_by_angle, merge_segments};
+use methods::helper::{sphere_intersect, clean_coil_by_angle, merge_segments, add_even_breaks_by_angle};
 
 use serde::{Serialize, Deserialize};
 
@@ -115,7 +115,7 @@ impl MethodCfg {
         GeoVector::zhat()
     }
     pub fn default_backup_zero_angle_vector() -> GeoVector {
-        GeoVector::xhat()
+        GeoVector::yhat()
     }
 
     pub fn default_iterations() -> usize {
@@ -404,7 +404,20 @@ impl methods::LayoutMethod for Method {
             serde_yaml::to_writer(f, &new_circles)?;
         }
 
-        
+        // Add breaks
+        for (coil_id, coil) in layout_out.coils.iter_mut().enumerate() {
+            let break_count = new_circles[coil_id].break_count;
+            let break_angle_offset = new_circles[coil_id].break_angle_offset;
+            let zero_angle_vector = {
+                if coil.normal.normalize().dot(&self.method_args.zero_angle_vector.normalize()) < 0.95 {
+                    self.method_args.zero_angle_vector
+                } else {
+                    self.method_args.backup_zero_angle_vector
+                }
+            }.normalize();
+
+            add_even_breaks_by_angle(coil, break_count, break_angle_offset, zero_angle_vector)?;
+        }
         
         Ok(layout_out)
     }

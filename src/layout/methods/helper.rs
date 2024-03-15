@@ -101,12 +101,12 @@ pub fn clean_coil_by_angle(
     // Calculate the angles
     // Get a reference zero-angle vector in the plane of the coil
     // Project the zhat vector onto the plane of the coil for this
-    // If the normal is close to zhat, use the xhat vector instead
+    // If the normal is close to zhat, use the yhat vector instead
     let zhat = GeoVector::zhat();
     let zero_theta_vec = if normal.dot(&zhat).abs() < 0.999 {
         zhat.rej_onto(&normal).normalize()
     } else {
-        GeoVector::xhat().rej_onto(&normal).normalize()
+        GeoVector::yhat().rej_onto(&normal).normalize()
     };
     let pi2_theta_vec = zero_theta_vec.cross(&normal).normalize();
     
@@ -375,16 +375,24 @@ pub fn clean_coil_by_angle(
 pub fn add_even_breaks_by_angle(
     coil: &mut layout::Coil,
     break_count: usize,
+    break_angle_offset: Angle,
     zero_angle_vec: GeoVector,
 ) -> layout::ProcResult<()> {
     let center = coil.center;
     let axis = coil.normal;
     let points = &coil.vertices.iter().map(|v| v.point).collect::<Vec<Point>>();
-    let binned_points = bin_by_angle(points, break_count, center, axis, zero_angle_vec)?;
+
+    let zero_angle_vec = zero_angle_vec.rej_onto(&axis).normalize();
+    if zero_angle_vec.has_nan() {
+        panic!("Math error: zero_angle_vec is NaN after rejection and normalizing");
+    }
+    let offset_zero_angle_vec = zero_angle_vec.rotate_around(&axis, break_angle_offset);
+
+    let binned_points = bin_by_angle(points, break_count, center, axis, offset_zero_angle_vec)?;
 
     coil.breaks = Vec::<usize>::new();
     coil.port = Some(binned_points[0]);
-    coil.breaks.extend(binned_points[1..binned_points.len() - 1].iter().cloned());
+    coil.breaks.extend(binned_points[1..].iter().cloned());
 
     Ok(())
 }
@@ -399,7 +407,7 @@ pub fn bin_by_angle(points: &Vec::<Point>, bin_count: usize, center: Point, axis
 
     let zero_angle_vec = zero_angle_vec.rej_onto(&axis).normalize();
     if zero_angle_vec.has_nan() {
-        layout::err_str("Math error: zero_angle_vec is NaN after rejection and normalizing")?;
+        panic!("Math error: zero_angle_vec is NaN after rejection and normalizing");
     }
 
     // Iterate through points to bin
@@ -423,7 +431,7 @@ pub fn bin_by_angle(points: &Vec::<Point>, bin_count: usize, center: Point, axis
         // Bin the point
         let bin_id = (angle / angle_step) as usize;
         if bin_id >= bin_count as usize {
-            layout::err_str("Math error: Angle bin out of range")?;
+            panic!("Math error: Angle bin out of range");
         }
         let error = (angle - bin_id as Angle * angle_step).abs();
         if error < bin_error[bin_id] {
@@ -434,7 +442,7 @@ pub fn bin_by_angle(points: &Vec::<Point>, bin_count: usize, center: Point, axis
 
     // Error if any bins are empty
     if binned_points.iter().any(|id| id.is_none()) {
-        layout::err_str(&format!("Math error: Angle binning (break count: {bin_count}) failed (no points within some bins)"))?;
+        panic!("Math error: Angle binning (break count: {bin_count}) failed (no points within some bins)");
     }
 
     // Unwrap the points

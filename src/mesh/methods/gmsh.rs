@@ -131,11 +131,7 @@ impl methods::MeshMethod for Method {
     fn save_mesh(&self, layout: &layout::Layout, output_path: &str) -> mesh::ProcResult<()> {
         let output_path = output_path.to_string() + ".geo";
 
-        let break_count = self.method_args.break_count;
         let poly_count = self.method_args.poly_count;
-        if break_count < 1 {
-            mesh::err_str("Break count must be at least 1")?;
-        }
 
         let mut full_loops = Vec::<Loop>::new();
         
@@ -144,37 +140,14 @@ impl methods::MeshMethod for Method {
             println!("Coil {}...", coil_n);
 
             let radius = coil.wire_radius;
-            
-            // TODO chop
-            if coil.vertices.len() < break_count {
-                mesh::err_str(&format!("Not enough points ({}) for that many breaks ({})", coil.vertices.len(), break_count))?;
-            }
 
             // Initialize the GMSH vectors
             let mut single_loop = Loop::new();
             single_loop.self_inductance_nh = coil.self_inductance(1.0);
             
-            // Initialize the angle bins
-            let angle_step: Angle = 2.0 * PI / break_count as Angle;
-            let mut bin_error: Vec<Angle> = vec![angle_step; break_count as usize];
-            let mut binned_points: Vec<Option<usize>> = vec![None as Option<usize>; break_count as usize];
-            
-            // Calculate the angles
-            // Get a reference zero-angle vector in the plane of the coil
-            // Project the zhat vector onto the plane of the coil for this
-            // If the normal is close to zhat, use the xhat vector instead
-            let normal = coil.normal;
-            let zhat = GeoVector::zhat();
-            let zero_theta_vec = if normal.dot(&zhat).abs() < 0.999 {
-                zhat.rej_onto(&normal).normalize()
-            } else {
-                GeoVector::xhat().rej_onto(&normal).normalize()
-            };
-            
-            // Convert each point to an angle and bin them
-            // Also add the radial points used in the splines, while we're iterating
+            // Add the radial polygon points for each coil vertex (and center, used for arcs)
             let center = coil.center;
-            for (point_id, vertex) in coil.vertices.iter().enumerate() {
+            for vertex in coil.vertices.iter() {
                 let point = &vertex.point;
 
                 // Get the relevant vectors
@@ -190,33 +163,15 @@ impl methods::MeshMethod for Method {
                 }
                 // Add the wire point to the list (some may be unused)
                 single_loop.points.push(vertex.point + self.method_args.origin_offset);
-                
-                let mut angle = zero_theta_vec.angle_to(&out_vec);
-
-                if out_vec.cross(&zero_theta_vec).dot(&normal) < 0.0 {
-                    angle = (2.0 * PI) - angle;
-                }
-
-                // Bin the point
-                let bin_id = (angle / angle_step) as usize;
-                if bin_id >= break_count as usize {
-                    mesh::err_str("Math error: Angle bin out of range")?;
-                }
-                let error = (angle - bin_id as Angle * angle_step).abs();
-                if error < bin_error[bin_id] {
-                    bin_error[bin_id] = error;
-                    binned_points[bin_id] = Some(point_id);
-                }
-            }
-
-            // Error if any bins are empty
-            if binned_points.iter().any(|p| p.is_none()) {
-                mesh::err_str(&format!("Math error: Angle binning (break count: {break_count}) failed (no points within some bins)"))?;
             }
 
             // Add two capacitor breaks on either side of the first binned break (the port)
             // Position them at the first points in either direction from the port that are at least 2*lc away
-            let port_id = binned_points[0].unwrap();
+            let port_id = if let Some(id) = coil.port {
+                id
+            } else {
+                0
+            };
 
             // Upper side capacitor break:
             let mut upper_capacitor_break_id = port_id;
@@ -225,8 +180,8 @@ impl methods::MeshMethod for Method {
                 let previously_checked_id = upper_capacitor_break_id;
                 upper_capacitor_break_id = coil.vertices[upper_capacitor_break_id].next_id;
                 distance += (coil.vertices[upper_capacitor_break_id].point - coil.vertices[previously_checked_id].point).norm();
-                if upper_capacitor_break_id == binned_points[1].unwrap() {
-                    mesh::err_str("Math error: Nearby capacitor break (positive idx direction) not found before first break")?;
+                if coil.breaks.len() > 1 && upper_capacitor_break_id == coil.breaks[0] {
+                    mesh::err_str("Math error: Nearby capacitor break (positive idx direction) not found before first break -- lc too large")?;
                 }
             }
             
@@ -237,15 +192,14 @@ impl methods::MeshMethod for Method {
                 let previously_checked_id = lower_capacitor_break_id;
                 lower_capacitor_break_id = coil.vertices[lower_capacitor_break_id].prev_id;
                 distance += (coil.vertices[lower_capacitor_break_id].point - coil.vertices[previously_checked_id].point).norm();
-                if lower_capacitor_break_id == binned_points[break_count - 1].unwrap() {
-                    mesh::err_str("Math error: Nearby capacitor break (negative idx direction) not found before last break")?;
+                if coil.breaks.len() > 1 && lower_capacitor_break_id == coil.breaks[coil.breaks.len() - 1] {
+                    mesh::err_str("Math error: Nearby capacitor break (negative idx direction) not found before last break -- lc too large")?;
                 }
             }
 
             let mut break_points = vec![port_id, upper_capacitor_break_id];
-            break_points.extend(binned_points.iter().skip(1).map(|p| p.unwrap()));
+            break_points.extend(coil.breaks.clone());
             break_points.push(lower_capacitor_break_id);
-            // TODO chop
 
             // Add the arcs
             for id in break_points.iter() {
