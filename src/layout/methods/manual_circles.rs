@@ -149,7 +149,7 @@ impl methods::LayoutMethod for Method {
             // Create the circle through surface intersection with sphere
             let (cid, points, point_normals) =
                 sphere_intersect(surface, center, coil_radius, epsilon);
-            let coil_normal = surface.point_normals[cid].normalize();
+            let coil_normal = surface.vertices[cid].normal.normalize();
 
             if verbose { println!("Uncleaned point count: {}", points.len()) };
 
@@ -504,14 +504,15 @@ impl Method {
     #[allow(dead_code)]
     fn get_adjacency(&self, surface: &Surface, circles: &Vec::<CircleArgs>) -> Vec<Vec<bool>> {
         let mut adjacency: Vec<Vec<bool>> = vec![vec![false; circles.len()]; circles.len()];
-        for point in surface.points.iter() {
+        for vertex in surface.vertices.iter() {
+            let point = vertex.point;
             for (i, circle) in circles.iter().enumerate() {
-                let center = &circle.center;
+                let center = circle.center;
                 let radius = circle.coil_radius;
                 if (point - center).norm() < radius {
                     for (j, other_circle) in circles.iter().enumerate() {
                         if i != j {
-                            let other_center = &other_circle.center;
+                            let other_center = other_circle.center;
                             let other_radius = other_circle.coil_radius;
                             if (point - other_center).norm() < other_radius {
                                 adjacency[i][j] = true;

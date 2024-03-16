@@ -94,7 +94,7 @@ impl methods::LayoutMethod for Method {
         let (cid, points, point_normals) = 
             sphere_intersect(surface, center, coil_radius, epsilon);
         
-        let coil_normal = surface.point_normals[cid].normalize();
+        let coil_normal = surface.vertices[cid].normal.normalize();
 
         println!("Uncleaned point count: {}", points.len());
 

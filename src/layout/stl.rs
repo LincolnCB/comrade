@@ -3,96 +3,19 @@ use stl_io;
 use crate::layout;
 use crate::io;
 use layout::geo_3d::{
-    Surface,
     Point,
     GeoVector,
-    NEWSurface,
+    Surface,
     SurfaceVertex,
     SurfaceEdge,
     SurfaceFace,
 };
 
-/// Load a STL file from the inut path.
-/// Uses the `stl_io` crate.
-/// Returns a `ProcResult` with the `Surface` or an `Err`
-pub fn load_stl(filename: &str) -> layout::ProcResult<Surface>{
-    let mut file = match std::fs::OpenOptions::new().read(true).open(filename)
-    {
-        Ok(file) => file,
-        Err(error) => {
-            return Err(crate::io::IoError{file: filename.to_string(), cause: error}.into());
-        },
-    };
-    let stl = match stl_io::read_stl(&mut file)
-    {
-        Ok(stl) => stl,
-        Err(error) => {
-            return Err(crate::io::IoError{file: filename.to_string(), cause: error}.into());
-        },
-    };
-
-    // Initialize the surface struct
-    let mut surface = Surface::empty();
-
-    // First, copy all the points over
-    for vertex in stl.vertices.into_iter() {
-        surface.points.push(Point{
-            x: vertex[0],
-            y: vertex[1],
-            z: vertex[2],
-        });
-    }
-
-    // Track each point's adjacent points and normals
-    let mut point_normals = vec![Vec::<GeoVector>::new(); surface.points.len()];
-    surface.adj = vec![Vec::<usize>::new(); surface.points.len()];
-
-    // Then, add the adjacent points
-    for face in stl.faces.into_iter() {
-        surface.area += face_area(&face, &surface.points);
-        // For each point in the triangle:
-        for i in 0..3 {
-            // Find the point index
-            let point_index = face.vertices[i];
-
-            // For each other point in the triangle:
-            for j in 0..3 {
-                if j != i {
-                    // Push the other point index to the adjacent list
-                    let adj_index = face.vertices[j];
-                    surface.adj[point_index].push(adj_index);
-                }
-            }
-
-            // Add the normal to the point's normal list
-            point_normals[point_index].push(GeoVector::new(face.normal[0], face.normal[1], face.normal[2]).normalize());
-        }
-    }
-
-    // Average the point normals:
-    for normal_list in point_normals.iter() {
-        let mut avg_normal = GeoVector::new(0.0, 0.0, 0.0);
-        for normal in normal_list.iter() {
-            avg_normal += *normal;
-        }
-        avg_normal /= normal_list.len() as f32;
-        surface.point_normals.push(avg_normal.normalize());
-    }
-
-    // Sort and dedup the adjacent points
-    for adj_list in surface.adj.iter_mut() {
-        adj_list.sort();
-        adj_list.dedup();
-    }
-
-    Ok(surface)
-}
-
 // TODO: Update the STL loading to use the new Surface struct
 // /// Load a STL file from the inut path.
 // /// Uses the `stl_io` crate.
 // /// Returns a `ProcResult` with the `Surface` or an `Err`
-pub fn load_stl_new(filename: &str) -> layout::ProcResult<NEWSurface>{
+pub fn load_stl(filename: &str) -> layout::ProcResult<Surface>{
     let mut file = io::open(filename)?;
     let stl = match stl_io::read_stl(&mut file)
     {
@@ -103,7 +26,7 @@ pub fn load_stl_new(filename: &str) -> layout::ProcResult<NEWSurface>{
     };
 
     // Initialize the surface struct
-    let mut surface = NEWSurface::empty();
+    let mut surface = Surface::empty();
 
     // First, create vertices for each point
     for vertex in stl.vertices.into_iter() {
@@ -146,7 +69,15 @@ pub fn load_stl_new(filename: &str) -> layout::ProcResult<NEWSurface>{
             let pid1 = tri_face.vertices[i];
             face_vertices.push(pid1);
             let pid2 = tri_face.vertices[(i + 1) % 3];
-            let edge_index = edge_indices.get(&(pid1, pid2)).unwrap();
+            let edge_key = if pid1 < pid2 {
+                (pid1, pid2)
+            } else {
+                (pid2, pid1)
+            };
+            if !edge_indices.contains_key(&edge_key) {
+                panic!("Edge {:?} not found!", edge_key);
+            }
+            let edge_index = edge_indices.get(&edge_key).unwrap();
             face_edges.push(*edge_index);
             if edges[*edge_index].adj_faces[0] == None {
                 edges[*edge_index].adj_faces[0] = Some(face_id);
@@ -196,22 +127,18 @@ pub fn load_stl_new(filename: &str) -> layout::ProcResult<NEWSurface>{
         surface.edges.push(edge);
     }
 
+    // Add point normal to each vertex
+    for vertex in surface.vertices.iter_mut() {
+        let mut normal = GeoVector::new(0.0, 0.0, 0.0);
+        for edge_index in vertex.adj_edges.iter() {
+            let edge = &surface.edges[*edge_index];
+            let face = &surface.faces[edge.adj_faces[0].unwrap()];
+            normal += face.normal;
+        }
+        vertex.normal = normal.normalize();
+    }
+
     Ok(surface)
-}
-
-/// Get the area of the triangle.
-/// Uses Heron's formula.
-fn face_area(face: &stl_io::IndexedTriangle, points: &Vec<Point>) -> f32 {
-    let p1 = &points[face.vertices[0]];
-    let p2 = &points[face.vertices[1]];
-    let p3 = &points[face.vertices[2]];
-
-    let a = p1.distance(p2);
-    let b = p2.distance(p3);
-    let c = p3.distance(p1);
-
-    let s = (a + b + c) / 2.0;
-    (s * (s - a) * (s - b) * (s - c)).sqrt()
 }
 
 // TODO: FIX TESTS

@@ -16,20 +16,21 @@ pub fn sphere_intersect(
     let mut new_normals = Vec::<GeoVector>::new();
 
     let mut cid = 0;
-    let mut min_dist_to_center = surface.points[0].distance(&center);
+    let mut min_dist_to_center = surface.vertices[0].point.distance(&center);
 
     // For each point in the surface
-    for (point_id, point) in surface.points.iter().enumerate() {
+    for (point_id, surface_vertex) in surface.vertices.iter().enumerate() {
+        let point = surface_vertex.point;
         // Calculate the distance from the center
         let distance = point.distance(&center);
 
         // If the distance is within epsilon of the radius
         if (radius - distance).abs() <= epsilon {
             // Add the point to the new points list
-            new_points.push(*point);
+            new_points.push(point);
 
             // Add the point's normal to the new normals list
-            new_normals.push(surface.point_normals[point_id].normalize());
+            new_normals.push(surface.vertices[point_id].normal.normalize());
         }
 
         // Track the closest point to the center
@@ -37,6 +38,10 @@ pub fn sphere_intersect(
             min_dist_to_center = distance;
             cid = point_id;
         }
+    }
+
+    if new_normals.iter().any(|n| n.has_nan()) {
+        panic!("BUG! helper::sphere_intersect: NaN normal found in new_normals");
     }
 
     // Return the center id, new points, and new normals

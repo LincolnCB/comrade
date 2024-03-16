@@ -43,11 +43,11 @@ impl Point {
     pub fn nearest_point_idx(&self, surface: &Surface) -> usize {
         let mut min_dist = std::f32::MAX;
         let mut min_point_idx = 0;
-        for i in 0..surface.points.len() {
-            let dist = self.distance(&surface.points[i]);
+        for (idx, vertex) in surface.vertices.iter().enumerate() {
+            let dist = self.distance(&vertex.point);
             if dist < min_dist {
                 min_dist = dist;
-                min_point_idx = i;
+                min_point_idx = idx;
             }
         }
         min_point_idx
@@ -55,13 +55,33 @@ impl Point {
     
     /// Get the closest point on the surface to this point.
     pub fn nearest_point(&self, surface: &Surface) -> Point {
-        surface.points[self.nearest_point_idx(surface)]
+        surface.vertices[self.nearest_point_idx(surface)].point
     }
 
     /// Project this point onto the nearest face of the surface.
     pub fn project_to_surface_face(&self, surface: &Surface) -> Point {
         *self - (self - surface)
     }
+
+    /// Check if a point is in the triangular prism defined by extruding a face in both directions
+    pub fn is_above_surface_face(&self, surface: &Surface, face_idx: usize) -> bool {
+        let face = &surface.faces[face_idx];
+        let normal = face.normal;
+
+        let halfplane_sign = |p: &Point, p1: &Point, p2: &Point| {
+            let v_edge = *p2 - *p1;
+            let v_point = *p - *p1;
+            let cross = v_edge.cross(&normal);
+            cross.dot(&v_point) > 0.0
+        };
+
+        let sign_1 = halfplane_sign(self, &surface.vertices[face.vertices[0]].point, &surface.vertices[face.vertices[1]].point);
+        let sign_2 = halfplane_sign(self, &surface.vertices[face.vertices[1]].point, &surface.vertices[face.vertices[2]].point);
+        let sign_3 = halfplane_sign(self, &surface.vertices[face.vertices[2]].point, &surface.vertices[face.vertices[0]].point);
+
+        sign_1 == sign_2 && sign_2 == sign_3
+    }
+        
 
 }
 impl fmt::Display for Point {
@@ -133,50 +153,34 @@ impl Sub<&Surface> for &Point {
     fn sub(self, surface: &Surface) -> GeoVector {
         let min_point_idx = self.nearest_point_idx(surface);
 
-        // Get the point normal and the distance rejection vector
-        let min_point = surface.points[min_point_idx];
-        let min_point_normal = surface.point_normals[min_point_idx];
-        let vec_to_point = *self - min_point;
-        let rej = vec_to_point.rej_onto(&min_point_normal).normalize();
+        let vertex = &surface.vertices[min_point_idx];
+        let vec_to_point = *self - vertex.point;
 
-        // Find the two adjacent points most aligned with the rejection vector
-        let mut max_dot_1 = std::f32::MIN;
-        let mut max_dot_2 = std::f32::MIN;
-        let mut adj_point_1_idx = 0;
-        let mut adj_point_2_idx = 0;
-        for i in 0..surface.adj[min_point_idx].len() {
-            let adj_point = surface.points[surface.adj[min_point_idx][i]];
-            let adj_vec = adj_point - min_point;
-            let dot = adj_vec.rej_onto(&min_point_normal).normalize().dot(&rej);
-            if dot > max_dot_1 {
-                max_dot_2 = max_dot_1;
-                adj_point_2_idx = adj_point_1_idx;
-                max_dot_1 = dot;
-                adj_point_1_idx = i;
-            }
-            else if dot > max_dot_2 {
-                max_dot_2 = dot;
-                adj_point_2_idx = i;
+        // Check if the point is above any of the faces
+        // If above multiple (concave towards the point), use the closest face
+        let mut min_face_idx: Option<f32> = None;
+        let mut min_dist: Option<f32> = None;
+        for face_idx in vertex.adj_faces.iter() {
+            if self.is_above_surface_face(surface, *face_idx) {
+                let face = &surface.faces[*face_idx as usize];
+                let dist = vec_to_point.dot(&face.normal);
+                if min_dist.is_none() || dist < min_dist.unwrap() {
+                    min_dist = Some(dist);
+                    min_face_idx = Some(*face_idx as f32);
+                }
             }
         }
 
-        // Get the face normal
-        let adj_point_1 = surface.points[surface.adj[min_point_idx][adj_point_1_idx]];
-        let adj_point_2 = surface.points[surface.adj[min_point_idx][adj_point_2_idx]];
-        let side_1 = adj_point_1 - min_point;
-        let side_2 = adj_point_2 - min_point;
-
-        let mut face_normal = side_1.cross(&side_2);
-
-        face_normal = if face_normal.norm() > 0.001 {
-            face_normal.normalize()
+        // If the point is above a face, return the vector to the face
+        // Otherwise, return the vector to the nearest point
+        if let Some(face_idx) = min_face_idx {
+            let face = &surface.faces[face_idx as usize];
+            let face_normal = face.normal;
+            return vec_to_point.proj_onto(&face_normal);
+        } else {
+            return vec_to_point;
         }
-        else {
-            min_point_normal.normalize()
-        };
 
-
-        vec_to_point.proj_onto(&face_normal)
     }
 }
         
@@ -388,37 +392,17 @@ impl fmt::Display for GeoVector {
     }
 }
 
-/// The substrate surface.
-/// Contains a list of points.
-#[derive(Debug)]
-pub struct Surface {
-    pub points: Vec<Point>,
-    pub adj: Vec<Vec<usize>>,
-    pub area: f32,
-    pub point_normals: Vec<GeoVector>,
-}
-impl Surface {
-    pub fn empty() -> Self {
-        Surface{
-            points: Vec::new(),
-            adj: Vec::new(),
-            area: 0.0,
-            point_normals: Vec::new(),
-        }
-    }
-}
-
 /// An updated surface
 // TODO: expand docs
 #[derive(Debug)]
-pub struct NEWSurface {
+pub struct Surface {
     pub vertices: Vec<SurfaceVertex>,
     pub edges: Vec<SurfaceEdge>,
     pub faces: Vec<SurfaceFace>,
 }
-impl NEWSurface {
+impl Surface {
     pub fn empty() -> Self {
-        NEWSurface{
+        Surface{
             vertices: Vec::new(),
             edges: Vec::new(),
             faces: Vec::new(),
