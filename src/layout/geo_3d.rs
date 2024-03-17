@@ -408,6 +408,20 @@ impl Surface {
             faces: Vec::new(),
         }
     }
+
+    pub fn get_boundary_vertex_indices(&self) -> Vec<usize> {
+        let mut boundary_vertex_indices = Vec::new();
+
+        for edge in self.edges.iter() {
+            if edge.adj_faces.iter().any(|f| f.is_none()) {
+                boundary_vertex_indices.extend_from_slice(&edge.vertices);
+            }
+        }
+
+        boundary_vertex_indices.sort();
+        boundary_vertex_indices.dedup();
+        boundary_vertex_indices
+    }
 }
 
 #[derive(Debug)]

@@ -406,7 +406,7 @@ pub fn add_even_breaks_by_angle(
 pub fn bin_by_angle(points: &Vec::<Point>, bin_count: usize, center: Point, axis: GeoVector, zero_angle_vec: GeoVector) -> layout::ProcResult<Vec::<usize>> {
 
     // Initialize the angle bins
-    let angle_step: Angle = 2.0 * PI / bin_count as Angle;
+    let angle_step: Angle = (2.0 * PI) / bin_count as Angle;
     let mut bin_error: Vec<Angle> = vec![angle_step; bin_count as usize];
     let mut binned_points: Vec<Option<usize>> = vec![None as Option<usize>; bin_count as usize];
 
@@ -429,14 +429,14 @@ pub fn bin_by_angle(points: &Vec::<Point>, bin_count: usize, center: Point, axis
         
         let mut angle = zero_angle_vec.angle_to(&out_vec);
 
-        if out_vec.cross(&zero_angle_vec).dot(&axis) < 0.0 {
+        if out_vec.cross(&zero_angle_vec).dot(&axis) < 0.0 && angle > 1e-6{
             angle = (2.0 * PI) - angle;
         }
 
         // Bin the point
         let bin_id = (angle / angle_step) as usize;
         if bin_id >= bin_count as usize {
-            panic!("Math error: Angle bin out of range");
+            panic!("Math error: Angle ({angle}) bin {bin_id} out of range 0:{}", bin_count - 1);
         }
         let error = (angle - bin_id as Angle * angle_step).abs();
         if error < bin_error[bin_id] {

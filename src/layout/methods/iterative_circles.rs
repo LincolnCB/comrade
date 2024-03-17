@@ -212,11 +212,37 @@ impl methods::LayoutMethod for Method {
         let internal_pressure_scale = self.method_args.internal_pressure_scale;
         let external_pressure_scale = self.method_args.external_pressure_scale;
 
+        // Store boundary points
+        let boundary_points: Vec<Point> = surface.get_boundary_vertex_indices().iter().map(|v| surface.vertices[*v].point).collect();
+        let closest_boundary_point = |point: &Point| -> Point {
+            let mut closest = boundary_points[0];
+            let mut closest_distance = (*point - closest).norm();
+            for boundary_point in boundary_points.iter().skip(1) {
+                let distance = (point - boundary_point).norm();
+                if distance < closest_distance {
+                    closest = *boundary_point;
+                    closest_distance = distance;
+                }
+            }
+            closest
+        };
+        
+        // Shrink initial radii to keep the coils within the boundary
+        for (coil_id, circle) in new_circles.iter_mut().enumerate() {
+            let boundary_point = closest_boundary_point(&circle.center);
+            let vec_to_boundary = circle.center - boundary_point;
+            let distance_to_boundary = vec_to_boundary.norm();
+            if distance_to_boundary < circle.coil_radius {
+                circle.coil_radius = distance_to_boundary;
+                println!("WARNING: Coil {} too close to boundary, radius shrunk to {:.2}", coil_id, distance_to_boundary);
+            }
+        }
+            
         // Run a single pass
-        let mut layout_out = self.single_pass(surface, &original_circles)?;
+        let mut layout_out = self.single_pass(surface, &new_circles)?;
 
         // Print initial statistics
-        if self.method_args.verbose {
+        if self.method_args.verbose && iterations > 0 {
             println!("Initial Statistics:");
             println!();
 
@@ -255,6 +281,7 @@ impl methods::LayoutMethod for Method {
             println!();
         }
 
+        // Iterate to automatically decouple
         for (i, _) in (0..iterations).enumerate() {
             println!("Iteration {}/{}...", (i + 1), iterations);
             assert!(new_circles.len() == layout_out.coils.len());
@@ -294,11 +321,11 @@ impl methods::LayoutMethod for Method {
                         if d_rel < far_cutoff {
                             let k = coil.coupling_factor(other_coil, 1.0);
                             
-                            // Add internal pressure forces to both
-                            coil_forces[coil_id].push(vec_from_other.normalize() * coil_radial_forces[coil_id]);
-                            coil_force_directions[coil_id].push(-1.0 * coil_radial_forces[coil_id].signum());
-                            coil_forces[other_id].push(-vec_from_other.normalize() * coil_radial_forces[other_id]);
-                            coil_force_directions[other_id].push(-1.0 * coil_radial_forces[other_id].signum());
+                            // Add internal pressure of one coil as an external force on the other
+                            coil_forces[coil_id].push(vec_from_other.normalize() * coil_radial_forces[other_id]);
+                            coil_force_directions[coil_id].push(-1.0 * coil_radial_forces[other_id].signum());
+                            coil_forces[other_id].push(-vec_from_other.normalize() * coil_radial_forces[coil_id]);
+                            coil_force_directions[other_id].push(-1.0 * coil_radial_forces[coil_id].signum());
                             
                             // Add coupling forces to both coils
                             let d_rel_err = -(coupling_force_scale * 0.5) * k;
@@ -330,6 +357,14 @@ impl methods::LayoutMethod for Method {
                     delta_c += total_delta.normalize() * (center_bound - total_delta.norm());
                 }
                 center = center + step_size * delta_c.rej_onto(&coil.normal);
+
+                // If center is too close to the boundary, move it away (before making radius changes)
+                let boundary_point = closest_boundary_point(&center);
+                let vec_to_boundary = center - boundary_point;
+                let distance_to_boundary = vec_to_boundary.norm();
+                if distance_to_boundary < radius {
+                    center = boundary_point + vec_to_boundary.normalize() * radius;
+                }
                     
                 // Calculate external pressure forces
                 for (force_num, force) in coil_forces[coil_id].iter().enumerate() {
@@ -339,12 +374,19 @@ impl methods::LayoutMethod for Method {
                         coil_radial_forces[coil_id] += force.norm() / original_radius * force_direction * external_pressure_scale;
                     }
                 }
+
+                // Update the radius based on the radial forces
                 radius += step_size * coil_radial_forces[coil_id] * original_radius;
                 if radius > (1.0 + radius_freedom) * original_radius {
                     radius = (1.0 + radius_freedom) * original_radius;
                 } else if radius < (1.0 - radius_freedom) * original_radius {
                     radius = (1.0 - radius_freedom) * original_radius;
                 }
+                // Cap the radius by the distance to the boundary
+                if radius > distance_to_boundary {
+                    radius = distance_to_boundary;
+                }
+
 
                 new_circles[coil_id].center = center - (&center - surface);
                 new_circles[coil_id].coil_radius = radius;
@@ -405,7 +447,9 @@ impl methods::LayoutMethod for Method {
         }
 
         // Add breaks
+        println!("Adding breaks...");
         for (coil_id, coil) in layout_out.coils.iter_mut().enumerate() {
+            println!("Coil {}/{}...", coil_id + 1, new_circles.len());
             let break_count = new_circles[coil_id].break_count;
             let break_angle_offset = new_circles[coil_id].break_angle_offset;
             let zero_angle_vector = {
@@ -435,8 +479,8 @@ impl Method {
         let epsilon = self.method_args.epsilon;
         let pre_shift = self.method_args.pre_shift;
 
-        for (coil_num, circle_args) in circles.iter().enumerate() {
-            println!("Coil {}/{}...", (coil_num + 1), circles.len());
+        for (coil_id, circle_args) in circles.iter().enumerate() {
+            println!("Coil {}/{}...", coil_id + 1, circles.len());
             
             // Grab arguments from the circle arguments
             let coil_radius = circle_args.coil_radius;
