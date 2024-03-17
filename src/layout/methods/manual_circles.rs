@@ -139,6 +139,31 @@ impl methods::LayoutMethod for Method {
         let epsilon = self.method_args.epsilon;
         let pre_shift = self.method_args.pre_shift;
 
+        // Store boundary points
+        let boundary_points: Vec<Point> = surface.get_boundary_vertex_indices().iter().map(|v| surface.vertices[*v].point).collect();
+        let closest_boundary_point = |point: &Point| -> Point {
+            let mut closest = boundary_points[0];
+            let mut closest_distance = (*point - closest).norm();
+            for boundary_point in boundary_points.iter().skip(1) {
+                let distance = (point - boundary_point).norm();
+                if distance < closest_distance {
+                    closest = *boundary_point;
+                    closest_distance = distance;
+                }
+            }
+            closest
+        };
+
+        // Shrink initial radii to keep the coils within the boundary
+        for (coil_id, circle) in circles.iter().enumerate() {
+            let boundary_point = closest_boundary_point(&circle.center);
+            let vec_to_boundary = circle.center - boundary_point;
+            let distance_to_boundary = vec_to_boundary.norm();
+            if distance_to_boundary < circle.coil_radius {
+                println!("WARNING: Coil {} too close to boundary, radius of {:.2} but distance of {:.2}", coil_id, circle.coil_radius, distance_to_boundary);
+            }
+        }
+
         for (coil_num, circle_args) in circles.iter().enumerate() {
             println!("Coil {}/{}...", (coil_num + 1), circles.len());
             
