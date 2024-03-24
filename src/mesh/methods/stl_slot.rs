@@ -41,7 +41,7 @@ impl MethodCfg {
         8
     }
     pub fn default_slot_depth() -> f32 {
-        3.0
+        10.0
     }
     pub fn default() -> Self {
         MethodCfg{
@@ -104,7 +104,7 @@ impl methods::MeshMethod for Method {
 
                 // Put the polygon points around the plane given by the point and the out_vec/up_vec
                 for i in 0..bottom_poly_count{
-                    let angle = 2.0 * PI * (i as Angle) / (self.method_args.poly_num as Angle) - PI;
+                    let angle = 2.0 * PI * (i as Angle + 0.5) / (self.method_args.poly_num as Angle) - PI;
                     let poly_point = point + (out_vec * angle.cos() + up_vec * angle.sin()) * radius;
                     corner_slice.push(poly_point);
                 }
