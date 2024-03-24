@@ -1,7 +1,71 @@
 mod proc_errors;
+mod cfg;
+mod methods;
+
+use serde::{Serialize, Deserialize};
+use crate::layout::geo_3d::*;
 
 pub use proc_errors::{
     SimError,
     ProcResult,
     err_str,
 };
+// Re-export cfg handling
+pub use cfg::{
+    SimArgs,
+    SimTarget,
+};
+// Re-export simulation methods
+pub use methods::{
+    SimChoice,
+    SimMethod,
+};
+
+/// Simulation output struct.
+/// This struct contains all the necessary results from the simulation process.
+/// Returned from the simulation process, used as input to the matching process.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SimOutput {
+    pub coil_fields: Vec<CoilField>,
+}
+impl SimOutput {
+    /// Create a new simulation.
+    pub fn new() -> Self{
+        SimOutput{coil_fields: Vec::new()}
+    }
+}
+
+/// A coil field.
+/// Contains a list of points and the field at each point.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CoilField {
+    pub field_points: Vec<FieldPoint>,
+}
+impl CoilField {
+    /// Create a new coil field.
+    pub fn new() -> Self{
+        CoilField{field_points: Vec::new()}
+    }
+}
+
+/// A field point.
+/// Contains the point and the E and B fields at that point.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FieldPoint {
+    pub point: Point,
+    pub e: GeoVector,
+    pub b: GeoVector,
+}
+
+pub fn do_simulation(sim_target: &SimTarget) -> ProcResult<SimOutput> {
+
+    // Extract the simulation method and arguments from target
+    let sim_method = &sim_target.sim_method;
+
+    println!("Simulating...");
+
+    // Run the simulation method
+    println!("Running simulation method: {}", sim_method.get_method_name());
+    sim_method.do_simulation()
+}
+

@@ -74,30 +74,6 @@ struct MethodCfg {
     final_cfg_output: Option<String>,
 }
 impl MethodCfg {
-    pub fn default() -> Self {
-        MethodCfg{
-            circles: vec![CircleArgs::default()],
-            epsilon: Self::default_epsilon(),
-            pre_shift: Self::default_pre_shift(),
-
-            clearance: Self::default_clearance(),
-            wire_radius: Self::default_wire_radius(),
-            zero_angle_vector: Self::default_zero_angle_vector(),
-            backup_zero_angle_vector: Self::default_backup_zero_angle_vector(),
-
-            iterations: Self::default_iterations(),
-            center_freedom: Self::default_center_freedom(),
-            radius_freedom: Self::default_radius_freedom(),
-            close_cutoff: Self::default_close_cutoff(),
-            far_cutoff: Self::default_far_cutoff(),
-            coupling_force_scale: Self::default_coupling_force_scale(),
-            internal_pressure_scale: Self::default_internal_pressure_scale(),
-            external_pressure_scale: Self::default_external_pressure_scale(),
-
-            verbose: Self::default_verbose(),
-            final_cfg_output: Self::default_final_cfg_output(),
-        }
-    }
     pub fn default_epsilon() -> f32 {
         0.15
     }
@@ -150,6 +126,33 @@ impl MethodCfg {
         None
     }
 }
+impl Default for MethodCfg{
+    fn default() -> Self {
+        MethodCfg{
+            circles: vec![CircleArgs::default()],
+            epsilon: Self::default_epsilon(),
+            pre_shift: Self::default_pre_shift(),
+
+            clearance: Self::default_clearance(),
+            wire_radius: Self::default_wire_radius(),
+            zero_angle_vector: Self::default_zero_angle_vector(),
+            backup_zero_angle_vector: Self::default_backup_zero_angle_vector(),
+
+            iterations: Self::default_iterations(),
+            center_freedom: Self::default_center_freedom(),
+            radius_freedom: Self::default_radius_freedom(),
+            close_cutoff: Self::default_close_cutoff(),
+            far_cutoff: Self::default_far_cutoff(),
+            coupling_force_scale: Self::default_coupling_force_scale(),
+            internal_pressure_scale: Self::default_internal_pressure_scale(),
+            external_pressure_scale: Self::default_external_pressure_scale(),
+
+            verbose: Self::default_verbose(),
+            final_cfg_output: Self::default_final_cfg_output(),
+        }
+    }
+
+}
 
 /// Single element arguments
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
@@ -163,7 +166,7 @@ struct CircleArgs {
     break_angle_offset: f32,
 }
 impl CircleArgs {
-    pub fn default() -> Self {
+    fn default() -> Self {
         CircleArgs{
             coil_radius: Self::default_coil_radius(),
             center: Self::default_center(),

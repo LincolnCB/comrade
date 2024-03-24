@@ -38,10 +38,12 @@ impl MethodCfg {
     pub fn default_poly_num() -> usize {
         8
     }
-    pub fn default() -> Self {
+}
+impl Default for MethodCfg {
+    fn default() -> Self {
         MethodCfg{
-            radius_offset: Self::default_radius_offset(),
-            poly_num: Self::default_poly_num(),
+            radius_offset: MethodCfg::default_radius_offset(),
+            poly_num: MethodCfg::default_poly_num(),
         }
     }
 }

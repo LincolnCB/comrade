@@ -47,18 +47,6 @@ struct MethodCfg {
     verbose: bool,
 }
 impl MethodCfg {
-    pub fn default() -> Self {
-        MethodCfg{
-            circles: vec![CircleArgs::default()],
-            clearance: Self::default_clearance(),
-            epsilon: Self::default_epsilon(),
-            wire_radius: Self::default_wire_radius(),
-            pre_shift: Self::default_pre_shift(),
-            zero_angle_vector: Self::default_zero_angle_vector(),
-            backup_zero_angle_vector: Self::default_backup_zero_angle_vector(),
-            verbose: Self::default_verbose(),
-        }
-    }
     pub fn default_clearance() -> f32 {
         1.29
     }
@@ -81,6 +69,20 @@ impl MethodCfg {
         GeoVector::yhat()
     }
 }
+impl Default for MethodCfg {
+    fn default() -> Self {
+        MethodCfg{
+            circles: vec![CircleArgs::default()],
+            clearance: Self::default_clearance(),
+            epsilon: Self::default_epsilon(),
+            wire_radius: Self::default_wire_radius(),
+            pre_shift: Self::default_pre_shift(),
+            zero_angle_vector: Self::default_zero_angle_vector(),
+            backup_zero_angle_vector: Self::default_backup_zero_angle_vector(),
+            verbose: Self::default_verbose(),
+        }
+    }
+}
 
 /// Single element arguments
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
@@ -94,7 +96,7 @@ struct CircleArgs {
     break_angle_offset: f32,
 }
 impl CircleArgs {
-    pub fn default() -> Self {
+    fn default() -> Self {
         CircleArgs{
             coil_radius: Self::default_coil_radius(),
             center: Self::default_center(),

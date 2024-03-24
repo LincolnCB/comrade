@@ -36,7 +36,6 @@ pub struct LayoutTarget {
     /// Layout arguments.
     pub layout_args: LayoutArgs,
 }
-
 impl LayoutTarget {
     /// Construct a layout target from a config file.
     pub fn from_argfile(cfg_file: &str, is_last: bool) -> args::ProcResult<Self> {

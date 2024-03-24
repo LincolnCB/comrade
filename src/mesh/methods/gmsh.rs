@@ -68,15 +68,17 @@ impl MethodCfg {
     pub fn default_larmor_mhz() -> f32 {
         127.73
     }
-    pub fn default() -> Self {
+}
+impl Default for MethodCfg {
+    fn default() -> Self {
         MethodCfg{
-            break_count: Self::default_break_count(),
-            angle_shift: Self::default_angle_shift(),
-            single_surface: Self::default_single_surface(),
-            polygonal: Self::default_polygonal(),
-            poly_count: Self::default_poly_count(),
-            lc: Self::default_lc(),
-            larmor_mhz: Self::default_larmor_mhz(),
+            break_count: MethodCfg::default_break_count(),
+            angle_shift: MethodCfg::default_angle_shift(),
+            single_surface: MethodCfg::default_single_surface(),
+            polygonal: MethodCfg::default_polygonal(),
+            poly_count: MethodCfg::default_poly_count(),
+            lc: MethodCfg::default_lc(),
+            larmor_mhz: MethodCfg::default_larmor_mhz(),
             origin_offset: GeoVector::zero(),
         }
     }
@@ -127,7 +129,6 @@ impl methods::MeshMethod for Method {
     }
 
     /// Run the meshing process with the given arguments.
-    /// Uses the `mesh` and `layout` modules.
     fn save_mesh(&self, layout: &layout::Layout, output_path: &str) -> mesh::ProcResult<()> {
         let output_path = output_path.to_string() + ".geo";
 

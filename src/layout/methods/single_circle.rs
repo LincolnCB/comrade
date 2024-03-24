@@ -50,13 +50,15 @@ impl MethodCfg {
     pub fn default_center() -> Point {
         Point::new(0.0, 0.0, 0.0)
     }
-    pub fn default() -> Self {
+}
+impl Default for MethodCfg {
+    fn default() -> Self {
         MethodCfg{
-            coil_radius: Self::default_coil_radius(),
-            wire_radius: Self::default_wire_radius(),
-            epsilon: Self::default_epsilon(),
-            pre_shift: Self::default_pre_shift(),
-            center: Self::default_center(),
+            center: MethodCfg::default_center(),
+            coil_radius: MethodCfg::default_coil_radius(),
+            wire_radius: MethodCfg::default_wire_radius(),
+            epsilon: MethodCfg::default_epsilon(),
+            pre_shift: MethodCfg::default_pre_shift(),
         }
     }
 }

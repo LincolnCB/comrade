@@ -43,11 +43,13 @@ impl MethodCfg {
     pub fn default_slot_depth() -> f32 {
         10.0
     }
-    pub fn default() -> Self {
+}
+impl Default for MethodCfg {
+    fn default() -> Self {
         MethodCfg{
-            radius_offset: Self::default_radius_offset(),
-            poly_num: Self::default_poly_num(),
-            slot_depth: Self::default_slot_depth(),
+            radius_offset: MethodCfg::default_radius_offset(),
+            poly_num: MethodCfg::default_poly_num(),
+            slot_depth: MethodCfg::default_slot_depth(),
         }
     }
 }
