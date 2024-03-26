@@ -3,7 +3,6 @@ mod cfg;
 mod methods;
 
 use serde::{Serialize, Deserialize};
-use crate::layout::geo_3d::*;
 
 pub use proc_errors::{
     SimError,
@@ -26,35 +25,27 @@ pub use methods::{
 /// Returned from the simulation process, used as input to the matching process.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SimOutput {
-    pub coil_fields: Vec<CoilField>,
+    pub coil_values: Vec<CoilRLC>,
 }
 impl SimOutput {
     /// Create a new simulation.
     pub fn new() -> Self{
-        SimOutput{coil_fields: Vec::new()}
+        SimOutput{coil_values: Vec::new()}
     }
 }
 
-/// A coil field.
-/// Contains a list of points and the field at each point.
+/// Coil RLC values struct.
+/// This struct contains the resistance, inductance, and capacitance values for a coil.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct CoilField {
-    pub field_points: Vec<FieldPoint>,
+pub struct CoilRLC {
+    pub resistance: f64,
+    pub inductance: f64,
+    pub capacitance: f64,
 }
-impl CoilField {
-    /// Create a new coil field.
-    pub fn new() -> Self{
-        CoilField{field_points: Vec::new()}
+impl CoilRLC {
+    pub fn rlc(&self) -> (f64, f64, f64) {
+        (self.resistance, self.inductance, self.capacitance)
     }
-}
-
-/// A field point.
-/// Contains the point and the E and B fields at that point.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct FieldPoint {
-    pub point: Point,
-    pub e: GeoVector,
-    pub b: GeoVector,
 }
 
 pub fn do_simulation(sim_target: &SimTarget) -> ProcResult<SimOutput> {
