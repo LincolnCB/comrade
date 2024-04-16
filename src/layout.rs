@@ -95,9 +95,30 @@ impl Coil {
         Ok(Coil{center, normal, wire_radius, vertices: coil_vertices, port: None, breaks: Vec::new()})
     }
 
+    /// Calculate the wire length of the coil, in mm
+    pub fn wire_length(&self) -> f32 {
+        let mut length = 0.0;
+        for vertex in self.vertices.iter() {
+            length += vertex.point.distance(&self.vertices[vertex.next_id].point);
+        }
+        length
+    }
+
+    /// Calculate the average radius of the coil, in mm
+    pub fn average_radius(&self) -> f32 {
+        let mut radius = 0.0;
+        for vertex in self.vertices.iter() {
+            radius += vertex.point.distance(&self.center);
+        }
+        radius / (self.vertices.len() as f32)
+    }
+
     /// Calculate the self-inductance of the coil, in nH.
     pub fn self_inductance(&self, dl:f32) -> f32 {
-        self.mutual_inductance(&self, dl) / 2.0 // Divide by 2 to prevent double counting
+        // TODO: This may depend on frequency, so it may need to be updated.
+        const CORRECTION_SCALE : f32 = 0.0012;
+        let correction_factor = CORRECTION_SCALE * self.average_radius() / self.wire_radius;
+        self.mutual_inductance(&self, dl) + self.wire_length() * correction_factor
     }
 
     /// Calculate the mutual inductance between two coils, in nH.
@@ -106,6 +127,8 @@ impl Coil {
     /// there will be two segments of length dl and one of length 0.3 * dl.
     /// This value will have no effect on the calculation if longer than a given segment length.
     pub fn mutual_inductance(&self, other: &Coil, dl: f32) -> f32 {
+        let d_thresh = 0.25; // Threshold for distance between points
+
         let mut lambda = 0.0;
         let dl_sq = dl * dl;
 
@@ -115,8 +138,8 @@ impl Coil {
             let p1 = self.vertices[vertex.next_id].point;
             let np = (p1 - p0).normalize();
             let dp = p0.distance(&p1);
-            let i_max = (dp / dl).ceil() as u32;
-            let dp_remainder = dp - (i_max as f32 - 1.0) * dl;
+            let i_max = (dp / dl).floor() as u32;
+            let dp_remainder = dp - (i_max as f32) * dl;
             let dp_remainder_normalized = dp_remainder / dp;
 
             for other_vertex in other.vertices.iter() {
@@ -125,8 +148,8 @@ impl Coil {
                 let q1 = other.vertices[other_vertex.next_id].point;
                 let nq = (q1 - q0).normalize();
                 let dq = q0.distance(&q1);
-                let j_max = (dq / dl).ceil() as u32;
-                let dq_remainder = dq - (j_max as f32 - 1.0) * dl;
+                let j_max = (dq / dl).floor() as u32;
+                let dq_remainder = dq - (j_max as f32) * dl;
                 let dq_remainder_normalized = dq_remainder / dq;
 
                 // Get the dot product of the two normalized segments
@@ -138,27 +161,27 @@ impl Coil {
                     let p = p0 + np * (i as f32 + 0.5) * dl;
                     for j in 0..j_max {
                         let q = q0 + nq * (j as f32 + 0.5) * dl;
-                        if p.distance(&q) > self.wire_radius + other.wire_radius {
+                        if p.distance(&q) > d_thresh * (self.wire_radius + other.wire_radius) {
                             lambda += dl_sq_dot / p.distance(&q)
                         }
                     }
                     // Remainder for second segment
-                    let q = q0 + nq * (1.0 - 0.5 * dq_remainder_normalized);
-                    if p.distance(&q) > self.wire_radius + other.wire_radius {
+                    let q = q0 + nq * (1.0 - 0.5 * dq_remainder_normalized) * dq;
+                    if p.distance(&q) > d_thresh * (self.wire_radius + other.wire_radius) {
                         lambda += dl * dq_remainder * dot / p.distance(&q);
                     }
                 }
                 // Remainder for first segment
-                let p = p0 + np * (1.0 - 0.5 * dp_remainder_normalized);
+                let p = p0 + np * (1.0 - 0.5 * dp_remainder_normalized) * dp;
                 for j in 0..j_max {
                     let q = q0 + nq * (j as f32 + 0.5) * dl;
-                    if p.distance(&q) > self.wire_radius + other.wire_radius {
+                    if p.distance(&q) > d_thresh * (self.wire_radius + other.wire_radius) {
                         lambda += dl * dp_remainder * dot / p.distance(&q);
                     }
                 }
                 // Remainder for both segments
                 let q = q0 + nq * (1.0 - 0.5 * dq_remainder_normalized);
-                if p.distance(&q) > self.wire_radius + other.wire_radius {
+                if p.distance(&q) > d_thresh * (self.wire_radius + other.wire_radius) {
                     lambda += dp_remainder * dq_remainder * dot / p.distance(&q);
                 }
             }

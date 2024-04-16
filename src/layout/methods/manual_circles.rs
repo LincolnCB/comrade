@@ -215,7 +215,7 @@ impl methods::LayoutMethod for Method {
         // Add breaks
         for (coil_id, coil) in layout_out.coils.iter_mut().enumerate() {
             let break_count = circles[coil_id].break_count;
-            let break_angle_offset = circles[coil_id].break_angle_offset;
+            let break_angle_offset_rad = circles[coil_id].break_angle_offset * std::f32::consts::PI / 180.0;
             let zero_angle_vector = {
                 if coil.normal.normalize().dot(&self.method_args.zero_angle_vector.normalize()) < 0.95 {
                     self.method_args.zero_angle_vector
@@ -224,7 +224,7 @@ impl methods::LayoutMethod for Method {
                 }
             }.normalize();
 
-            add_even_breaks_by_angle(coil, break_count, break_angle_offset, zero_angle_vector)?;
+            add_even_breaks_by_angle(coil, break_count, break_angle_offset_rad, zero_angle_vector)?;
         }
         
         Ok(layout_out)

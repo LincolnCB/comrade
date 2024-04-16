@@ -86,7 +86,8 @@ impl Point {
 }
 impl fmt::Display for Point {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "({}, {}, {})", self.x, self.y, self.z)
+        let precision = f.precision().unwrap_or(3);
+        write!(f, "({:.*}, {:.*}, {:.*})", precision, self.x, precision, self.y, precision, self.z)
     }
 }
 impl Add<GeoVector> for Point {

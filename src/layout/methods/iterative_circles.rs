@@ -401,6 +401,12 @@ impl methods::LayoutMethod for Method {
         // Print statistics
         if self.method_args.verbose {
 
+            println!("Final Coils:");
+            for (coil_id, coil) in layout_out.coils.iter().enumerate() {
+                println!("Coil {}: Radius [{:.2}], Center [{:.2}], Length [{:.2}]", coil_id, new_circles[coil_id].coil_radius, coil.center, coil.wire_length());
+            }
+            println!();
+
             println!("Distances:");
             for (coil_id, coil) in layout_out.coils.iter().enumerate() {
                 for (other_coil_id, other_coil) in layout_out.coils.iter().enumerate() {
@@ -429,9 +435,10 @@ impl methods::LayoutMethod for Method {
             }
             println!();
 
-            println!("Final Coils:");
+            println!("Self inductance estimates");
             for (coil_id, coil) in layout_out.coils.iter().enumerate() {
-                println!("Coil {}: Radius {:.2}, Center {}", coil_id, new_circles[coil_id].coil_radius, coil.center);
+                let self_inductance = coil.self_inductance(1.0);
+                println!("Coil {}: {:.3}", coil_id, self_inductance);
             }
             println!();
 
@@ -454,7 +461,7 @@ impl methods::LayoutMethod for Method {
         for (coil_id, coil) in layout_out.coils.iter_mut().enumerate() {
             println!("Coil {}/{}...", coil_id + 1, new_circles.len());
             let break_count = new_circles[coil_id].break_count;
-            let break_angle_offset = new_circles[coil_id].break_angle_offset;
+            let break_angle_offset_rad = new_circles[coil_id].break_angle_offset * std::f32::consts::PI / 180.0;
             let zero_angle_vector = {
                 if coil.normal.normalize().dot(&self.method_args.zero_angle_vector.normalize()) < 0.95 {
                     self.method_args.zero_angle_vector
@@ -463,7 +470,7 @@ impl methods::LayoutMethod for Method {
                 }
             }.normalize();
 
-            add_even_breaks_by_angle(coil, break_count, break_angle_offset, zero_angle_vector)?;
+            add_even_breaks_by_angle(coil, break_count, break_angle_offset_rad, zero_angle_vector)?;
         }
         
         Ok(layout_out)

@@ -29,10 +29,6 @@ impl Method {
 /// Deserializer from yaml method cfg file
 #[derive(Debug, Serialize, Deserialize)]
 struct MethodCfg {
-    #[serde(default = "MethodCfg::default_break_count", alias = "breaks")]
-    break_count: usize,
-    #[serde(default = "MethodCfg::default_angle_shift", alias = "angle")]
-    angle_shift: f32,
     #[serde(default = "MethodCfg::default_single_surface")]
     single_surface: bool,
     #[serde(default = "MethodCfg::default_polygonal")]
@@ -47,12 +43,6 @@ struct MethodCfg {
     origin_offset: GeoVector,
 }
 impl MethodCfg {
-    pub fn default_break_count() -> usize {
-        4
-    }
-    pub fn default_angle_shift() -> f32 {
-        0.0
-    }
     pub fn default_single_surface() -> bool {
         true
     }
@@ -72,8 +62,6 @@ impl MethodCfg {
 impl Default for MethodCfg {
     fn default() -> Self {
         MethodCfg{
-            break_count: MethodCfg::default_break_count(),
-            angle_shift: MethodCfg::default_angle_shift(),
             single_surface: MethodCfg::default_single_surface(),
             polygonal: MethodCfg::default_polygonal(),
             poly_count: MethodCfg::default_poly_count(),
