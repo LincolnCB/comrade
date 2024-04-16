@@ -58,7 +58,7 @@ struct MethodCfg {
     close_cutoff: f32,
     #[serde(default = "MethodCfg::default_far_cutoff")]
     far_cutoff: f32,
-    #[serde(default = "MethodCfg::default_coupling_force_scale")]
+    #[serde(default = "MethodCfg::default_coupling_force_scale", alias = "coupling_scale")]
     coupling_force_scale: f32,
     #[serde(default = "MethodCfg::default_internal_pressure_scale")]
     internal_pressure_scale: f32,
@@ -229,14 +229,27 @@ impl methods::LayoutMethod for Method {
             }
             closest
         };
+
+        // Store if the coils are on the boundary
+        let mut on_boundary = vec![false; new_circles.len()];
         
-        // Shrink initial radii to keep the coils within the boundary
+        // Shrink initial radii to keep the coils within the boundary. Shift center if radius is too small.
         for (coil_id, circle) in new_circles.iter_mut().enumerate() {
-            let boundary_point = closest_boundary_point(&circle.center);
-            let vec_to_boundary = circle.center - boundary_point;
-            let distance_to_boundary = vec_to_boundary.norm();
+            let mut boundary_point = closest_boundary_point(&circle.center);
+            let mut vec_to_boundary = circle.center - boundary_point;
+            let mut distance_to_boundary = vec_to_boundary.norm();
             if distance_to_boundary < circle.coil_radius {
+                let min_radius = circle.coil_radius * (1.0 - radius_freedom);
+                if distance_to_boundary < min_radius {
+                    circle.center = boundary_point + vec_to_boundary.normalize() * min_radius;
+                    println!("WARNING: Coil {} closer than minimum radius to boundary, center by {:.2} shifted to {:.2}",
+                        coil_id, (min_radius - distance_to_boundary), circle.center);
+                    boundary_point = closest_boundary_point(&circle.center);
+                    vec_to_boundary = circle.center - boundary_point;
+                    distance_to_boundary = vec_to_boundary.norm();
+                }
                 circle.coil_radius = distance_to_boundary;
+                on_boundary[coil_id] = true;
                 println!("WARNING: Coil {} too close to boundary, radius shrunk to {:.2}", coil_id, distance_to_boundary);
             }
         }
@@ -292,6 +305,7 @@ impl methods::LayoutMethod for Method {
             let step_size = 1.0 - (i as f32) / (iterations as f32) * 0.5;
 
             let mut coil_forces = vec![Vec::<GeoVector>::new(); layout_out.coils.len()];
+            // Direction of the forces: -1 for inwards (push), 1 for outwards (pull)
             let mut coil_force_directions = vec![Vec::<f32>::new(); layout_out.coils.len()];
             let mut coil_radial_forces = vec![0.0; layout_out.coils.len()];
 
@@ -300,6 +314,10 @@ impl methods::LayoutMethod for Method {
                 let radius = circle.coil_radius;
                 let original_radius = original_circles[coil_id].coil_radius;
                 coil_radial_forces[coil_id] = (original_radius - radius) / original_radius * internal_pressure_scale;
+                // Add a multiplier if the coil is past the radial freedom (squished on the boundary)
+                if radius < (1.0 - radius_freedom) * original_radius {
+                    coil_radial_forces[coil_id] = coil_radial_forces[coil_id] * 2.0;
+                }
             }
 
             // Calculate the forces on each coil
@@ -320,15 +338,33 @@ impl methods::LayoutMethod for Method {
                         let distance_scale = new_circles[coil_id].coil_radius + new_circles[other_id].coil_radius;
                         let d_rel = vec_from_other.norm() / distance_scale;
 
-                        // Get forces from adjacent coils
+                        // Apply internal pressure forces between adjacent coils
+                        if d_rel < close_cutoff {
+                            let this_pressure = coil_radial_forces[coil_id];
+                            let other_pressure = coil_radial_forces[other_id];
+
+                            // Add internal pressure of this coil as an external force on the other
+                            coil_forces[coil_id].push(vec_from_other.normalize() * other_pressure);
+                            coil_force_directions[coil_id].push(-1.0 * other_pressure.signum());
+                            // Push self back if other coil is on boundary (but don't treat this as pressure)
+                            if on_boundary[other_id] && this_pressure > 0.0 {
+                                coil_forces[coil_id].push(vec_from_other.normalize() * this_pressure);
+                                coil_force_directions[coil_id].push(0.0);
+                            }
+
+                            // Add internal pressure of the other coil as an external force on this coil
+                            coil_forces[other_id].push(-vec_from_other.normalize() * this_pressure);
+                            coil_force_directions[other_id].push(-1.0 * this_pressure.signum());
+                            // Push other back if this coil is on boundary (but don't treat this as pressure)
+                            if on_boundary[coil_id] && other_pressure > 0.0 {
+                                coil_forces[other_id].push(-vec_from_other.normalize() * other_pressure);
+                                coil_force_directions[other_id].push(0.0);
+                            }
+                        }
+
+                        // Apply coupling forces from nearby coils
                         if d_rel < far_cutoff {
                             let k = coil.coupling_factor(other_coil, 1.0);
-                            
-                            // Add internal pressure of one coil as an external force on the other
-                            coil_forces[coil_id].push(vec_from_other.normalize() * coil_radial_forces[other_id]);
-                            coil_force_directions[coil_id].push(-1.0 * coil_radial_forces[other_id].signum());
-                            coil_forces[other_id].push(-vec_from_other.normalize() * coil_radial_forces[coil_id]);
-                            coil_force_directions[other_id].push(-1.0 * coil_radial_forces[coil_id].signum());
                             
                             // Add coupling forces to both coils
                             let d_rel_err = -(coupling_force_scale * 0.5) * k;
@@ -386,9 +422,10 @@ impl methods::LayoutMethod for Method {
                     radius = (1.0 - radius_freedom) * original_radius;
                 }
                 // Cap the radius by the distance to the boundary
-                if radius > distance_to_boundary {
+                if radius >= distance_to_boundary {
                     radius = distance_to_boundary;
-                }
+                    on_boundary[coil_id] = true;
+                } else { on_boundary[coil_id] = false; }
 
 
                 new_circles[coil_id].center = center - (&center - surface);
@@ -490,7 +527,7 @@ impl Method {
         let pre_shift = self.method_args.pre_shift;
 
         for (coil_id, circle_args) in circles.iter().enumerate() {
-            println!("Coil {}/{}...", coil_id + 1, circles.len());
+            if verbose { println!("Coil {}/{}...", coil_id + 1, circles.len()); }
             
             // Grab arguments from the circle arguments
             let coil_radius = circle_args.coil_radius;
