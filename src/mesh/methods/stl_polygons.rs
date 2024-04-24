@@ -1,7 +1,6 @@
 use crate::{
     layout,
     mesh,
-    args,
 };
 use mesh::methods;
 use crate::geo_3d::*;
@@ -12,26 +11,15 @@ use std::f32::consts::PI;
 
 /// STL Polygons Method struct.
 /// This struct contains all the parameters for the STL Polygons meshing method.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct Method {
-    /// Arguments for the STL Polygons method.
-    method_args: MethodCfg,
-}
-impl Method {
-    pub fn new() -> args::ProcResult<Self> {
-        Ok(Method{method_args: MethodCfg::default()})
-    }
-}
-
-/// Deserializer from yaml method cfg file
-#[derive(Debug, Serialize, Deserialize)]
-struct MethodCfg {
-    #[serde(default = "MethodCfg::default_radius_offset", alias = "offset")]
+    #[serde(default = "Method::default_radius_offset", alias = "offset")]
     radius_offset: f32,
-    #[serde(default = "MethodCfg::default_poly_num")]
+    #[serde(default = "Method::default_poly_num")]
     poly_num: usize,
 }
-impl MethodCfg {
+impl Method {
     pub fn default_radius_offset() -> f32 {
         0.0
     }
@@ -39,11 +27,11 @@ impl MethodCfg {
         8
     }
 }
-impl Default for MethodCfg {
+impl Default for Method {
     fn default() -> Self {
-        MethodCfg{
-            radius_offset: MethodCfg::default_radius_offset(),
-            poly_num: MethodCfg::default_poly_num(),
+        Method{
+            radius_offset: Method::default_radius_offset(),
+            poly_num: Method::default_poly_num(),
         }
     }
 }
@@ -59,13 +47,6 @@ impl methods::MeshMethod for Method {
         "stl".to_string()
     }
 
-    /// Parse the meshing method config file
-    fn parse_method_cfg(&mut self, method_cfg_file: &str) -> args::ProcResult<()>{
-        let f = crate::io::open(method_cfg_file)?;
-        self.method_args = serde_yaml::from_reader(f)?;
-        Ok(())
-    }
-
     /// Run the meshing process with the given arguments.
     /// Uses the `mesh` and `layout` modules.
     fn save_mesh(&self, layout: &layout::Layout, output_path: &str) -> mesh::ProcResult<()> {
@@ -77,7 +58,7 @@ impl methods::MeshMethod for Method {
         for (coil_n, coil) in layout.coils.iter().enumerate() {
             println!("Coil {}/{}...", (coil_n + 1), layout.coils.len());
 
-            let radius = coil.wire_radius + self.method_args.radius_offset;
+            let radius = coil.wire_radius + self.radius_offset;
 
             // Initialize the triangle list
             let mut triangles = Vec::<stl_io::Triangle>::new();
@@ -93,8 +74,8 @@ impl methods::MeshMethod for Method {
                 let out_vec = (point - coil.center).rej_onto(&up_vec).normalize();
 
                 // Put the polygon points around the plane given by the point and the out_vec/up_vec
-                for i in 0..self.method_args.poly_num {
-                    let angle = 2.0 * PI * (i as Angle - 0.5) / (self.method_args.poly_num as Angle);
+                for i in 0..self.poly_num {
+                    let angle = 2.0 * PI * (i as Angle - 0.5) / (self.poly_num as Angle);
                     let poly_point = point + out_vec * angle.sin() * radius - up_vec * angle.cos() * radius;
                     corner_slice.push(poly_point);
                 }

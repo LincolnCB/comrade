@@ -1,7 +1,6 @@
 use crate::{
     layout,
     mesh,
-    args,
 };
 use crate::geo_3d::*;
 use mesh::methods;
@@ -15,34 +14,23 @@ use std::f32::consts::PI;
 
 /// GMSH Method struct.
 /// This struct contains all the parameters for the GMSH meshing method.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct Method {
-    /// Arguments for the GMSH method.
-    method_args: MethodCfg,
-}
-impl Method {
-    pub fn new() -> args::ProcResult<Self> {
-        Ok(Method{method_args: MethodCfg::default()})
-    }
-}
-
-/// Deserializer from yaml method cfg file
-#[derive(Debug, Serialize, Deserialize)]
-struct MethodCfg {
-    #[serde(default = "MethodCfg::default_single_surface")]
+    #[serde(default = "Method::default_single_surface")]
     single_surface: bool,
-    #[serde(default = "MethodCfg::default_polygonal")]
+    #[serde(default = "Method::default_polygonal")]
     polygonal: bool,
-    #[serde(default = "MethodCfg::default_poly_count", alias = "spline_count")]
+    #[serde(default = "Method::default_poly_count", alias = "spline_count")]
     poly_count: usize,
-    #[serde(default = "MethodCfg::default_lc")]
+    #[serde(default = "Method::default_lc")]
     lc: f32,
-    #[serde(default = "MethodCfg::default_larmor_mhz")]
+    #[serde(default = "Method::default_larmor_mhz")]
     larmor_mhz: f32,
     #[serde(default = "GeoVector::zero")]
     origin_offset: GeoVector,
 }
-impl MethodCfg {
+impl Method {
     pub fn default_single_surface() -> bool {
         true
     }
@@ -59,14 +47,14 @@ impl MethodCfg {
         127.73
     }
 }
-impl Default for MethodCfg {
+impl Default for Method {
     fn default() -> Self {
-        MethodCfg{
-            single_surface: MethodCfg::default_single_surface(),
-            polygonal: MethodCfg::default_polygonal(),
-            poly_count: MethodCfg::default_poly_count(),
-            lc: MethodCfg::default_lc(),
-            larmor_mhz: MethodCfg::default_larmor_mhz(),
+        Method{
+            single_surface: Method::default_single_surface(),
+            polygonal: Method::default_polygonal(),
+            poly_count: Method::default_poly_count(),
+            lc: Method::default_lc(),
+            larmor_mhz: Method::default_larmor_mhz(),
             origin_offset: GeoVector::zero(),
         }
     }
@@ -109,18 +97,11 @@ impl methods::MeshMethod for Method {
         "geo".to_string()
     }
 
-    /// Parse the meshing method config file
-    fn parse_method_cfg(&mut self, method_cfg_file: &str) -> args::ProcResult<()>{
-        let f = crate::io::open(method_cfg_file)?;
-        self.method_args = serde_yaml::from_reader(f)?;
-        Ok(())
-    }
-
     /// Run the meshing process with the given arguments.
     fn save_mesh(&self, layout: &layout::Layout, output_path: &str) -> mesh::ProcResult<()> {
         let output_path = output_path.to_string() + ".geo";
 
-        let poly_count = self.method_args.poly_count;
+        let poly_count = self.poly_count;
 
         let mut full_loops = Vec::<Loop>::new();
         
@@ -148,10 +129,10 @@ impl methods::MeshMethod for Method {
                 for i in 0..poly_count {
                     let theta = (i as f32 - 0.5) * 2.0 * PI / poly_count as f32; // -0.5 gives a flat bottom
                     let point = vertex.point + up_vec * radius * theta.cos() + out_vec * radius * theta.sin();
-                    single_loop.points.push(point + self.method_args.origin_offset);
+                    single_loop.points.push(point + self.origin_offset);
                 }
                 // Add the wire point to the list (some may be unused)
-                single_loop.points.push(vertex.point + self.method_args.origin_offset);
+                single_loop.points.push(vertex.point + self.origin_offset);
             }
 
             // Add two capacitor breaks on either side of the first binned break (the port)
@@ -165,7 +146,7 @@ impl methods::MeshMethod for Method {
             // Upper side capacitor break:
             let mut upper_capacitor_break_id = port_id;
             let mut distance = 0.0;
-            while distance < 2.0 * self.method_args.lc {
+            while distance < 2.0 * self.lc {
                 let previously_checked_id = upper_capacitor_break_id;
                 upper_capacitor_break_id = coil.vertices[upper_capacitor_break_id].next_id;
                 distance += (coil.vertices[upper_capacitor_break_id].point - coil.vertices[previously_checked_id].point).norm();
@@ -177,7 +158,7 @@ impl methods::MeshMethod for Method {
             // Lower side capacitor break:
             let mut lower_capacitor_break_id = port_id;
             let mut distance = 0.0;
-            while distance < 2.0 * self.method_args.lc {
+            while distance < 2.0 * self.lc {
                 let previously_checked_id = lower_capacitor_break_id;
                 lower_capacitor_break_id = coil.vertices[lower_capacitor_break_id].prev_id;
                 distance += (coil.vertices[lower_capacitor_break_id].point - coil.vertices[previously_checked_id].point).norm();
@@ -289,10 +270,10 @@ impl Method {
 
         let mut file = LineWriter::new(file);
 
-        let poly_count = self.method_args.poly_count;
+        let poly_count = self.poly_count;
 
         // Write the lc
-        writeln!(file, "lc = {};", self.method_args.lc)?;
+        writeln!(file, "lc = {};", self.lc)?;
         writeln!(file)?;
 
 
@@ -331,7 +312,7 @@ impl Method {
 
             // Write the arcs
             for (arc_id, arc) in single_loop.arcs.iter().enumerate() {
-                if self.method_args.polygonal {
+                if self.polygonal {
                     writeln!(file, "Line({}) = {{{}, {}}};", arc_id + arc_offsets[loop_n], arc.start + point_offsets[loop_n], arc.end + point_offsets[loop_n])?;
                 } else {
                     writeln!(file, "Circle({}) = {{{}, {}, {}}};", arc_id + arc_offsets[loop_n], arc.start + point_offsets[loop_n], arc.center + point_offsets[loop_n], arc.end + point_offsets[loop_n])?;
@@ -469,7 +450,7 @@ impl Method {
         // Write the physical surfaces (one coil)
         writeln!(file, "// Physical Surfaces")?;
         writeln!(file, "// ------------------------------------------")?;
-        let single_surface = self.method_args.single_surface;
+        let single_surface = self.single_surface;
         let mut physical_surface_str = "".to_string();
         for (loop_n, single_loop) in loop_vec.iter().enumerate() {
             let break_count = single_loop.arcs.len() / poly_count;
@@ -516,7 +497,7 @@ impl Method {
 
         let mut file = LineWriter::new(file);
 
-        let poly_count = self.method_args.poly_count;
+        let poly_count = self.poly_count;
 
         // Write the ports
         for (loop_n, _) in loop_vec.iter().enumerate() {
@@ -545,7 +526,7 @@ impl Method {
         for (loop_n, single_loop) in loop_vec.iter().enumerate() {
             let break_count = single_loop.arcs.len() / poly_count;
             let capacitor_count = break_count - 2;
-            let break_cap_pf = capacitor_count as f32 * 1.0e9 / ((2.0 * PI * self.method_args.larmor_mhz).powi(2) * single_loop.self_inductance_nh);
+            let break_cap_pf = capacitor_count as f32 * 1.0e9 / ((2.0 * PI * self.larmor_mhz).powi(2) * single_loop.self_inductance_nh);
             for segment_n in 1..break_count {
 
                 let mut line_str = "".to_string();

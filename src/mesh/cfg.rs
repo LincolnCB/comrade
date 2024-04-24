@@ -9,11 +9,7 @@ use serde::{Serialize, Deserialize};
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MeshArgs {
     /// Meshing method.
-    #[serde(rename = "method")]
-    pub method_name: String,
-
-    /// Meshing method method_cfg.
-    pub method_cfg: String,
+    pub method: MeshChoice,
 
     /// Input path for the layout file (must be json).
     #[serde(default, alias = "input", alias = "in", alias = "i")]
@@ -41,7 +37,8 @@ impl MeshTarget {
         let f = crate::io::open(cfg_file)?;
         let mut mesh_args: MeshArgs = serde_yaml::from_reader(f)?;
         
-        let mut mesh_method = MeshChoice::from_name(&mesh_args.method_name)?;
+        // TODO: Refactor Target to clean this up, temporary
+        let mesh_method = mesh_args.method.clone();
 
         // Check the input path
         if is_first {
@@ -60,9 +57,6 @@ impl MeshTarget {
         let _ = crate::io::create(&format!("{}.{}", &mesh_args.output_path, mesh_method.get_output_extension()))?;
 
         mesh_args.save |= is_last;
-
-        // Parse the method-specific arguments
-        mesh_method.parse_method_cfg(&mesh_args.method_cfg)?;
 
         Ok(MeshTarget{mesh_method, mesh_args})
     }

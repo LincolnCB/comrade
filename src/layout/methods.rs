@@ -39,13 +39,13 @@ mod iterative_circles;
 #[serde(tag = "name", content = "args")]
 pub enum LayoutChoice {
     /// Basic circular layout, based on Monika Sliwak's MATLAB prototype.
-    #[serde(alias = "single_circle")]
+    #[serde(rename = "single_circle")]
     SingleCircle(single_circle::Method),
     /// Manual circles layout, for specifying multiple circles by hand.
-    #[serde(alias = "manual_circles")]
+    #[serde(rename = "manual_circles")]
     ManualCircles(manual_circles::Method),
     /// Iterative circles layout, for specifying multiple circles by hand and doing local optimization.
-    #[serde(alias = "iterative_circles")]
+    #[serde(rename = "iterative_circles")]
     IterativeCircles(iterative_circles::Method),
 }
 

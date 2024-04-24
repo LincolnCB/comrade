@@ -1,7 +1,6 @@
 use crate::{
     layout,
     mesh,
-    args,
 };
 use mesh::methods;
 use crate::geo_3d::*;
@@ -12,28 +11,17 @@ use std::f32::consts::PI;
 
 /// STL Slot Method struct.
 /// This struct contains all the parameters for the STL Slot meshing method.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct Method {
-    /// Arguments for the STL Slot method.
-    method_args: MethodCfg,
-}
-impl Method {
-    pub fn new() -> args::ProcResult<Self> {
-        Ok(Method{method_args: MethodCfg::default()})
-    }
-}
-
-/// Deserializer from yaml method cfg file
-#[derive(Debug, Serialize, Deserialize)]
-struct MethodCfg {
-    #[serde(default = "MethodCfg::default_radius_offset", alias = "offset")]
+    #[serde(default = "Method::default_radius_offset", alias = "offset")]
     radius_offset: f32,
-    #[serde(default = "MethodCfg::default_poly_num")]
+    #[serde(default = "Method::default_poly_num")]
     poly_num: usize,
-    #[serde(default = "MethodCfg::default_slot_depth")]
+    #[serde(default = "Method::default_slot_depth")]
     slot_depth: f32,
 }
-impl MethodCfg {
+impl Method {
     pub fn default_radius_offset() -> f32 {
         0.0
     }
@@ -44,12 +32,12 @@ impl MethodCfg {
         10.0
     }
 }
-impl Default for MethodCfg {
+impl Default for Method {
     fn default() -> Self {
-        MethodCfg{
-            radius_offset: MethodCfg::default_radius_offset(),
-            poly_num: MethodCfg::default_poly_num(),
-            slot_depth: MethodCfg::default_slot_depth(),
+        Method{
+            radius_offset: Method::default_radius_offset(),
+            poly_num: Method::default_poly_num(),
+            slot_depth: Method::default_slot_depth(),
         }
     }
 }
@@ -65,13 +53,6 @@ impl methods::MeshMethod for Method {
         "stl".to_string()
     }
 
-    /// Parse the meshing method config file
-    fn parse_method_cfg(&mut self, method_cfg_file: &str) -> args::ProcResult<()>{
-        let f = crate::io::open(method_cfg_file)?;
-        self.method_args = serde_yaml::from_reader(f)?;
-        Ok(())
-    }
-
     /// Run the meshing process with the given arguments.
     /// Uses the `mesh` and `layout` modules.
     fn save_mesh(&self, layout: &layout::Layout, output_path: &str) -> mesh::ProcResult<()> {
@@ -83,7 +64,7 @@ impl methods::MeshMethod for Method {
         for (coil_n, coil) in layout.coils.iter().enumerate() {
             println!("Coil {}...", coil_n);
 
-            let radius = coil.wire_radius + self.method_args.radius_offset;
+            let radius = coil.wire_radius + self.radius_offset;
 
             // Initialize the triangle list
             let mut triangles = Vec::<stl_io::Triangle>::new();
@@ -91,8 +72,8 @@ impl methods::MeshMethod for Method {
             // Create the corner slice polygons
             let mut corner_slices = Vec::<Vec::<Point>>::new();
 
-            let bottom_poly_count = (self.method_args.poly_num as f32 / 2.0).ceil() as usize;
-            let is_even = self.method_args.poly_num % 2 == 0;
+            let bottom_poly_count = (self.poly_num as f32 / 2.0).ceil() as usize;
+            let is_even = self.poly_num % 2 == 0;
 
             for coil_vertex in coil.vertices.iter() {
                 let mut corner_slice = Vec::new();
@@ -102,11 +83,11 @@ impl methods::MeshMethod for Method {
                 let up_vec = coil_vertex.wire_radius_normal.normalize();
                 let out_vec = (point - coil.center).rej_onto(&up_vec).normalize();
 
-                let slot_up_vec = coil_vertex.surface_normal.normalize() * self.method_args.slot_depth;
+                let slot_up_vec = coil_vertex.surface_normal.normalize() * self.slot_depth;
 
                 // Put the polygon points around the plane given by the point and the out_vec/up_vec
                 for i in 0..bottom_poly_count{
-                    let angle = 2.0 * PI * (i as Angle + 0.5) / (self.method_args.poly_num as Angle) - PI;
+                    let angle = 2.0 * PI * (i as Angle + 0.5) / (self.poly_num as Angle) - PI;
                     let poly_point = point + (out_vec * angle.cos() + up_vec * angle.sin()) * radius;
                     corner_slice.push(poly_point);
                 }

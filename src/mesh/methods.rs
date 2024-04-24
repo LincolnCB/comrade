@@ -10,11 +10,11 @@
  */
 
 use enum_dispatch::enum_dispatch;
+use serde::{Serialize, Deserialize};
 
 use crate::{
     layout,
     mesh,
-    args,
 };
 
 //
@@ -34,39 +34,20 @@ mod gmsh;
 /// include it here,
 /// add handling for its constructor in `MESH_TARGET_CONSTRUCTION`,
 /// and implement the `MeshMethod` trait for it.
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[enum_dispatch(MeshMethod)]
+#[serde(tag = "name", content = "args")]
 pub enum MeshChoice {
     /// Meshing method based on STL polygons.
+    #[serde(rename = "stl_polygons")]
     StlPolygons(stl_polygons::Method),
     /// Meshing method that creates a slot for CAD models.
+    #[serde(rename = "stl_slot")]
     StlSlot(stl_slot::Method),
     /// Meshing method that creates a mesh for Marie's GMesh.
+    #[serde(rename = "gmsh")]
     Gmsh(gmsh::Method),
 }
-
-/// Meshing construction array -- Written out in once place for easy modification.
-/// To add a new method:
-/// include it in the `MeshChoice` enum,
-/// add handling for its constructor here,
-/// and implement the `MeshMethod` trait for it.
-const MESH_TARGET_CONSTRUCTION: &[MeshConstructor] = &[
-    // Example meshing constructor.
-    MeshConstructor{
-        arg_name: "stl_polygons", 
-        constructor: || {Ok(MeshChoice::StlPolygons(stl_polygons::Method::new()?))},
-    },
-    // Slot meshing constructor.
-    MeshConstructor{
-        arg_name: "stl_slot", 
-        constructor: || {Ok(MeshChoice::StlSlot(stl_slot::Method::new()?))},
-    },
-    // Marie's GMesh meshing constructor.
-    MeshConstructor{
-        arg_name: "gmsh", 
-        constructor: || {Ok(MeshChoice::Gmsh(gmsh::Method::new()?))},
-    },
-];
 
 //
 // ------------------------------------------------------------
@@ -90,44 +71,6 @@ pub trait MeshMethod {
     /// Get the output file extension for the meshing method.
     fn get_output_extension(&self) -> String;
 
-    /// Parse the method config file
-    fn parse_method_cfg(&mut self, method_cfg_file: &str) -> args::ProcResult<()>;
-
     /// Save the mesh to a file.
     fn save_mesh(&self, layout: &layout::Layout, output_path: &str) -> mesh::ProcResult<()>;
-}
-
-/// Meshing method constructor.
-/// Used to construct a meshing method from a config file.
-struct MeshConstructor {
-    /// Name of the meshing method.
-    arg_name: &'static str,
-    /// Constructor function.
-    constructor: fn() -> args::ProcResult<MeshChoice>,
-}
-
-//
-// ------------------------------------------------------------
-// Functions and structs with no modification or reference needed
-//      |
-//      V
-//
-
-/// Meshing target construction
-impl MeshChoice {
-    /// Construct a meshing target from a name (given in the config file).
-    pub fn from_name(arg_name: &str) -> args::ProcResult<Self> {
-        for constructor in MESH_TARGET_CONSTRUCTION {
-            if constructor.arg_name == arg_name {
-                return (constructor.constructor)();
-            }
-        }
-        
-        let mut error_str = format!("Meshing method not found: {arg_name}\n");
-        error_str.push_str("Available methods:\n");
-        for constructor in MESH_TARGET_CONSTRUCTION {
-            error_str.push_str(&format!("    {}\n", constructor.arg_name));
-        }
-        args::err_str(&error_str)
-    }
 }
