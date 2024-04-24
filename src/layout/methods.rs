@@ -98,7 +98,7 @@ pub trait LayoutMethod {
     /// Uses the `layout` module.
     /// Takes a loaded `Surface`.
     /// Returns a `ProcResult` with the `layout::Layout` or an `Err`.
-    fn do_layout(&self, surface: &crate::layout::geo_3d::Surface) -> layout::ProcResult<layout::Layout>;
+    fn do_layout(&self, surface: &crate::geo_3d::Surface) -> layout::ProcResult<layout::Layout>;
 }
 
 /// Layout constructor struct. Used to construct the layout methods from the arg_name string.

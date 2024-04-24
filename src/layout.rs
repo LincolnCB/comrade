@@ -1,4 +1,3 @@
-pub mod geo_3d;
 mod proc_errors;
 mod cfg;
 mod methods;
@@ -9,7 +8,7 @@ use serde::{Serialize, Deserialize};
 use std::f32::consts::PI;
 const MU0: f32 = 1.256637062; // mu0 in nH/mm
 
-use geo_3d::*;
+use crate::geo_3d::*;
 
 // Re-export errors
 pub use proc_errors::{

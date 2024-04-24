@@ -1,5 +1,5 @@
 use crate::layout;
-use layout::geo_3d::*;
+use crate::geo_3d::*;
 use std::f32::consts::PI;
 
 /// Find the points on a surface that intersect a sphere.

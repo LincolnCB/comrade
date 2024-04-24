@@ -8,8 +8,8 @@ use crate::{
     layout,
     args
 };
+use crate::geo_3d::*;
 use layout::methods;
-use layout::geo_3d::*;
 use methods::helper::{sphere_intersect, clean_coil_by_angle, merge_segments, add_even_breaks_by_angle};
 
 use serde::{Serialize, Deserialize};

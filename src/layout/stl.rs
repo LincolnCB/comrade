@@ -2,7 +2,7 @@ use stl_io;
 
 use crate::layout;
 use crate::io;
-use layout::geo_3d::{
+use crate::geo_3d::{
     Point,
     GeoVector,
     Surface,

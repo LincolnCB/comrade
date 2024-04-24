@@ -4,6 +4,7 @@ pub mod sim;
 pub mod matching;
 pub mod args;
 pub mod io;
+pub mod geo_3d;
 mod crate_errors;
 
 use strum::IntoEnumIterator;
