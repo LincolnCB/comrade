@@ -4,10 +4,7 @@
 *
 !*/
 
-use crate::{
-    layout,
-    args
-};
+use crate::layout;
 use crate::geo_3d::*;
 use layout::methods;
 use methods::helper::{sphere_intersect, clean_coil_by_angle, merge_segments, add_even_breaks_by_angle};
@@ -16,64 +13,53 @@ use serde::{Serialize, Deserialize};
 
 /// Iterative Circles Method struct.
 /// This struct contains all the parameters for the Iterative Circles layout method.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct Method {
-    /// Arguments for the Iterative Circles method.
-    method_args: MethodCfg,
-}
-impl Method {
-    pub fn new() -> args::ProcResult<Self> {
-        Ok(Method{method_args: MethodCfg::default()})
-    }
-}
-
-/// Deserializer from yaml method cfg file
-#[derive(Debug, Serialize, Deserialize)]
-struct MethodCfg {
     // Circle intersection parameters
     circles: Vec<CircleArgs>,
-    #[serde(default = "MethodCfg::default_epsilon")]
+    #[serde(default = "Method::default_epsilon")]
     epsilon: f32,
-    #[serde(default = "MethodCfg::default_pre_shift")]
+    #[serde(default = "Method::default_pre_shift")]
     pre_shift: bool,
 
     // Overlap handling parameters
-    #[serde(default = "MethodCfg::default_clearance")]
+    #[serde(default = "Method::default_clearance")]
     clearance: f32,
-    #[serde(default = "MethodCfg::default_wire_radius")]
+    #[serde(default = "Method::default_wire_radius")]
     wire_radius: f32,
-    #[serde(default = "MethodCfg::default_zero_angle_vector")]
+    #[serde(default = "Method::default_zero_angle_vector")]
     zero_angle_vector: GeoVector,
-    #[serde(default = "MethodCfg::default_backup_zero_angle_vector")]
+    #[serde(default = "Method::default_backup_zero_angle_vector")]
     backup_zero_angle_vector: GeoVector,
 
     // Iteration parameters
-    #[serde(default = "MethodCfg::default_iterations")]
+    #[serde(default = "Method::default_iterations")]
     iterations: usize,
-    #[serde(default = "MethodCfg::default_radius_freedom")]
+    #[serde(default = "Method::default_radius_freedom")]
     radius_freedom: f32,
-    #[serde(default = "MethodCfg::default_center_freedom")]
+    #[serde(default = "Method::default_center_freedom")]
     center_freedom: f32,
-    #[serde(default = "MethodCfg::default_close_cutoff")]
+    #[serde(default = "Method::default_close_cutoff")]
     close_cutoff: f32,
-    #[serde(default = "MethodCfg::default_far_cutoff")]
+    #[serde(default = "Method::default_far_cutoff")]
     far_cutoff: f32,
-    #[serde(default = "MethodCfg::default_coupling_force_scale", alias = "coupling_scale")]
+    #[serde(default = "Method::default_coupling_force_scale", alias = "coupling_scale")]
     coupling_force_scale: f32,
-    #[serde(default = "MethodCfg::default_internal_pressure_scale")]
+    #[serde(default = "Method::default_internal_pressure_scale")]
     internal_pressure_scale: f32,
-    #[serde(default = "MethodCfg::default_external_pressure_scale")]
+    #[serde(default = "Method::default_external_pressure_scale")]
     external_pressure_scale: f32,
 
     // Verbosity
-    #[serde(default = "MethodCfg::default_verbose")]
+    #[serde(default = "Method::default_verbose")]
     verbose: bool,
 
     // Save final cfg output
-    #[serde(default = "MethodCfg::default_final_cfg_output")]
+    #[serde(default = "Method::default_final_cfg_output")]
     final_cfg_output: Option<String>,
 }
-impl MethodCfg {
+impl Method {
     pub fn default_epsilon() -> f32 {
         0.15
     }
@@ -126,9 +112,9 @@ impl MethodCfg {
         None
     }
 }
-impl Default for MethodCfg{
+impl Default for Method{
     fn default() -> Self {
-        MethodCfg{
+        Method{
             circles: vec![CircleArgs::default()],
             epsilon: Self::default_epsilon(),
             pre_shift: Self::default_pre_shift(),
@@ -194,26 +180,19 @@ impl methods::LayoutMethod for Method {
         "Iterative Circles".to_string()
     }
 
-    /// Parse the layout method config file
-    fn parse_method_cfg(&mut self, method_cfg_file: &str) -> args::ProcResult<()>{
-        let f = crate::io::open(method_cfg_file)?;
-        self.method_args = serde_yaml::from_reader(f)?;
-        Ok(())
-    }
-
     fn do_layout(&self, surface: &Surface) -> layout::ProcResult<layout::Layout> {
 
-        let original_circles = self.method_args.circles.clone();
-        let mut new_circles = self.method_args.circles.clone();
+        let original_circles = self.circles.clone();
+        let mut new_circles = self.circles.clone();
 
-        let iterations = self.method_args.iterations;
-        let center_freedom = self.method_args.center_freedom;
-        let radius_freedom = self.method_args.radius_freedom;
-        let close_cutoff = self.method_args.close_cutoff;
-        let far_cutoff = self.method_args.far_cutoff;
-        let coupling_force_scale = self.method_args.coupling_force_scale;
-        let internal_pressure_scale = self.method_args.internal_pressure_scale;
-        let external_pressure_scale = self.method_args.external_pressure_scale;
+        let iterations = self.iterations;
+        let center_freedom = self.center_freedom;
+        let radius_freedom = self.radius_freedom;
+        let close_cutoff = self.close_cutoff;
+        let far_cutoff = self.far_cutoff;
+        let coupling_force_scale = self.coupling_force_scale;
+        let internal_pressure_scale = self.internal_pressure_scale;
+        let external_pressure_scale = self.external_pressure_scale;
 
         // Store boundary points
         let boundary_points: Vec<Point> = surface.get_boundary_vertex_indices().iter().map(|v| surface.vertices[*v].point).collect();
@@ -258,7 +237,7 @@ impl methods::LayoutMethod for Method {
         let mut layout_out = self.single_pass(surface, &new_circles)?;
 
         // Print initial statistics
-        if self.method_args.verbose && iterations > 0 {
+        if self.verbose && iterations > 0 {
             println!("Initial Statistics:");
             println!();
 
@@ -325,9 +304,9 @@ impl methods::LayoutMethod for Method {
 
                 // Get the parameters that will shift, and their original values
                 let mut center = coil.center;
-                let original_center = self.method_args.circles[coil_id].center;
+                let original_center = self.circles[coil_id].center;
                 let mut radius = new_circles[coil_id].coil_radius;
-                let original_radius = self.method_args.circles[coil_id].coil_radius;
+                let original_radius = self.circles[coil_id].coil_radius;
 
                 // Check all coils of a higher id than the current coil
                 for (other_id, other_coil) in layout_out.coils.iter().enumerate() {
@@ -436,7 +415,7 @@ impl methods::LayoutMethod for Method {
 
 
         // Print statistics
-        if self.method_args.verbose {
+        if self.verbose {
 
             println!("Final Coils:");
             for (coil_id, coil) in layout_out.coils.iter().enumerate() {
@@ -487,9 +466,9 @@ impl methods::LayoutMethod for Method {
             // println!("{d}, {dr}, {k}, {m}");
         }
 
-        if self.method_args.final_cfg_output.is_some() {
+        if self.final_cfg_output.is_some() {
             println!("Writing final cfg...");
-            let f = crate::io::create(&self.method_args.final_cfg_output.as_ref().unwrap())?;
+            let f = crate::io::create(&self.final_cfg_output.as_ref().unwrap())?;
             serde_yaml::to_writer(f, &new_circles)?;
         }
 
@@ -500,10 +479,10 @@ impl methods::LayoutMethod for Method {
             let break_count = new_circles[coil_id].break_count;
             let break_angle_offset_rad = new_circles[coil_id].break_angle_offset * std::f32::consts::PI / 180.0;
             let zero_angle_vector = {
-                if coil.normal.normalize().dot(&self.method_args.zero_angle_vector.normalize()) < 0.95 {
-                    self.method_args.zero_angle_vector
+                if coil.normal.normalize().dot(&self.zero_angle_vector.normalize()) < 0.95 {
+                    self.zero_angle_vector
                 } else {
-                    self.method_args.backup_zero_angle_vector
+                    self.backup_zero_angle_vector
                 }
             }.normalize();
 
@@ -519,12 +498,12 @@ impl Method {
     /// Do a single pass of the iterative circles method
     fn single_pass(&self, surface: &Surface, circles: &Vec::<CircleArgs>) -> layout::ProcResult<layout::Layout> {
         let mut layout_out = layout::Layout::new();
-        let verbose = self.method_args.verbose;
+        let verbose = self.verbose;
 
         // Iterate through the circles
-        let wire_radius = self.method_args.wire_radius;
-        let epsilon = self.method_args.epsilon;
-        let pre_shift = self.method_args.pre_shift;
+        let wire_radius = self.wire_radius;
+        let epsilon = self.epsilon;
+        let pre_shift = self.pre_shift;
 
         for (coil_id, circle_args) in circles.iter().enumerate() {
             if verbose { println!("Coil {}/{}...", coil_id + 1, circles.len()); }
@@ -783,7 +762,7 @@ impl Method {
             // Offset the segments
             for segment in merged_segments.iter_mut() {
 
-                let c = self.method_args.clearance + 2.0 * coil.wire_radius;
+                let c = self.clearance + 2.0 * coil.wire_radius;
                 // The amount to offset the wire
                 let start_tail = segment.wire_crossings[0] / segment.length;
                 let end_tail = 1.0 - segment.wire_crossings[segment.wire_crossings.len() - 1] / segment.length;
@@ -887,7 +866,7 @@ impl Method {
                 if i != j {
                     for (k, vertex) in coil.vertices.iter().enumerate() {
                         if ((vertex.point - other_coil.center).norm() - circles[j].coil_radius).abs() < 
-                            (coil.wire_radius + other_coil.wire_radius + self.method_args.clearance) * clearance_scale {
+                            (coil.wire_radius + other_coil.wire_radius + self.clearance) * clearance_scale {
                             
                             intersections[i][j].push(k);
                         }
@@ -904,7 +883,7 @@ mod debug {
 
     #[allow(dead_code)]
     pub fn dump_yaml(method: &Method) {
-        let s = serde_yaml::to_string(&method.method_args).unwrap();
+        let s = serde_yaml::to_string(&method).unwrap();
         println!("{}", s);
     }
 }

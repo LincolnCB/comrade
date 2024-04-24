@@ -4,10 +4,7 @@
 *
 !*/
 
-use crate::{
-    layout,
-    args
-};
+use crate::layout;
 use crate::geo_3d::*;
 use layout::methods;
 use methods::helper::{sphere_intersect, clean_coil_by_angle, merge_segments, add_even_breaks_by_angle};
@@ -16,37 +13,26 @@ use serde::{Serialize, Deserialize};
 
 /// Manual Circles Method struct.
 /// This struct contains all the parameters for the Manual Circles layout method.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct Method {
-    /// Arguments for the Manual Circles method.
-    method_args: MethodCfg,
-}
-impl Method {
-    pub fn new() -> args::ProcResult<Self> {
-        Ok(Method{method_args: MethodCfg::default()})
-    }
-}
-
-/// Deserializer from yaml method cfg file
-#[derive(Debug, Serialize, Deserialize)]
-struct MethodCfg {
     circles: Vec<CircleArgs>,
-    #[serde(default = "MethodCfg::default_clearance")]
+    #[serde(default = "Method::default_clearance")]
     clearance: f32,
-    #[serde(default = "MethodCfg::default_wire_radius")]
+    #[serde(default = "Method::default_wire_radius")]
     wire_radius: f32,
-    #[serde(default = "MethodCfg::default_epsilon")]
+    #[serde(default = "Method::default_epsilon")]
     epsilon: f32,
-    #[serde(default = "MethodCfg::default_pre_shift")]
+    #[serde(default = "Method::default_pre_shift")]
     pre_shift: bool,
-    #[serde(default = "MethodCfg::default_zero_angle_vector")]
+    #[serde(default = "Method::default_zero_angle_vector")]
     zero_angle_vector: GeoVector,
-    #[serde(default = "MethodCfg::default_backup_zero_angle_vector")]
+    #[serde(default = "Method::default_backup_zero_angle_vector")]
     backup_zero_angle_vector: GeoVector,
-    #[serde(default = "MethodCfg::default_verbose")]
+    #[serde(default = "Method::default_verbose")]
     verbose: bool,
 }
-impl MethodCfg {
+impl Method {
     pub fn default_clearance() -> f32 {
         1.29
     }
@@ -69,9 +55,9 @@ impl MethodCfg {
         GeoVector::yhat()
     }
 }
-impl Default for MethodCfg {
+impl Default for Method {
     fn default() -> Self {
-        MethodCfg{
+        Method{
             circles: vec![CircleArgs::default()],
             clearance: Self::default_clearance(),
             epsilon: Self::default_epsilon(),
@@ -124,22 +110,15 @@ impl methods::LayoutMethod for Method {
         "Manual Circles".to_string()
     }
 
-    /// Parse the layout method config file
-    fn parse_method_cfg(&mut self, method_cfg_file: &str) -> args::ProcResult<()>{
-        let f = crate::io::open(method_cfg_file)?;
-        self.method_args = serde_yaml::from_reader(f)?;
-        Ok(())
-    }
-
     fn do_layout(&self, surface: &Surface) -> layout::ProcResult<layout::Layout> {
         let mut layout_out = layout::Layout::new();
-        let verbose = self.method_args.verbose;
+        let verbose = self.verbose;
 
         // Iterate through the circles
-        let circles = &self.method_args.circles;
-        let wire_radius = self.method_args.wire_radius;
-        let epsilon = self.method_args.epsilon;
-        let pre_shift = self.method_args.pre_shift;
+        let circles = &self.circles;
+        let wire_radius = self.wire_radius;
+        let epsilon = self.epsilon;
+        let pre_shift = self.pre_shift;
 
         // Store boundary points
         let boundary_points: Vec<Point> = surface.get_boundary_vertex_indices().iter().map(|v| surface.vertices[*v].point).collect();
@@ -193,7 +172,7 @@ impl methods::LayoutMethod for Method {
         }
 
         // Do overlaps
-        self.mousehole_overlap(&mut layout_out, &self.method_args.circles);
+        self.mousehole_overlap(&mut layout_out, &self.circles);
 
         // Do inductance estimates
         if verbose {
@@ -217,10 +196,10 @@ impl methods::LayoutMethod for Method {
             let break_count = circles[coil_id].break_count;
             let break_angle_offset_rad = circles[coil_id].break_angle_offset * std::f32::consts::PI / 180.0;
             let zero_angle_vector = {
-                if coil.normal.normalize().dot(&self.method_args.zero_angle_vector.normalize()) < 0.95 {
-                    self.method_args.zero_angle_vector
+                if coil.normal.normalize().dot(&self.zero_angle_vector.normalize()) < 0.95 {
+                    self.zero_angle_vector
                 } else {
-                    self.method_args.backup_zero_angle_vector
+                    self.backup_zero_angle_vector
                 }
             }.normalize();
 
@@ -458,7 +437,7 @@ impl Method {
             // Offset the segments
             for segment in merged_segments.iter_mut() {
 
-                let c = self.method_args.clearance + 2.0 * coil.wire_radius;
+                let c = self.clearance + 2.0 * coil.wire_radius;
                 // The amount to offset the wire
                 let start_tail = segment.wire_crossings[0] / segment.length;
                 let end_tail = 1.0 - segment.wire_crossings[segment.wire_crossings.len() - 1] / segment.length;
@@ -562,7 +541,7 @@ impl Method {
                 if i != j {
                     for (k, vertex) in coil.vertices.iter().enumerate() {
                         if ((vertex.point - other_coil.center).norm() - circles[j].coil_radius).abs() < 
-                            (coil.wire_radius + other_coil.wire_radius + self.method_args.clearance) * clearance_scale {
+                            (coil.wire_radius + other_coil.wire_radius + self.clearance) * clearance_scale {
                             
                             intersections[i][j].push(k);
                         }
@@ -579,7 +558,7 @@ mod debug {
 
     #[allow(dead_code)]
     pub fn dump_yaml(method: &Method) {
-        let s = serde_yaml::to_string(&method.method_args).unwrap();
+        let s = serde_yaml::to_string(&method).unwrap();
         println!("{}", s);
     }
 }

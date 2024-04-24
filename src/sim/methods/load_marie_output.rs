@@ -51,8 +51,9 @@ impl methods::SimMethod for Method {
     /// Run the simulation process with the given arguments.
     fn do_simulation(&self) -> sim::ProcResult<sim::SimOutput> {
 
-        // Load the MARIE output file
-        let f = crate::io::open(&self.method_args.marie_output_path)?;
+        // TODO: do more of this
+        // // Load the MARIE output file
+        // let f = crate::io::open(&self.method_args.marie_output_path)?;
 
         sim::ProcResult::Ok(sim::SimOutput::new())
     }

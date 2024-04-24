@@ -10,11 +10,9 @@
  */
 
 use enum_dispatch::enum_dispatch;
+use serde::{Serialize, Deserialize};
 
-use crate::{
-    layout,
-    args,
-};
+use crate::layout;
 
 // Some helpful method examples
 pub mod helper;
@@ -36,40 +34,20 @@ mod iterative_circles;
 /// include it here,
 /// add handling for its constructor in `LAYOUT_TARGET_CONSTRUCTION`,
 /// and implement the `LayoutMethod` trait for it.
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[enum_dispatch(LayoutMethod)]
+#[serde(tag = "name", content = "args")]
 pub enum LayoutChoice {
     /// Basic circular layout, based on Monika Sliwak's MATLAB prototype.
+    #[serde(alias = "single_circle")]
     SingleCircle(single_circle::Method),
     /// Manual circles layout, for specifying multiple circles by hand.
+    #[serde(alias = "manual_circles")]
     ManualCircles(manual_circles::Method),
     /// Iterative circles layout, for specifying multiple circles by hand and doing local optimization.
+    #[serde(alias = "iterative_circles")]
     IterativeCircles(iterative_circles::Method),
 }
-
-/// Layout construction array -- Written out in once place for easy modification.
-/// To add a new method:
-/// include it in the `LayoutChoice` enum,
-/// add handling for its constructor here,
-/// and implement the `LayoutMethod` trait for it.
-const LAYOUT_TARGET_CONSTRUCTION: &[LayoutConstructor] = &[
-    // EXAMPLE:
-    // Single Circle layout constructor.
-    LayoutConstructor{
-        arg_name: "single_circle", 
-        constructor: || {Ok(LayoutChoice::SingleCircle(single_circle::Method::new()?))},
-    },
-    // Manual Circles layout constructor.
-    LayoutConstructor{
-        arg_name: "manual_circles", 
-        constructor: || {Ok(LayoutChoice::ManualCircles(manual_circles::Method::new()?))},
-    },
-    // Iterative Circles layout constructor.
-    LayoutConstructor{
-        arg_name: "iterative_circles", 
-        constructor: || {Ok(LayoutChoice::IterativeCircles(iterative_circles::Method::new()?))},
-    },
-];
 
 //
 // ------------------------------------------------------------
@@ -90,51 +68,9 @@ pub trait LayoutMethod {
     /// Get the arg_name of the layout method.
     fn get_method_name(&self) -> String;
     
-    /// Parse the layout method config file (allows different arguments for different methods).
-    /// Takes a `&str` with the path to the argument file.
-    fn parse_method_cfg(&mut self, method_cfg_file: &str) -> args::ProcResult<()>;
-    
     /// Run the layout process with the given arguments.
     /// Uses the `layout` module.
     /// Takes a loaded `Surface`.
     /// Returns a `ProcResult` with the `layout::Layout` or an `Err`.
     fn do_layout(&self, surface: &crate::geo_3d::Surface) -> layout::ProcResult<layout::Layout>;
-}
-
-/// Layout constructor struct. Used to construct the layout methods from the arg_name string.
-struct LayoutConstructor {
-    /// Name of the layout method.
-    arg_name: &'static str,
-    /// Constructor function.
-    constructor: fn() -> args::ProcResult<LayoutChoice>,
-}
-
-//
-// ------------------------------------------------------------
-// Functions and structs with no modification or reference needed
-//      |
-//      V
-//
-
-/// Layout target construction
-impl LayoutChoice {
-    /// Construct a layout method from a name (given in the config file).
-    pub fn from_name(arg_name: &str) -> args::ProcResult<Self> {
-        for constructor in LAYOUT_TARGET_CONSTRUCTION.iter() {
-            if constructor.arg_name == arg_name {
-                return (constructor.constructor)();
-            }
-        }
-
-        // If the arg_name is not found, return an error with the available methods
-        let mut error_str = format!("Layout method not found: {arg_name}\n");
-        error_str.push_str("\n");
-        error_str.push_str("Available methods:\n");
-        for constructor in LAYOUT_TARGET_CONSTRUCTION.iter() {
-            error_str.push_str(&format!("    {}\n", constructor.arg_name));
-        }
-        error_str.push_str("\n");
-        error_str.push_str("New methods need to be added to src/layout/methods.rs");
-        args::err_str(&error_str)
-    }
 }
