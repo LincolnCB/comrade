@@ -3,8 +3,8 @@ use crate::{
     mesh,
     args,
 };
-use mesh::methods;
 use crate::geo_3d::*;
+use mesh::methods;
 
 use serde::{Serialize, Deserialize};
 use std::fs::OpenOptions;
