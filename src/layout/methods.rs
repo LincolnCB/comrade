@@ -76,7 +76,7 @@ pub trait LayoutMethodTrait {
 
     /// Load the layout input file. 
     /// Default implementation is for STL files.
-    fn load_input(&self, input_path: &str) -> layout::ProcResult<crate::geo_3d::Surface> {
+    fn load_surface(&self, input_path: &str) -> layout::ProcResult<crate::geo_3d::Surface> {
         println!("Loading STL file: {}", input_path);
         crate::layout::stl::load_stl(input_path)
     }

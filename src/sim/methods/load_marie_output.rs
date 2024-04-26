@@ -1,7 +1,4 @@
-use crate::{
-    sim,
-    args,
-};
+use crate::sim;
 
 use sim::methods;
 
@@ -9,43 +6,28 @@ use serde::{Serialize, Deserialize};
 
 /// Method struct for "simulation" by just loading previously calculated MARIE output.
 /// This struct contains all the parameters needed to load a MARIE output file.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct Method {
-    /// Arguments for the simulation method.
-    method_args: MethodCfg,
+    // No fields yet
 }
-impl Method {
-    pub fn new() -> args::ProcResult<Self> {
-        Ok(Method{method_args: MethodCfg::default()})
-    }
-}
-
-/// Deserializer from yaml method cfg file
-#[derive(Debug, Serialize, Deserialize)]
-pub struct MethodCfg {
-    /// Path to the MARIE output file.
-    #[serde(alias = "mat_path")]
-    marie_output_path: String,
-}
-impl Default for MethodCfg {
+impl Default for Method {
     fn default() -> Self {
-        MethodCfg{
-            marie_output_path: String::from(""),
+        Method{
+            // No fields yet
         }
     }
 }
 
-impl methods::SimMethod for Method {
+impl methods::SimMethodTrait for Method {
     /// Get the name of the simulation method.
-    fn get_method_name(&self) -> String {
-        String::from("Load MARIE output")
+    fn get_method_name(&self) -> &'static str {
+        "Load MARIE MAT Output"
     }
 
-    /// Parse the simulation method config file.
-    fn parse_method_cfg(&mut self, method_cfg_file: &str) -> args::ProcResult<()> {
-        let f = crate::io::open(method_cfg_file)?;
-        self.method_args = serde_yaml::from_reader(f)?;
-        Ok(())
+    /// Get a vector of viable input filetypes for the simulation method.
+    fn get_input_filetypes(&self) -> Vec<&'static str> {
+        vec!["mat"]
     }
 
     /// Run the simulation process with the given arguments.
@@ -55,6 +37,6 @@ impl methods::SimMethod for Method {
         // // Load the MARIE output file
         // let f = crate::io::open(&self.method_args.marie_output_path)?;
 
-        sim::ProcResult::Ok(sim::SimOutput::new())
+        Ok(sim::SimOutput::new())
     }
 }

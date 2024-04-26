@@ -20,7 +20,7 @@ pub use crate_errors::{
 pub struct Targets{
     pub layout_target: Option<layout::LayoutTarget>,
     pub mesh_target: Option<mesh::MeshTarget>,
-    pub sim_target: Option<()>, // TODO THIS IS A DUMMY
+    pub sim_target: Option<sim::SimTarget>,
     pub matching_target: Option<()>, // TODO THIS IS A DUMMY
     pub shared_args: args::SharedArgs,
 }
@@ -68,7 +68,7 @@ pub fn build_targets(cli_args : args::ComradeCli) -> ComradeResult<Targets>{
 
         match stage {
             args::RunStage::Layout => {
-                if let Some(layout_cfg_file) = &cli_args.layout_args {
+                if let Some(layout_cfg_file) = &cli_args.layout_cfg {
                     println!("Loading layout config file: {}...", layout_cfg_file);
                     targets.layout_target = Some(layout::LayoutTarget::from_cfg_file(
                         layout_cfg_file,
@@ -80,7 +80,7 @@ pub fn build_targets(cli_args : args::ComradeCli) -> ComradeResult<Targets>{
                 }
             },
             args::RunStage::Mesh => {
-                if let Some(mesh_cfg_file) = &cli_args.mesh_args {
+                if let Some(mesh_cfg_file) = &cli_args.mesh_cfg {
                     println!("Loading mesh config file: {}...", mesh_cfg_file);
                     targets.mesh_target = Some(mesh::MeshTarget::from_cfg_file(
                         mesh_cfg_file,
@@ -93,16 +93,19 @@ pub fn build_targets(cli_args : args::ComradeCli) -> ComradeResult<Targets>{
                 }
             },
             args::RunStage::Sim => {
-                if let Some(sim_cfg_file) = &cli_args.sim_args {
+                if let Some(sim_cfg_file) = &cli_args.sim_cfg {
                     println!("Loading simulation config file: {}...", sim_cfg_file);
-                    args::err_str("Simulation config not yet implemented!!!")?;
+                    targets.sim_target = Some(sim::SimTarget::from_cfg_file(
+                        sim_cfg_file,
+                        is_last
+                    )?);
                 }
                 else {
                     args::err_str("Simulation config file not specified")?;
                 }
             },
             args::RunStage::Match => {
-                if let Some(matching_cfg_file) = &cli_args.matching_args {
+                if let Some(matching_cfg_file) = &cli_args.matching_cfg {
                     println!("Loading matching config file: {}...", matching_cfg_file);
                     args::err_str("Matching config not yet implemented!!!")?;
                 }

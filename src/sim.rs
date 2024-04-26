@@ -10,14 +10,11 @@ pub use proc_errors::{
     err_str,
 };
 // Re-export cfg handling
-pub use cfg::{
-    SimArgs,
-    SimTarget,
-};
+pub use cfg::SimTarget;
 // Re-export simulation methods
 pub use methods::{
-    SimChoice,
-    SimMethod,
+    MethodEnum,
+    SimMethodTrait,
 };
 
 /// Simulation output struct.
@@ -51,7 +48,7 @@ impl CoilRLC {
 pub fn do_simulation(sim_target: &SimTarget) -> ProcResult<SimOutput> {
 
     // Extract the simulation method and arguments from target
-    let sim_method = &sim_target.sim_method;
+    let sim_method = &sim_target.method;
 
     println!("Simulating...");
 
