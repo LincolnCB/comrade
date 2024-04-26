@@ -22,7 +22,7 @@ pub use cfg::LayoutTarget;
 // Re-export layout methods
 pub use methods::{
     MethodEnum,
-    MethodTrait,
+    LayoutMethodTrait,
 };
 
 /// Layout struct.

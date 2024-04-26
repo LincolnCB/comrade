@@ -3,7 +3,7 @@
  * Adding new methods should be done here.
  * 
  * New methods need:
- * - A struct implementing `MethodTrait`
+ * - A struct implementing `LayoutMethodTrait`
  * - An enum variant containing that struct in `MethodEnum`
  * - A constructor arg_name and function in `LAYOUT_TARGET_CONSTRUCTION`
  * 
@@ -33,9 +33,9 @@ mod iterative_circles;
 /// To add a new method:
 /// include it here,
 /// add handling for its constructor in `LAYOUT_TARGET_CONSTRUCTION`,
-/// and implement the `MethodTrait` trait for it.
+/// and implement the `LayoutMethodTrait` trait for it.
 #[derive(Serialize, Deserialize, Clone, Debug)]
-#[enum_dispatch(MethodTrait)]
+#[enum_dispatch(LayoutMethodTrait)]
 #[serde(tag = "name", content = "args")]
 pub enum MethodEnum {
     /// Basic circular layout, based on Monika Sliwak's MATLAB prototype.
@@ -64,7 +64,7 @@ pub enum MethodEnum {
 /// add handling for its constructor in `LAYOUT_TARGET_CONSTRUCTION`,
 /// and implement this trait for it.
 #[enum_dispatch] // This is a macro that allows the enum to be used in a trait object-like way
-pub trait MethodTrait {
+pub trait LayoutMethodTrait {
     /// Get the name of the layout method.
     fn get_method_name(&self) -> &'static str;
 

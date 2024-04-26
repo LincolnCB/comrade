@@ -2,7 +2,7 @@ use crate::{
     args,
     layout,
 };
-use layout::MethodTrait;
+use layout::LayoutMethodTrait;
 use serde::{Serialize, Deserialize};
 
 /// Layout target struct. Includes the layout method, method arguments, and general i/o arguments.

@@ -3,8 +3,8 @@
  * Adding new methods should be done here.
  * 
  * New methods need:
- * - A struct implementing `MeshMethod`
- * - An enum variant containing that struct in `MeshChoice`
+ * - A struct implementing `MeshMethodTrait`
+ * - An enum variant containing that struct in `MethodEnum`
  * - A constructor arg_name and function in `MESH_TARGET_CONSTRUCTION`
  * 
  */
@@ -33,11 +33,11 @@ mod gmsh;
 /// To add a new method:
 /// include it here,
 /// add handling for its constructor in `MESH_TARGET_CONSTRUCTION`,
-/// and implement the `MeshMethod` trait for it.
+/// and implement the `MeshMethodTrait` trait for it.
 #[derive(Serialize, Deserialize, Clone, Debug)]
-#[enum_dispatch(MeshMethod)]
+#[enum_dispatch(MeshMethodTrait)]
 #[serde(tag = "name", content = "args")]
-pub enum MeshChoice {
+pub enum MethodEnum {
     /// Meshing method based on STL polygons.
     #[serde(rename = "stl_polygons")]
     StlPolygons(stl_polygons::Method),
@@ -60,11 +60,11 @@ pub enum MeshChoice {
 /// Meshing method trait.
 /// This trait must be implemented for all meshing methods.
 /// To add a new method:
-/// include it in the `MeshChoice` enum,
+/// include it in the `MethodEnum` enum,
 /// add handling for its constructor in `MESH_TARGET_CONSTRUCTION`,
 /// and implement this trait for it.
 #[enum_dispatch] // This is a macro that allows the enum to be used in a trait object-like way
-pub trait MeshMethod {
+pub trait MeshMethodTrait {
     /// Get the name of the meshing method.
     fn get_method_name(&self) -> String;
 

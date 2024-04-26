@@ -155,7 +155,7 @@ pub fn run_process(targets: Targets) -> ComradeResult<()> {
         let layout_in = match layout_out {
             Some(layout_out) => layout_out,
             None => {
-                let input_path = match mesh_target.mesh_args.input_path.as_ref() {
+                let input_path = match mesh_target.input_path.as_ref() {
                     Some(input_path) => input_path,
                     None => panic!("BUG: Running the meshing, but missing input path! Should've been checked!"),
                 };

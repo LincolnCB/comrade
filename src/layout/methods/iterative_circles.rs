@@ -174,7 +174,7 @@ impl CircleArgs {
     }
 }
 
-impl methods::MethodTrait for Method {
+impl methods::LayoutMethodTrait for Method {
     /// Get the name of the layout method.
     fn get_method_name(&self) -> &'static str {
         "Iterative Circles"

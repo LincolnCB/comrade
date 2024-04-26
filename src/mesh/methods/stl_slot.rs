@@ -42,7 +42,7 @@ impl Default for Method {
     }
 }
 
-impl methods::MeshMethod for Method {
+impl methods::MeshMethodTrait for Method {
     /// Get the name of the meshing method.
     fn get_method_name(&self) -> String {
         "STL Slot".to_string()
