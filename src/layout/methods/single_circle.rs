@@ -49,10 +49,10 @@ impl Default for Method {
     }
 }
 
-impl methods::LayoutMethod for Method {
+impl methods::MethodTrait for Method {
     /// Get the name of the layout method.
-    fn get_method_name(&self) -> String {
-        "Single Circle".to_string()
+    fn get_method_name(&self) -> &'static str {
+        "Single Circle"
     }
 
     /// Run the layout process with the given arguments.

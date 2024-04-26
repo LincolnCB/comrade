@@ -1,12 +1,15 @@
-use crate::args;
-use crate::layout::LayoutChoice;
+use crate::{
+    args,
+    layout,
+};
+use layout::MethodTrait;
 use serde::{Serialize, Deserialize};
 
-/// Arguments for the layout process.
+/// Layout target struct. Includes the layout method, method arguments, and general i/o arguments.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct LayoutArgs {
+pub struct LayoutTarget {
     /// Layout method.
-    pub method: LayoutChoice,
+    pub method: layout::MethodEnum,
 
     /// Input path for the STL file.
     #[serde(alias = "input", alias = "in", alias = "i")]
@@ -20,38 +23,33 @@ pub struct LayoutArgs {
     #[serde(default, rename = "force_save")]
     pub save: bool,
 }
-
-/// Layout target struct.
-/// Contains the layout method and arguments.
-pub struct LayoutTarget {
-    /// Layout method.
-    pub layout_method: LayoutChoice,
-    /// Layout arguments.
-    pub layout_args: LayoutArgs,
-}
 impl LayoutTarget {
     /// Construct a layout target from a config file.
-    pub fn from_argfile(cfg_file: &str, is_last: bool) -> args::ProcResult<Self> {
+    pub fn from_cfg_file(cfg_file: &str, is_last: bool) -> args::ProcResult<Self> {
         let f = crate::io::open(cfg_file)?;
-        let mut layout_args: LayoutArgs = serde_yaml::from_reader(f)?;
-        
-        // TODO: Refactor Target to clean this up, temporary
-        let layout_method = layout_args.method.clone();
+        let mut layout_target: LayoutTarget = serde_yaml::from_reader(f)?;
 
-        // Check that the input path is a supported filetype (TODO: expand types)
-        if !layout_args.input_path.ends_with(".stl") {
-            args::err_str("Layout input path must end with .stl")?;
+        // Check that the input path is a supported filetype
+        let mut supported = false;
+        for filetype in layout_target.method.get_input_filetypes() {
+            if layout_target.input_path.ends_with(filetype) {
+                supported = true;
+                break;
+            }
+        }
+        if !supported {
+            args::err_str("Input file type not supported by layout method")?;
         }
 
         // Check the output path
-        if layout_args.save && layout_args.output_path.is_none() {
+        if layout_target.save && layout_target.output_path.is_none() {
             args::err_str("Layout output path not specified, but force_save was set")?;
         }
 
-        layout_args.save |= is_last;
+        layout_target.save |= is_last;
 
-        if layout_args.save {
-            if let Some(output_path) = layout_args.output_path.as_ref() {
+        if layout_target.save {
+            if let Some(output_path) = layout_target.output_path.as_ref() {
                 if !output_path.ends_with(".json")
                 {
                     args::err_str("Layout output path must end with .json")?;
@@ -63,14 +61,14 @@ impl LayoutTarget {
             }
         }
 
-        Ok(LayoutTarget{layout_method, layout_args})
+        Ok(layout_target)
     }
 }
 
 /// Private function to take hardcoded arg values and write the YAML file for it.
 #[allow(dead_code)]
-fn write_args_yaml(path: &str, layout_args: &LayoutArgs) -> args::ProcResult<()> {
+fn write_args_yaml(path: &str, layout_target: &LayoutTarget) -> args::ProcResult<()> {
     let f = crate::io::create(path)?;
-    serde_yaml::to_writer(f, layout_args)?;
+    serde_yaml::to_writer(f, layout_target)?;
     Ok(())
 }

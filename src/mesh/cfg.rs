@@ -33,7 +33,7 @@ pub struct MeshTarget {
 
 impl MeshTarget {
     /// Construct a mesh target from a config file.
-    pub fn from_argfile(cfg_file: &str, is_first: bool, is_last: bool) -> args::ProcResult<Self> {
+    pub fn from_cfg_file(cfg_file: &str, is_first: bool, is_last: bool) -> args::ProcResult<Self> {
         let f = crate::io::open(cfg_file)?;
         let mut mesh_args: MeshArgs = serde_yaml::from_reader(f)?;
         

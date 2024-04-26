@@ -3,8 +3,8 @@
  * Adding new methods should be done here.
  * 
  * New methods need:
- * - A struct implementing `LayoutMethod`
- * - An enum variant containing that struct in `LayoutChoice`
+ * - A struct implementing `MethodTrait`
+ * - An enum variant containing that struct in `MethodEnum`
  * - A constructor arg_name and function in `LAYOUT_TARGET_CONSTRUCTION`
  * 
  */
@@ -33,11 +33,11 @@ mod iterative_circles;
 /// To add a new method:
 /// include it here,
 /// add handling for its constructor in `LAYOUT_TARGET_CONSTRUCTION`,
-/// and implement the `LayoutMethod` trait for it.
+/// and implement the `MethodTrait` trait for it.
 #[derive(Serialize, Deserialize, Clone, Debug)]
-#[enum_dispatch(LayoutMethod)]
+#[enum_dispatch(MethodTrait)]
 #[serde(tag = "name", content = "args")]
-pub enum LayoutChoice {
+pub enum MethodEnum {
     /// Basic circular layout, based on Monika Sliwak's MATLAB prototype.
     #[serde(rename = "single_circle")]
     SingleCircle(single_circle::Method),
@@ -60,13 +60,26 @@ pub enum LayoutChoice {
 /// Layout method trait.
 /// This trait defines the functions that all layout methods must implement.
 /// To add a new method:
-/// include it in the `LayoutChoice` enum,
+/// include it in the `MethodEnum` enum,
 /// add handling for its constructor in `LAYOUT_TARGET_CONSTRUCTION`,
 /// and implement this trait for it.
 #[enum_dispatch] // This is a macro that allows the enum to be used in a trait object-like way
-pub trait LayoutMethod {
-    /// Get the arg_name of the layout method.
-    fn get_method_name(&self) -> String;
+pub trait MethodTrait {
+    /// Get the name of the layout method.
+    fn get_method_name(&self) -> &'static str;
+
+    /// Get a vector of viable input filetypes for the layout method.
+    /// Defaults to STL.
+    fn get_input_filetypes(&self) -> Vec<&'static str> {
+        vec!["stl"]
+    }
+
+    /// Load the layout input file. 
+    /// Default implementation is for STL files.
+    fn load_input(&self, input_path: &str) -> layout::ProcResult<crate::geo_3d::Surface> {
+        println!("Loading STL file: {}", input_path);
+        crate::layout::stl::load_stl(input_path)
+    }
     
     /// Run the layout process with the given arguments.
     /// Uses the `layout` module.

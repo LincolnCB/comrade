@@ -17,14 +17,12 @@ pub use proc_errors::{
     err_str,
 };
 // Re-export cfg handling
-pub use cfg::{
-    LayoutArgs,
-    LayoutTarget,
-};
+pub use cfg::LayoutTarget;
+
 // Re-export layout methods
 pub use methods::{
-    LayoutChoice,
-    LayoutMethod,
+    MethodEnum,
+    MethodTrait,
 };
 
 /// Layout struct.
@@ -209,17 +207,11 @@ pub struct CoilVertex {
 /// Run the layout process.
 /// Returns a `ProcResult` with the `Layout` or an `Err`.
 pub fn do_layout(layout_target: &LayoutTarget) -> ProcResult<Layout> {
-    
-    // Extract the layout method and arguments from target
-    let layout_method = &layout_target.layout_method;
-    let layout_args = &layout_target.layout_args;
+    // Extract the layout method
+    let layout_method = &layout_target.method;
 
-    // TODO: Handle different types of mesh files here.
-    // Make sure to put all the optional filetype names in the cfg module.
-    
-    // Load the STL file
-    println!("Loading STL file...");
-    let surface = stl::load_stl(&layout_args.input_path)?;
+    // Load the input
+    let surface = layout_method.load_input(&layout_target.input_path)?;
 
     // Run the layout method
     println!("Running layout method: {}...", layout_method.get_method_name());

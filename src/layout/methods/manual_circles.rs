@@ -104,10 +104,10 @@ impl CircleArgs {
     }
 }
 
-impl methods::LayoutMethod for Method {
+impl methods::MethodTrait for Method {
     /// Get the name of the layout method.
-    fn get_method_name(&self) -> String {
-        "Manual Circles".to_string()
+    fn get_method_name(&self) -> &'static str {
+        "Manual Circles"
     }
 
     fn do_layout(&self, surface: &Surface) -> layout::ProcResult<layout::Layout> {

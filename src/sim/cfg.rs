@@ -26,7 +26,7 @@ pub struct SimTarget {
 }
 impl SimTarget {
     /// Construct a simulation target from a config file.
-    pub fn from_argfile(cfg_file: &str) -> args::ProcResult<Self> {
+    pub fn from_cfg_file(cfg_file: &str) -> args::ProcResult<Self> {
         let f = crate::io::open(cfg_file)?;
         let sim_args: SimArgs = serde_yaml::from_reader(f)?;
         
