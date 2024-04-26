@@ -66,10 +66,10 @@ pub enum MethodEnum {
 #[enum_dispatch] // This is a macro that allows the enum to be used in a trait object-like way
 pub trait MeshMethodTrait {
     /// Get the name of the meshing method.
-    fn get_method_name(&self) -> String;
+    fn get_method_name(&self) -> &'static str;
 
     /// Get the output file extension for the meshing method.
-    fn get_output_extension(&self) -> String;
+    fn get_output_extension(&self) -> &'static str;
 
     /// Save the mesh to a file.
     fn save_mesh(&self, layout: &layout::Layout, output_path: &str) -> mesh::ProcResult<()>;

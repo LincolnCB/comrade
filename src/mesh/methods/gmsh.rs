@@ -88,13 +88,13 @@ impl Loop {
 
 impl methods::MeshMethodTrait for Method {
     /// Get the name of the meshing method.
-    fn get_method_name(&self) -> String {
-        "GMSH".to_string()
+    fn get_method_name(&self) -> &'static str {
+        "GMSH"
     }
 
     /// Get the output file extension for the meshing method.
-    fn get_output_extension(&self) -> String {
-        "geo".to_string()
+    fn get_output_extension(&self) -> &'static str {
+        "geo"
     }
 
     /// Run the meshing process with the given arguments.

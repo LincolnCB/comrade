@@ -38,13 +38,13 @@ impl Default for Method {
 
 impl methods::MeshMethodTrait for Method {
     /// Get the name of the meshing method.
-    fn get_method_name(&self) -> String {
-        "STL Polygons".to_string()
+    fn get_method_name(&self) -> &'static str {
+        "STL Polygons"
     }
 
     /// Get the output file extension for the meshing method.
-    fn get_output_extension(&self) -> String {
-        "stl".to_string()
+    fn get_output_extension(&self) -> &'static str{
+        "stl"
     }
 
     /// Run the meshing process with the given arguments.
