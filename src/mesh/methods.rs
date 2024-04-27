@@ -5,7 +5,6 @@
  * New methods need:
  * - A struct implementing `MeshMethodTrait`
  * - An enum variant containing that struct in `MethodEnum`
- * - A constructor arg_name and function in `MESH_TARGET_CONSTRUCTION`
  * 
  */
 
@@ -24,26 +23,28 @@ use crate::{
 //      V
 //
 
-// Source files for the meshing methods
+// Add the source module for the mesh methods here
 mod stl_polygons;
 mod stl_slot;
 mod gmsh;
 
 /// Meshing methods enum.
 /// To add a new method:
-/// include it here,
-/// add handling for its constructor in `MESH_TARGET_CONSTRUCTION`,
-/// and implement the `MeshMethodTrait` trait for it.
+/// include it here
+/// and make sure the source implements the `MeshMethodTrait` trait.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[enum_dispatch(MeshMethodTrait)]
 #[serde(tag = "name", content = "args")]
 pub enum MethodEnum {
+
     /// Meshing method based on STL polygons.
     #[serde(rename = "stl_polygons")]
     StlPolygons(stl_polygons::Method),
+
     /// Meshing method that creates a slot for CAD models.
     #[serde(rename = "stl_slot")]
     StlSlot(stl_slot::Method),
+
     /// Meshing method that creates a mesh for Marie's GMesh.
     #[serde(rename = "gmsh")]
     Gmsh(gmsh::Method),
@@ -51,8 +52,8 @@ pub enum MethodEnum {
 
 //
 // ------------------------------------------------------------
-// Traits and structs that don't need modification,
-// but are references for adding a new meshing method
+// The trait doesn't need modification,
+// but needs to be implemented in each method module
 //      |
 //      V
 //
@@ -60,11 +61,11 @@ pub enum MethodEnum {
 /// Meshing method trait.
 /// This trait must be implemented for all meshing methods.
 /// To add a new method:
-/// include it in the `MethodEnum` enum,
-/// add handling for its constructor in `MESH_TARGET_CONSTRUCTION`,
-/// and implement this trait for it.
+/// include it in the `MethodEnum` enum
+/// and make sure it implements this trait.
 #[enum_dispatch] // This is a macro that allows the enum to be used in a trait object-like way
 pub trait MeshMethodTrait {
+
     /// Get the name of the meshing method.
     fn get_method_name(&self) -> &'static str;
 

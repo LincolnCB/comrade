@@ -5,7 +5,6 @@
  * New methods need:
  * - A struct implementing `SimMethodTrait`
  * - An enum variant containing that struct in `MethodEnum`
- * - A constructor arg_name and function in `SIM_TARGET_CONSTRUCTION`
  * 
  */
 
@@ -21,18 +20,18 @@ use crate::sim;
 //      V
 //
 
-// Source files for the simulation methods
+// Add the source module for the layout methods here
 mod load_marie_output;
 
 /// Simulation methods enum.
 /// To add a new method:
-/// include it here,
-/// add handling for its constructor in `SIM_TARGET_CONSTRUCTION`,
-/// and implement the `SimMethodTrait` trait for it.
+/// include it here
+/// and make sure the source implements the `SimMethodTrait` trait.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[enum_dispatch(SimMethodTrait)]
 #[serde(tag = "name", content = "args")]
 pub enum MethodEnum {
+
     /// Direct loading of MARIE simulation output, where the simulation was already done.
     #[serde(rename = "load_marie_output")]
     LoadMarieOutput(load_marie_output::Method),
@@ -40,8 +39,8 @@ pub enum MethodEnum {
 
 //
 // ------------------------------------------------------------
-// Traits and structs that don't need modification,
-// but are references for adding a new simulation
+// The trait doesn't need modification,
+// but needs to be implemented in each method module
 //      |
 //      V
 //
@@ -49,11 +48,11 @@ pub enum MethodEnum {
 /// Sim method trait.
 /// This trait defines the functions that all simulation methods must implement.
 /// To add a new method:
-/// include it in the `MethodEnum` enum,
-/// add handling for its constructor in `SIM_TARGET_CONSTRUCTION`,
-/// and implement this trait for it.
+/// include it in the `MethodEnum` enum
+/// and make sure it implements this trait.
 #[enum_dispatch] // This is a macro that allows the enum to be used in a trait object-like way
 pub trait SimMethodTrait {
+    
     /// Get the arg_name of the simulation method.
     fn get_method_name(&self) -> &'static str;
     

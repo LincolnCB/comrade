@@ -5,7 +5,6 @@
  * New methods need:
  * - A struct implementing `LayoutMethodTrait`
  * - An enum variant containing that struct in `MethodEnum`
- * - A constructor arg_name and function in `LAYOUT_TARGET_CONSTRUCTION`
  * 
  */
 
@@ -24,26 +23,28 @@ pub mod helper;
 //      V
 //
 
-// Source files for the layout methods
+// Add the source module for the layout methods here
 mod single_circle;
 mod manual_circles;
 mod iterative_circles;
 
 /// Layout methods enum.
 /// To add a new method:
-/// include it here,
-/// add handling for its constructor in `LAYOUT_TARGET_CONSTRUCTION`,
-/// and implement the `LayoutMethodTrait` trait for it.
+/// include it here
+/// and make sure the source implements the `LayoutMethodTrait` trait.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[enum_dispatch(LayoutMethodTrait)]
 #[serde(tag = "name", content = "args")]
 pub enum MethodEnum {
+
     /// Basic circular layout, based on Monika Sliwak's MATLAB prototype.
     #[serde(rename = "single_circle")]
     SingleCircle(single_circle::Method),
+
     /// Manual circles layout, for specifying multiple circles by hand.
     #[serde(rename = "manual_circles")]
     ManualCircles(manual_circles::Method),
+
     /// Iterative circles layout, for specifying multiple circles by hand and doing local optimization.
     #[serde(rename = "iterative_circles")]
     IterativeCircles(iterative_circles::Method),
@@ -51,8 +52,8 @@ pub enum MethodEnum {
 
 //
 // ------------------------------------------------------------
-// Traits and structs that don't need modification,
-// but are references for adding a new layout
+// The trait doesn't need modification,
+// but needs to be implemented in each method module
 //      |
 //      V
 //
@@ -60,11 +61,11 @@ pub enum MethodEnum {
 /// Layout method trait.
 /// This trait defines the functions that all layout methods must implement.
 /// To add a new method:
-/// include it in the `MethodEnum` enum,
-/// add handling for its constructor in `LAYOUT_TARGET_CONSTRUCTION`,
-/// and implement this trait for it.
-#[enum_dispatch] // This is a macro that allows the enum to be used in a trait object-like way
+/// include it in the `MethodEnum` enum
+/// and make sure it implements this trait
+#[enum_dispatch] // This is a macro that allows the enum to be used in a trait-object-like way
 pub trait LayoutMethodTrait {
+
     /// Get the name of the layout method.
     fn get_method_name(&self) -> &'static str;
 
