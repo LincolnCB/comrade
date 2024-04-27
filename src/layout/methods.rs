@@ -26,6 +26,7 @@ pub mod helper;
 // Add the source module for the layout methods here
 mod single_circle;
 mod manual_circles;
+mod manual_symmetric;
 mod iterative_circles;
 
 /// Layout methods enum.
@@ -44,6 +45,10 @@ pub enum MethodEnum {
     /// Manual circles layout, for specifying multiple circles by hand.
     #[serde(rename = "manual_circles")]
     ManualCircles(manual_circles::Method),
+
+    /// Manual circles layout with symmetry plane. 
+    #[serde(rename = "manual_symmetric")]
+    ManualSymmetric(manual_symmetric::Method),
 
     /// Iterative circles layout, for specifying multiple circles by hand and doing local optimization.
     #[serde(rename = "iterative_circles")]
