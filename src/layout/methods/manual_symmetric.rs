@@ -80,6 +80,8 @@ struct CircleArgs {
     break_count: usize,
     #[serde(default = "CircleArgs::default_break_angle_offset", alias = "angle")]
     break_angle_offset: f32,
+    #[serde(default = "CircleArgs::default_on_symmetry_plane", alias = "on_sym")]
+    on_symmetry_plane: bool,
 }
 impl CircleArgs {
     fn default() -> Self {
@@ -88,6 +90,7 @@ impl CircleArgs {
             center: Self::default_center(),
             break_count: Self::default_break_count(),
             break_angle_offset: Self::default_break_angle_offset(),
+            on_symmetry_plane: Self::default_on_symmetry_plane(),
         }
     }
     pub fn default_coil_radius() -> f32 {
@@ -101,6 +104,9 @@ impl CircleArgs {
     }
     pub fn default_break_angle_offset() -> f32 {
         0.0
+    }
+    pub fn default_on_symmetry_plane() -> bool {
+        false
     }
 }
 
