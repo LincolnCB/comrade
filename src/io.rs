@@ -86,7 +86,7 @@ pub fn write_to_file(path: &str, buffer: &str) -> IoResult<()> {
 }
 
 /// Read in cfg files from the supported filetypes.
-pub fn read_cfg_file<T>(path: &str) -> IoResult<T> 
+pub fn load_deser_from<T>(path: &str) -> IoResult<T> 
 where T: serde::de::DeserializeOwned
 {
     match path.split('.').last(){
@@ -120,11 +120,11 @@ where T: serde::de::DeserializeOwned
 }
 
 /// Dump a struct to a file with the supported filetypes.
-pub fn dump_cfg_to(path: &str, cfg: &impl serde::Serialize) -> IoResult<()> {
+pub fn save_ser_to(path: &str, cfg: &impl serde::Serialize) -> IoResult<()> {
     match path.split('.').last(){
         Some("json") => {
             let f = create(path)?;
-            match serde_json::to_writer(f, cfg){
+            match serde_json::to_writer_pretty(f, cfg){
                 Ok(_) => Ok(()),
                 Err(error) => return Err(IoError{file: Some(path.to_string()), cause: IoErrorType::SerdeJson(error)}),
             }

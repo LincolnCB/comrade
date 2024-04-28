@@ -218,13 +218,13 @@ pub fn do_layout(layout_target: &LayoutTarget) -> ProcResult<Layout> {
 }
 
 pub fn save_layout(layout: &Layout, output_path: &str) -> ProcResult<()> {
-    let f = crate::io::create(output_path)?;
-    serde_json::to_writer_pretty(f, layout)?;
+    assert!(output_path.ends_with(".json"), "Output path must end with .json -- cfg file loader should check this!");
+    crate::io::save_ser_to(output_path, layout)?;
     Ok(())
 }
 
 pub fn load_layout(input_path: &str) -> ProcResult<Layout> {
-    let f = crate::io::open(input_path)?;
-    let layout: Layout = serde_json::from_reader(f)?;
+    assert!(input_path.ends_with(".json"), "Input path must end with .json -- cfg file loader should check this!");
+    let layout: Layout = crate::io::load_deser_from(input_path)?;
     Ok(layout)
 }

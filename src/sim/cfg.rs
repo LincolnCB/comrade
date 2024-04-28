@@ -28,7 +28,7 @@ pub struct SimTarget {
 impl SimTarget {
     /// Construct a simulation target from a config file.
     pub fn from_cfg_file(cfg_file: &str, is_last: bool) -> args::ProcResult<Self> {
-        let mut sim_target: SimTarget = io::read_cfg_file(cfg_file)?;
+        let mut sim_target: SimTarget = io::load_deser_from(cfg_file)?;
 
         // Check that the input path is a supported filetype
         let mut supported = false;

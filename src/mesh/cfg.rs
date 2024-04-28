@@ -28,7 +28,7 @@ pub struct MeshTarget {
 impl MeshTarget {
     /// Construct a mesh target from a config file.
     pub fn from_cfg_file(cfg_file: &str, is_first: bool, is_last: bool) -> args::ProcResult<Self> {
-        let mut mesh_target: MeshTarget = io::read_cfg_file(cfg_file)?;
+        let mut mesh_target: MeshTarget = io::load_deser_from(cfg_file)?;
 
         // Check the input path
         if is_first {

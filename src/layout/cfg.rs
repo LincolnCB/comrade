@@ -28,7 +28,7 @@ pub struct LayoutTarget {
 impl LayoutTarget {
     /// Construct a layout target from a config file.
     pub fn from_cfg_file(cfg_file: &str, is_last: bool) -> args::ProcResult<Self> {
-        let mut layout_target: LayoutTarget = io::read_cfg_file(cfg_file)?;
+        let mut layout_target: LayoutTarget = io::load_deser_from(cfg_file)?;
 
         // Check that the input path is a supported filetype
         let mut supported = false;

@@ -466,10 +466,9 @@ impl methods::LayoutMethodTrait for Method {
             // println!("{d}, {dr}, {k}, {m}");
         }
 
-        if self.final_cfg_output.is_some() {
+        if let Some(final_cfg_output) = self.final_cfg_output.as_ref() {
             println!("Writing final cfg...");
-            let f = crate::io::create(&self.final_cfg_output.as_ref().unwrap())?;
-            serde_yaml::to_writer(f, &new_circles)?;
+            crate::io::save_ser_to(final_cfg_output, &new_circles)?;
         }
 
         // Add breaks
