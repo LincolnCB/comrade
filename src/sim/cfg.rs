@@ -7,6 +7,7 @@ use serde::{Serialize, Deserialize};
 
 /// Simulation target struct. Includes the simulation method and method arguments, as well as general i/o arguments.
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SimTarget {
     /// Simulation method.
     pub method: sim::MethodEnum,

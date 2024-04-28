@@ -84,7 +84,7 @@ pub trait LayoutMethodTrait {
     /// Default implementation is for STL files.
     fn load_surface(&self, input_path: &str) -> layout::ProcResult<crate::geo_3d::Surface> {
         println!("Loading STL file: {}", input_path);
-        crate::layout::stl::load_stl(input_path)
+        Ok(crate::io::stl::load_stl(input_path)?)
     }
     
     /// Run the layout process with the given arguments.

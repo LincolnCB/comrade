@@ -1,7 +1,6 @@
 mod proc_errors;
 mod cfg;
 mod methods;
-mod stl;
 
 use serde::{Serialize, Deserialize};
 

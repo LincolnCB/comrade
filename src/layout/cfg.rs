@@ -7,6 +7,7 @@ use serde::{Serialize, Deserialize};
 
 /// Layout target struct. Includes the layout method, method arguments, and general i/o arguments.
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct LayoutTarget {
     /// Layout method.
     pub method: layout::MethodEnum,
@@ -26,8 +27,7 @@ pub struct LayoutTarget {
 impl LayoutTarget {
     /// Construct a layout target from a config file.
     pub fn from_cfg_file(cfg_file: &str, is_last: bool) -> args::ProcResult<Self> {
-        let f = crate::io::open(cfg_file)?;
-        let mut layout_target: LayoutTarget = serde_yaml::from_reader(f)?;
+        let mut layout_target: LayoutTarget = crate::io::read_cfg_file(cfg_file)?;
 
         // Check that the input path is a supported filetype
         let mut supported = false;
@@ -61,14 +61,18 @@ impl LayoutTarget {
             }
         }
 
+        // TODO: Cut
+        // write_args_toml("LOCAL/layout_target.toml", &layout_target)?;
+
         Ok(layout_target)
     }
 }
 
-/// Private function to take hardcoded arg values and write the YAML file for it.
-#[allow(dead_code)]
-fn write_args_yaml(path: &str, layout_target: &LayoutTarget) -> args::ProcResult<()> {
-    let f = crate::io::create(path)?;
-    serde_yaml::to_writer(f, layout_target)?;
-    Ok(())
-}
+// /// Private function to take hardcoded arg values and write the TOML file for it.
+// #[allow(dead_code)]
+// fn write_args_toml(path: &str, layout_target: &LayoutTarget) -> args::ProcResult<()> {
+//     let mut f = crate::io::create(path)?;
+//     let toml_str = toml::ser::to_string(layout_target)?;
+//     crate::io::write(&mut f, &toml_str)?;
+//     Ok(())
+// }

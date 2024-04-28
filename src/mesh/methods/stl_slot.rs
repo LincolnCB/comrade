@@ -1,12 +1,12 @@
 use crate::{
     layout,
     mesh,
+    io,
 };
 use mesh::methods;
 use crate::geo_3d::*;
 
 use serde::{Serialize, Deserialize};
-use std::fs::OpenOptions;
 use std::f32::consts::PI;
 
 /// STL Slot Method struct.
@@ -137,33 +137,15 @@ impl methods::MeshMethodTrait for Method {
             // Save each coil to a separate file
             let numbered_output_path = output_path.replace(".stl", &format!("_c{}.stl", coil_n));
             println!("Saving coil {} to {}...", coil_n, numbered_output_path);
-            save_stl(&triangles, &numbered_output_path)?;
+            io::stl::save_stl(&triangles, &numbered_output_path)?;
         }
 
         // Save a full set of coils (often just for visualization)
         println!("Saving full array to {}", output_path);
-        save_stl(&full_triangles, &output_path)?;
+        io::stl::save_stl(&full_triangles, &output_path)?;
 
         Ok(())
     }
-}
-
-fn save_stl(triangles: &Vec<stl_io::Triangle>, output_path: &str) -> mesh::ProcResult<()> {
-    let mut file = match OpenOptions::new().write(true).create(true).open(&output_path)
-    {
-        Ok(file) => file,
-        Err(error) => {
-            return Err(crate::io::IoError{file: output_path.to_string(), cause: error}.into());
-        },
-    };
-    match stl_io::write_stl(&mut file, triangles.iter())
-    {
-        Ok(_) => (),
-        Err(error) => {
-            return Err(crate::io::IoError{file: output_path.to_string(), cause: error}.into());
-        },
-    };
-    Ok(())
 }
 
 /// Helper function for triangle construction.

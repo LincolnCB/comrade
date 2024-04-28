@@ -7,6 +7,10 @@ pub enum LayoutError {
     SerdeJsonError(serde_json::Error),
     /// Serde YAML error.
     SerdeYamlError(serde_yaml::Error),
+    /// TOML serialization error.
+    TomlSerError(toml::ser::Error),
+    /// TOML deserialization error.
+    TomlDeError(toml::de::Error),
     /// StringOnly error.
     StringOnly(String),
 }
@@ -16,6 +20,8 @@ impl std::fmt::Display for LayoutError {
             LayoutError::IoError(error) => write!(f, "- IO Error:\n{}", error),
             LayoutError::SerdeJsonError(error) => write!(f, "- JSON Serialization/Deserialization Error:\n{}", error),
             LayoutError::SerdeYamlError(error) => write!(f, "- YAML Serialization/Deserialization Error:\n{}", error),
+            LayoutError::TomlSerError(error) => write!(f, "- TOML Serialization Error:\n{}", error),
+            LayoutError::TomlDeError(error) => write!(f, "- TOML Deserialization Error:\n{}", error),
             LayoutError::StringOnly(error) => write!(f, "- {}", error),
         }
     }
@@ -33,6 +39,16 @@ impl From<serde_json::Error> for LayoutError {
 impl From<serde_yaml::Error> for LayoutError {
     fn from(error: serde_yaml::Error) -> Self {
         LayoutError::SerdeYamlError(error)
+    }
+}
+impl From<toml::ser::Error> for LayoutError {
+    fn from(error: toml::ser::Error) -> Self {
+        LayoutError::TomlSerError(error)
+    }
+}
+impl From<toml::de::Error> for LayoutError {
+    fn from(error: toml::de::Error) -> Self {
+        LayoutError::TomlDeError(error)
     }
 }
 impl From<String> for LayoutError {

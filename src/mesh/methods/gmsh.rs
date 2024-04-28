@@ -211,19 +211,9 @@ impl methods::MeshMethodTrait for Method {
             // Save each coil to a separate file
             let numbered_output_path = output_path.replace(".geo", &format!("_c{}.geo", coil_n));
             println!("Saving coil {} to {}...", coil_n, numbered_output_path);
-            match self.save_geo(&vec![single_loop.clone()], &numbered_output_path) {
-                Ok(_) => (),
-                Err(error) => {
-                    return Err(crate::io::IoError{file: output_path.to_string(), cause: error}.into());
-                },
-            };
+            self.save_geo(&vec![single_loop.clone()], &numbered_output_path)?;
             let txt_output_path = output_path.replace(".geo", &format!("_c{}.txt", coil_n));
-            match self.save_marie_txt(&vec![single_loop.clone()], &txt_output_path) {
-                Ok(_) => (),
-                Err(error) => {
-                    return Err(crate::io::IoError{file: output_path.to_string(), cause: error}.into());
-                },
-            };
+            self.save_marie_txt(&vec![single_loop.clone()], &txt_output_path)?;
 
             // Add the coil to the full set
             full_loops.push(single_loop);
@@ -231,19 +221,9 @@ impl methods::MeshMethodTrait for Method {
 
         // Save a full set of coils (often just for visualization)
         println!("Saving full array to {}", output_path);
-        match self.save_geo(&full_loops, &output_path) {
-            Ok(_) => (),
-            Err(error) => {
-                return Err(crate::io::IoError{file: output_path.to_string(), cause: error}.into());
-            },
-        };
+        self.save_geo(&full_loops, &output_path)?;
         let txt_output_path = output_path.replace(".geo", ".txt");
-        match self.save_marie_txt(&full_loops, &txt_output_path) {
-            Ok(_) => (),
-            Err(error) => {
-                return Err(crate::io::IoError{file: output_path.to_string(), cause: error}.into());
-            },
-        };
+        self.save_marie_txt(&full_loops, &txt_output_path)?;
 
         Ok(())
     }
@@ -264,8 +244,29 @@ const COL_WIDTH : [usize; 11] = [
 ];
 
 impl Method {
+
     /// Save a GMSH .geo file
-    fn save_geo(&self, loop_vec: &Vec<Loop>, output_path: &str) -> std::io::Result<()> {
+    fn save_geo(&self, loop_vec: &Vec<Loop>, output_path: &str) -> mesh::ProcResult<()> {
+        match self.save_geo_direct(loop_vec, output_path) {
+            Ok(_) => Ok(()),
+            Err(error) => {
+                Err(crate::io::IoError{file: Some(output_path.to_string()), cause: crate::io::IoErrorType::File(error)}.into())
+            },
+        }
+    }
+
+    /// Save a MARIE .txt file for ports and lumped elements
+    fn save_marie_txt(&self, loop_vec: &Vec<Loop>, output_path: &str) -> mesh::ProcResult<()> {
+        match self.save_marie_txt_direct(loop_vec, output_path) {
+            Ok(_) => Ok(()),
+            Err(error) => {
+                Err(crate::io::IoError{file: Some(output_path.to_string()), cause: crate::io::IoErrorType::File(error)}.into())
+            },
+        }
+    }
+
+    /// Save a GMSH .geo file -- direct interface with the GMSH io
+    fn save_geo_direct(&self, loop_vec: &Vec<Loop>, output_path: &str) -> std::io::Result<()> {
         let file = OpenOptions::new().write(true).create(true).truncate(true).open(&output_path)?;
 
         let mut file = LineWriter::new(file);
@@ -485,8 +486,8 @@ impl Method {
         Ok(())
     }
 
-    /// Save a MARIE .txt file for ports and lumped elements
-    fn save_marie_txt(&self, loop_vec: &Vec<Loop>, output_path: &str) -> std::io::Result<()> {
+    /// Save a MARIE .txt file for ports and lumped elements -- direct interface with the .txt io
+    fn save_marie_txt_direct(&self, loop_vec: &Vec<Loop>, output_path: &str) -> std::io::Result<()> {
         let file = OpenOptions::new().write(true).create(true).truncate(true).open(&output_path)?;
         let push_column = |line_str: &mut String, input: &str, col_width: usize| {
             line_str.push_str(input);

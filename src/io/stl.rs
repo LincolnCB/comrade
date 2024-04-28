@@ -1,6 +1,5 @@
 use stl_io;
 
-use crate::layout;
 use crate::io;
 use crate::geo_3d::{
     Point,
@@ -14,13 +13,13 @@ use crate::geo_3d::{
 /// Load a STL file from the inut path.
 /// Uses the external `stl_io` crate.
 /// Returns a `ProcResult` with the `Surface` or an `Err`
-pub fn load_stl(filename: &str) -> layout::ProcResult<Surface>{
+pub fn load_stl(filename: &str) -> io::IoResult<Surface>{
     let mut file = io::open(filename)?;
     let stl = match stl_io::read_stl(&mut file)
     {
         Ok(stl) => stl,
         Err(error) => {
-            return Err(io::IoError{file: filename.to_string(), cause: error}.into());
+            return Err(io::IoError{file: Some(filename.to_string()), cause: io::IoErrorType::File(error)}.into());
         },
     };
 
@@ -139,6 +138,21 @@ pub fn load_stl(filename: &str) -> layout::ProcResult<Surface>{
 
     Ok(surface)
 }
+
+/// Save a vector of triangles to a STL file.
+/// Uses the external `stl_io` crate.
+pub fn save_stl(triangles: &Vec<stl_io::Triangle>, output_path: &str) -> io::IoResult<()> {
+    let mut f = io::create(output_path)?;
+    match stl_io::write_stl(&mut f, triangles.iter())
+    {
+        Ok(_) => (),
+        Err(error) => {
+            return Err(io::IoError{file: Some(output_path.to_string()), cause: crate::io::IoErrorType::File(error)});
+        },
+    };
+    Ok(())
+}
+
 
 // TODO: FIX TESTS
 // #[cfg(test)]

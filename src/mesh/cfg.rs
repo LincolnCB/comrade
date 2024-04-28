@@ -7,6 +7,7 @@ use serde::{Serialize, Deserialize};
 
 /// Mesh target struct. Includes the mesh method, method arguments, and general i/o arguments.
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MeshTarget {
     /// Meshing method.
     pub method: mesh::MethodEnum,
