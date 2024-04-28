@@ -1,5 +1,6 @@
 use crate::{
     args,
+    io,
     layout,
 };
 use layout::LayoutMethodTrait;
@@ -27,7 +28,7 @@ pub struct LayoutTarget {
 impl LayoutTarget {
     /// Construct a layout target from a config file.
     pub fn from_cfg_file(cfg_file: &str, is_last: bool) -> args::ProcResult<Self> {
-        let mut layout_target: LayoutTarget = crate::io::read_cfg_file(cfg_file)?;
+        let mut layout_target: LayoutTarget = io::read_cfg_file(cfg_file)?;
 
         // Check that the input path is a supported filetype
         let mut supported = false;
@@ -61,18 +62,6 @@ impl LayoutTarget {
             }
         }
 
-        // TODO: Cut
-        // write_args_toml("LOCAL/layout_target.toml", &layout_target)?;
-
         Ok(layout_target)
     }
 }
-
-// /// Private function to take hardcoded arg values and write the TOML file for it.
-// #[allow(dead_code)]
-// fn write_args_toml(path: &str, layout_target: &LayoutTarget) -> args::ProcResult<()> {
-//     let mut f = crate::io::create(path)?;
-//     let toml_str = toml::ser::to_string(layout_target)?;
-//     crate::io::write(&mut f, &toml_str)?;
-//     Ok(())
-// }

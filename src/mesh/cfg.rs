@@ -1,5 +1,6 @@
 use crate::{
     args,
+    io,
     mesh,
 };
 use crate::mesh::MeshMethodTrait;
@@ -27,8 +28,7 @@ pub struct MeshTarget {
 impl MeshTarget {
     /// Construct a mesh target from a config file.
     pub fn from_cfg_file(cfg_file: &str, is_first: bool, is_last: bool) -> args::ProcResult<Self> {
-        let f = crate::io::open(cfg_file)?;
-        let mut mesh_target: MeshTarget = serde_yaml::from_reader(f)?;
+        let mut mesh_target: MeshTarget = io::read_cfg_file(cfg_file)?;
 
         // Check the input path
         if is_first {
@@ -50,12 +50,4 @@ impl MeshTarget {
 
         Ok(mesh_target)
     }
-}
-
-/// Private function to take hardcoded arg values and write the YAML file for it.
-#[allow(dead_code)]
-fn write_args_yaml(path: &str, mesh_target: &MeshTarget) -> args::ProcResult<()> {
-    let f = crate::io::create(path)?;
-    serde_yaml::to_writer(f, mesh_target)?;
-    Ok(())
 }

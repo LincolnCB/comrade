@@ -118,3 +118,35 @@ where T: serde::de::DeserializeOwned
         },
     }
 }
+
+/// Dump a struct to a file with the supported filetypes.
+pub fn dump_cfg_to(path: &str, cfg: &impl serde::Serialize) -> IoResult<()> {
+    match path.split('.').last(){
+        Some("json") => {
+            let f = create(path)?;
+            match serde_json::to_writer(f, cfg){
+                Ok(_) => Ok(()),
+                Err(error) => return Err(IoError{file: Some(path.to_string()), cause: IoErrorType::SerdeJson(error)}),
+            }
+        },
+        Some("toml") => {
+            let toml_str = match toml::to_string(cfg){
+                Ok(toml_str) => toml_str,
+                Err(error) => return Err(IoError{file: None, cause: IoErrorType::TomlSer(error)}),
+            };
+            write_to_file(path, &toml_str)
+        },
+        Some("yaml") | Some("yml") => {
+            let f = create(path)?;
+            match serde_yaml::to_writer(f, cfg){
+                Ok(_) => Ok(()),
+                Err(error) => return Err(IoError{file: Some(path.to_string()), cause: IoErrorType::SerdeYaml(error)}),
+            }
+        },
+        _ => {
+            let supported_filetypes = vec!["json", "toml", "yaml", "yml"];
+            let error_string = format!("Unsupported filetype for config file: {}\nSupported filetypes: {:?}", path, supported_filetypes);
+            Err(IoError{file: Some(path.to_string()), cause: IoErrorType::StringOnly(error_string)})
+        },
+    }
+}

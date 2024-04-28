@@ -1,5 +1,6 @@
 use crate::{
     args,
+    io,
     sim
 };
 use crate::sim::SimMethodTrait;
@@ -27,8 +28,7 @@ pub struct SimTarget {
 impl SimTarget {
     /// Construct a simulation target from a config file.
     pub fn from_cfg_file(cfg_file: &str, is_last: bool) -> args::ProcResult<Self> {
-        let f = crate::io::open(cfg_file)?;
-        let mut sim_target: SimTarget = serde_yaml::from_reader(f)?;
+        let mut sim_target: SimTarget = io::read_cfg_file(cfg_file)?;
 
         // Check that the input path is a supported filetype
         let mut supported = false;
@@ -65,13 +65,3 @@ impl SimTarget {
         Ok(sim_target)
     }
 }
-
-/// Private function to take hardcoded arg values and write the YAML file for it.
-#[allow(dead_code)]
-fn write_args_yaml(path: &str, sim_target: &SimTarget) -> args::ProcResult<()> {
-    let f = crate::io::create(path)?;
-    serde_yaml::to_writer(f, sim_target)?;
-    Ok(())
-}
-
-
