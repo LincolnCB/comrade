@@ -78,16 +78,16 @@ pub struct ExampleArgs {
     /// Stage to dump example for.
     pub stage: RunStage,
 
-    /// Method name to display default values for.
+    /// Method name to display example cfg file for. If none, display all available methods for the stage.
     pub method: Option<String>,
 
-    // TODO
-    /// Output format. Default is YAML.
+    /// Output format.
     #[arg(short, long)]
-    pub format: Option<String>,
+    #[clap(default_value = "yaml")]
+    pub format: Format,
 }
 
-/// Run stage. Used as start and optional end of comrade process.
+/// Comrade stage to run or demonstrate
 #[derive(Debug, Clone)]
 #[derive(ValueEnum, EnumIter)]
 pub enum RunStage {
@@ -107,6 +107,15 @@ impl RunStage {
             RunStage::Match => 4,
         }
     }
+}
+
+/// Output format for example config files.
+#[derive(Debug, Clone)]
+#[derive(ValueEnum, EnumIter)]
+pub enum Format {
+    Yaml,
+    Json,
+    Toml,
 }
 
 impl std::fmt::Display for RunStage {

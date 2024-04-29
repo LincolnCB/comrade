@@ -25,66 +25,47 @@ pub struct Targets{
     pub shared_args: args::SharedArgs,
 }
 
+/// Macro for displaying the config for a stage.
+macro_rules! display_stage_cfg {
+    ($stage:ident, $target_method_name:expr, $cfg_format:expr) => {
+        let mut method_names = Vec::<String>::new();
+        for method in $stage::MethodEnum::iter() {
+            let method_name = serde_yaml::to_string(&method).unwrap().split_whitespace().collect::<Vec<_>>()[1].to_string();
+            method_names.push(method_name);
+        }
+        let available_methods_str = format!("Available methods:\n{:#?}", method_names).replace(&['[', ']', ','][..], "");
+        if $target_method_name.is_none() {
+            println!("{}", available_methods_str);
+            return Ok(());
+        }
+        match method_names.iter().enumerate().find(|&(_, name)| name == $target_method_name.as_ref().unwrap()) {
+            Some(method_name) => {
+                let method = $stage::MethodEnum::iter().nth(method_name.0).unwrap();
+                match ($cfg_format) {
+                    args::Format::Yaml => println!("{}", serde_yaml::to_string(&method).unwrap()),
+                    args::Format::Json => println!("{}", serde_json::to_string_pretty(&method).unwrap()),
+                    args::Format::Toml => println!("{}", toml::to_string_pretty(&method).unwrap()),
+                }
+            },
+            None => {
+                return err_str(&format!("Method \"{}\" not found. {}", $target_method_name.unwrap(), available_methods_str));
+            },
+        };
+    };
+}
+
 /// Display an example config file for a stage.
 /// Returns a `ProcResult` with `()` or an `Err`.
 pub fn example_config(example_args: args::ExampleArgs) -> ComradeResult<()> {
     match example_args.stage {
         args::RunStage::Layout => {
-            let mut method_names = Vec::<String>::new();
-            for method in layout::MethodEnum::iter() {
-                let method_name = serde_yaml::to_string(&method).unwrap().split_whitespace().collect::<Vec<_>>()[1].to_string();
-                method_names.push(method_name)
-            }
-            if example_args.method.is_none() {
-                return err_str(&format!("Method not specified. Available methods:\n{:#?}", method_names));
-            }
-            match method_names.iter().enumerate().find(|&(_, name)| name == example_args.method.as_ref().unwrap()) {
-                Some(method_name) => {
-                    let method = layout::MethodEnum::iter().nth(method_name.0).unwrap();
-                    println!("{}", serde_yaml::to_string(&method).unwrap());
-                },
-                None => {
-                    return err_str(&format!("Method \"{}\" not found. Available methods:\n{:#?}", example_args.method.unwrap(), method_names));
-                },
-            };
+            display_stage_cfg!(layout, example_args.method, example_args.format);
         },
         args::RunStage::Mesh => {
-            let mut method_names = Vec::<String>::new();
-            for method in mesh::MethodEnum::iter() {
-                let method_name = serde_yaml::to_string(&method).unwrap().split_whitespace().collect::<Vec<_>>()[1].to_string();
-                method_names.push(method_name)
-            }
-            if example_args.method.is_none() {
-                return err_str(&format!("Method not specified. Available methods:\n{:#?}", method_names));
-            }
-            match method_names.iter().enumerate().find(|&(_, name)| name == example_args.method.as_ref().unwrap()) {
-                Some(method_name) => {
-                    let method = mesh::MethodEnum::iter().nth(method_name.0).unwrap();
-                    println!("{}", serde_yaml::to_string(&method).unwrap());
-                },
-                None => {
-                    return err_str(&format!("Method \"{}\" not found. Available methods:\n{:#?}", example_args.method.unwrap(), method_names));
-                },
-            };
+            display_stage_cfg!(mesh, example_args.method, example_args.format);
         },
         args::RunStage::Sim => {
-            let mut method_names = Vec::<String>::new();
-            for method in sim::MethodEnum::iter() {
-                let method_name = serde_yaml::to_string(&method).unwrap().split_whitespace().collect::<Vec<_>>()[1].to_string();
-                method_names.push(method_name)
-            }
-            if example_args.method.is_none() {
-                return err_str(&format!("Method not specified. Available methods:\n{:#?}", method_names));
-            }
-            match method_names.iter().enumerate().find(|&(_, name)| name == example_args.method.as_ref().unwrap()) {
-                Some(method_name) => {
-                    let method = sim::MethodEnum::iter().nth(method_name.0).unwrap();
-                    println!("{}", serde_yaml::to_string(&method).unwrap());
-                },
-                None => {
-                    return err_str(&format!("Method \"{}\" not found. Available methods:\n{:#?}", example_args.method.unwrap(), method_names));
-                },
-            };
+            display_stage_cfg!(sim, example_args.method, example_args.format);
         },
         args::RunStage::Match => {
             return err_str("Example config not yet implemented for this stage");
