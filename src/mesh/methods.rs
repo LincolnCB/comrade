@@ -10,6 +10,7 @@
 
 use enum_dispatch::enum_dispatch;
 use serde::{Serialize, Deserialize};
+use strum::EnumIter;
 
 use crate::{
     layout,
@@ -33,6 +34,7 @@ mod gmsh;
 /// include it here
 /// and make sure the source implements the `MeshMethodTrait` trait.
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(EnumIter)]
 #[enum_dispatch(MeshMethodTrait)]
 #[serde(tag = "name", content = "args")]
 pub enum MethodEnum {
@@ -67,11 +69,11 @@ pub enum MethodEnum {
 pub trait MeshMethodTrait {
 
     /// Get the name of the meshing method.
-    fn get_method_name(&self) -> &'static str;
+    fn get_method_display_name(&self) -> &'static str;
 
     /// Get the output file extension for the meshing method.
     fn get_output_extension(&self) -> &'static str;
-
+    
     /// Save the mesh to a file.
     fn save_mesh(&self, layout: &layout::Layout, output_path: &str) -> mesh::ProcResult<()>;
 }

@@ -17,6 +17,8 @@ use serde::{Serialize, Deserialize};
 #[serde(deny_unknown_fields)]
 pub struct Method {
     circles: Vec<CircleArgs>,
+    #[serde(default = "Method::default_symmetry_plane", alias = "plane")]
+    symmetry_plane: Plane,
     #[serde(default = "Method::default_clearance")]
     clearance: f32,
     #[serde(default = "Method::default_wire_radius")]
@@ -33,6 +35,9 @@ pub struct Method {
     verbose: bool,
 }
 impl Method {
+    pub fn default_symmetry_plane() -> Plane {
+        Plane::new(GeoVector::xhat(), 0.0)
+    }
     pub fn default_clearance() -> f32 {
         1.29
     }
@@ -59,6 +64,7 @@ impl Default for Method {
     fn default() -> Self {
         Method{
             circles: vec![CircleArgs::default()],
+            symmetry_plane: Self::default_symmetry_plane(),
             clearance: Self::default_clearance(),
             epsilon: Self::default_epsilon(),
             wire_radius: Self::default_wire_radius(),
@@ -112,10 +118,10 @@ impl CircleArgs {
 
 impl methods::LayoutMethodTrait for Method {
     /// Get the name of the layout method.
-    fn get_method_name(&self) -> &'static str {
+    fn get_method_display_name(&self) -> &'static str {
         "Manual Symmetric"
     }
-
+    
     fn do_layout(&self, surface: &Surface) -> layout::ProcResult<layout::Layout> {
         let mut layout_out = layout::Layout::new();
         let verbose = self.verbose;
@@ -127,7 +133,15 @@ impl methods::LayoutMethodTrait for Method {
         let pre_shift = self.pre_shift;
 
         // Store boundary points
-        let boundary_points: Vec<Point> = surface.get_boundary_vertex_indices().iter().map(|v| surface.vertices[*v].point).collect();
+        let boundary_points: Vec<Point> = surface.get_boundary_vertex_indices().iter()
+            // Get the point of the vertex
+            .map(|v| surface.vertices[*v].point)
+            // Filter out points that are too close to the symmetry plane
+            .filter(|point| {
+                let distance = self.symmetry_plane.distance_to_point(*point);
+                distance.abs() > epsilon
+            }).collect();
+
         let closest_boundary_point = |point: &Point| -> Point {
             let mut closest = boundary_points[0];
             let mut closest_distance = (*point - closest).norm();

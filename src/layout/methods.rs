@@ -10,6 +10,7 @@
 
 use enum_dispatch::enum_dispatch;
 use serde::{Serialize, Deserialize};
+use strum::EnumIter;
 
 use crate::layout;
 
@@ -34,6 +35,7 @@ mod iterative_circles;
 /// include it here
 /// and make sure the source implements the `LayoutMethodTrait` trait.
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(EnumIter)]
 #[enum_dispatch(LayoutMethodTrait)]
 #[serde(tag = "name", content = "args")]
 pub enum MethodEnum {
@@ -72,7 +74,7 @@ pub enum MethodEnum {
 pub trait LayoutMethodTrait {
 
     /// Get the name of the layout method.
-    fn get_method_name(&self) -> &'static str;
+    fn get_method_display_name(&self) -> &'static str;
 
     /// Get a vector of viable input filetypes for the layout method.
     /// Defaults to STL.

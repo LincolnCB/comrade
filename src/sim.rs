@@ -53,7 +53,7 @@ pub fn do_simulation(sim_target: &SimTarget) -> ProcResult<SimOutput> {
     println!("Simulating...");
 
     // Run the simulation method
-    println!("Running simulation method: {}", sim_method.get_method_name());
+    println!("Running simulation method: {}", sim_method.get_method_display_name());
     sim_method.do_simulation()
 }
 

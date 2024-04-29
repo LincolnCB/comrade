@@ -21,7 +21,7 @@ impl Default for Method {
 
 impl methods::SimMethodTrait for Method {
     /// Get the name of the simulation method.
-    fn get_method_name(&self) -> &'static str {
+    fn get_method_display_name(&self) -> &'static str {
         "Load MARIE MAT Output"
     }
 

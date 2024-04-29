@@ -44,7 +44,7 @@ impl Default for Method {
 
 impl methods::MeshMethodTrait for Method {
     /// Get the name of the meshing method.
-    fn get_method_name(&self) -> &'static str {
+    fn get_method_display_name(&self) -> &'static str {
         "STL Slot"
     }
 

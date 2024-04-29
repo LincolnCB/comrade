@@ -184,7 +184,14 @@ impl Sub<&Surface> for &Point {
 
     }
 }
-        
+impl Sub<Plane> for Point {
+    type Output = GeoVector;
+
+    fn sub(self, rhs: Plane) -> GeoVector {
+        let dist = rhs.distance_to_point(self);
+        rhs.normal * dist
+    }
+}
 
 /// A vector in 3D space.
 /// Used for the normal vector of a point.
@@ -387,9 +394,60 @@ impl std::ops::Neg for GeoVector {
         }
     }
 }
+impl std::convert::From<Point> for GeoVector {
+    fn from(point: Point) -> Self {
+        GeoVector{
+            x: point.x,
+            y: point.y,
+            z: point.z,
+        }
+    }
+}
 impl fmt::Display for GeoVector {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "({}, {}, {})", self.x, self.y, self.z)
+    }
+}
+
+/// A plane in 3D space.
+/// Contains a normal vector and an offset.
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+pub struct Plane {
+    pub normal: GeoVector,
+    pub offset: f32,
+}
+impl Plane {
+    /// Create a new plane.
+    pub fn new(normal: GeoVector, offset: f32) -> Self {
+        Plane{normal, offset}
+    }
+
+    /// Create a new plane from a normal vector and a point.
+    pub fn from_normal_and_point(normal: GeoVector, point: Point) -> Self {
+        let offset = normal.dot(&point.into());
+        Plane{normal, offset}
+    }
+
+    /// Create a new plane from three points.
+    pub fn from_points(p1: Point, p2: Point, p3: Point) -> Self {
+        let normal = (p2 - p1).cross(&(p3 - p1)).normalize();
+        let offset = normal.dot(&p1.into());
+        Plane{normal, offset}
+    }
+
+    /// Get the distance from a point to the plane.
+    pub fn distance_to_point(&self, point: Point) -> f32 {
+        self.normal.dot(&point.into()) - self.offset
+    }
+
+    /// Get the projection of a point onto the plane.
+    pub fn project_point(&self, point: Point) -> Point {
+        point - self.normal * self.distance_to_point(point)
+    }
+}
+impl fmt::Display for Plane {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Plane: normal={}, offset={}", self.normal, self.offset)
     }
 }
 

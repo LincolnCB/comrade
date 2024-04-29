@@ -10,6 +10,7 @@
 
 use enum_dispatch::enum_dispatch;
 use serde::{Serialize, Deserialize};
+use strum::EnumIter;
 
 use crate::sim;
 
@@ -28,6 +29,7 @@ mod load_marie_output;
 /// include it here
 /// and make sure the source implements the `SimMethodTrait` trait.
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(EnumIter)]
 #[enum_dispatch(SimMethodTrait)]
 #[serde(tag = "name", content = "args")]
 pub enum MethodEnum {
@@ -54,7 +56,7 @@ pub enum MethodEnum {
 pub trait SimMethodTrait {
     
     /// Get the arg_name of the simulation method.
-    fn get_method_name(&self) -> &'static str;
+    fn get_method_display_name(&self) -> &'static str;
     
     /// Get a vector of viable input filetypes for the simulation method.
     fn get_input_filetypes(&self) -> Vec<&'static str>;

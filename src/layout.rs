@@ -213,7 +213,7 @@ pub fn do_layout(layout_target: &LayoutTarget) -> ProcResult<Layout> {
     let surface = layout_method.load_surface(&layout_target.input_path)?;
 
     // Run the layout method
-    println!("Running layout method: {}...", layout_method.get_method_name());
+    println!("Running layout method: {}...", layout_method.get_method_display_name());
     layout_method.do_layout(&surface)
 }
 

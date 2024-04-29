@@ -4,6 +4,7 @@ use clap::{
     Args,
     Parser,
     ValueEnum,
+    Subcommand,
 };
 use strum::EnumIter;
 use std::ffi::OsString;
@@ -17,41 +18,73 @@ pub use proc_errors::{
 /// Constrained Optimization for Magnetic Resonance Array Design tool.
 #[derive(Debug, Parser)]
 #[clap(
+    version,
     name = "comrade",
-    version = "0.1.0",
     author = "Lincoln Craven-Brightman",
     about = "Constrained Optimization for Magnetic Resonance Array Design tool",
     override_usage = 
-"comrade <START_STAGE> [OPTIONS]
-    ⎡Some options are required:     ⎤
-    ⎢   (-l|--larmor) <LARMOR_MHZ>  ⎥
-    ⎣                               ⎦")]
+"comrade <COMMAND> <STAGE> [OPTIONS]
+    ⎡Config filepaths can be of the     ⎤
+    ⎢following supported types:         ⎥
+    ⎢   -YAML                           ⎥
+    ⎢   -JSON                           ⎥
+    ⎣   -TOML                           ⎦")]
 pub struct ComradeCli {
+    #[command(subcommand)]
+    pub subcommand: SubCommand,
+}
 
+#[derive(Debug, Clone, Subcommand)]
+pub enum SubCommand {
+    /// Run the comrade process.
+    #[command(name = "run")]
+    Run(RunArgs),
+    /// Output example config file for a stage.
+    #[command(name = "example-cfg")]
+    Example(ExampleArgs),
+}
+
+/// Run command arguments.
+#[derive(Debug, Args, Clone)]
+pub struct RunArgs {
     pub start_stage: RunStage,
-
+    
     #[command(flatten)]
     pub shared_args: SharedArgs,
-
+    
     /// End stage. If none, just run the start stage.
     #[arg(long = "to")]
     pub end_stage: Option<RunStage>,
-
-    /// Layout config filepath (YAML format).
+    
+    /// Layout config filepath.
     #[arg(long)]
     pub layout_cfg: Option<String>,
-
-    /// Mesh config filepath (YAML format).
+    
+    /// Mesh config filepath.
     #[arg(long)]
     pub mesh_cfg: Option<String>,
-
-    /// Simulation config filepath (YAML format).
+    
+    /// Simulation config filepath.
     #[arg(long)]
     pub sim_cfg: Option<String>,
-
-    /// Matching config filepath (YAML format).
+    
+    /// Matching config filepath.
     #[arg(long = "match_cfg")]
     pub matching_cfg: Option<String>,
+}
+
+#[derive(Debug, Args, Clone)]
+pub struct ExampleArgs {
+    /// Stage to dump example for.
+    pub stage: RunStage,
+
+    /// Method name to display default values for.
+    pub method: Option<String>,
+
+    // TODO
+    /// Output format. Default is YAML.
+    #[arg(short, long)]
+    pub format: Option<String>,
 }
 
 /// Run stage. Used as start and optional end of comrade process.
@@ -88,7 +121,7 @@ impl std::fmt::Display for RunStage {
 }
 
 /// Shared arguments, used in all commands. Compiled with clap.
-#[derive(Debug, Args)]
+#[derive(Debug, Args, Clone)]
 pub struct SharedArgs {
 
     // #[arg(short, long = "larmor")]

@@ -51,7 +51,7 @@ impl Default for Method {
 
 impl methods::LayoutMethodTrait for Method {
     /// Get the name of the layout method.
-    fn get_method_name(&self) -> &'static str {
+    fn get_method_display_name(&self) -> &'static str {
         "Single Circle"
     }
 

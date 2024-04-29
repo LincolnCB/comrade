@@ -25,6 +25,6 @@ pub fn do_mesh(mesh_target: &MeshTarget, layout_in: &layout::Layout) -> ProcResu
     println!("Meshing...");
 
     // Run the meshing method
-    println!("Running meshing method: {}", mesh_method.get_method_name());
+    println!("Running meshing method: {}", mesh_method.get_method_display_name());
     mesh_method.save_mesh(&layout_in, &mesh_target.output_path)
 }
