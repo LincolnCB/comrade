@@ -10,20 +10,20 @@ use serde::{Serialize, Deserialize};
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SimTarget {
-    /// Simulation method.
-    pub method: sim::MethodEnum,
-
     /// Input path for the simulation file.
     #[serde(default, alias = "input", alias = "in", alias = "i")]
     pub input_path: String,
-
+    
     /// Output path for the simulation results (must be json).
     #[serde(alias = "output", alias = "out", alias = "o")]
     pub output_path: Option<String>,
-
+    
     /// Force save the simulation results, even if it's not the last stage targeted.
     #[serde(default, rename = "force_save")]
     pub save: bool,
+
+    /// Simulation method.
+    pub method: sim::MethodEnum,
 }
 impl SimTarget {
     /// Construct a simulation target from a config file.

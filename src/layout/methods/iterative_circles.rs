@@ -115,7 +115,7 @@ impl Method {
 impl Default for Method{
     fn default() -> Self {
         Method{
-            circles: vec![CircleArgs::default()],
+            circles: vec![CircleArgs::default(); 2],
             epsilon: Self::default_epsilon(),
             pre_shift: Self::default_pre_shift(),
 

@@ -25,7 +25,36 @@ pub struct Targets{
     pub shared_args: args::SharedArgs,
 }
 
-/// Macro for displaying the config for a stage.
+/// Macro for constructing a full stage config from the method and stage.
+macro_rules! construct_stage_cfg {
+    (layout, $method:expr) => {
+        layout::LayoutTarget{
+            method: $method,
+            input_path: "PATH/TO/INPUT/FILE".to_string(),
+            output_path: Some("OPTIONAL/PATH/TO/OUTPUT/FILE".to_string()),
+            save: false,
+        }
+    };
+    (mesh, $method:expr) => {
+        mesh::MeshTarget{
+            method: $method,
+            input_path: Some("OPTIONAL/PATH/TO/INPUT/FILE".to_string()),
+            output_path: "PATH/TO/OUTPUT/FILE".to_string(),
+            save: false,
+        }
+    };
+    (sim, $method:expr) => {
+        sim::SimTarget{
+            method: $method,
+            input_path: "PATH/TO/INPUT/FILE".to_string(),
+            output_path: Some("OPTIONAL/PATH/TO/OUTPUT/FILE".to_string()),
+            save: false,
+        }
+    };
+    // (matching, $method:expr) => {
+}
+
+/// Macro for displaying the full config for a stage.
 macro_rules! display_stage_cfg {
     ($stage:ident, $target_method_name:expr, $cfg_format:expr) => {
         let mut method_names = Vec::<String>::new();
@@ -41,10 +70,11 @@ macro_rules! display_stage_cfg {
         match method_names.iter().enumerate().find(|&(_, name)| name == $target_method_name.as_ref().unwrap()) {
             Some(method_name) => {
                 let method = $stage::MethodEnum::iter().nth(method_name.0).unwrap();
+                let stage_cfg = construct_stage_cfg!($stage, method);
                 match ($cfg_format) {
-                    args::Format::Yaml => println!("{}", serde_yaml::to_string(&method).unwrap()),
-                    args::Format::Json => println!("{}", serde_json::to_string_pretty(&method).unwrap()),
-                    args::Format::Toml => println!("{}", toml::to_string_pretty(&method).unwrap()),
+                    args::Format::Yaml => println!("{}", serde_yaml::to_string(&stage_cfg).unwrap()),
+                    args::Format::Json => println!("{}", serde_json::to_string_pretty(&stage_cfg).unwrap()),
+                    args::Format::Toml => println!("{}", toml::to_string_pretty(&stage_cfg).unwrap()),
                 }
             },
             None => {

@@ -10,20 +10,20 @@ use serde::{Serialize, Deserialize};
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MeshTarget {
-    /// Meshing method.
-    pub method: mesh::MethodEnum,
-
     /// Input path for the layout file (must be json).
     #[serde(default, alias = "input", alias = "in", alias = "i")]
     pub input_path: Option<String>,
-
+    
     /// Output path for the mesh file (must match meshing method).
     #[serde(alias = "output", alias = "out", alias = "o")]
     pub output_path: String,
-
+    
     /// Force save the mesh file, even if it's not the last stage targeted.
     #[serde(default, rename = "force_save")]
     pub save: bool,
+    
+    /// Meshing method.
+    pub method: mesh::MethodEnum,
 }
 impl MeshTarget {
     /// Construct a mesh target from a config file.

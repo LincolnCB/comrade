@@ -9,14 +9,11 @@ use serde::{Serialize, Deserialize};
 /// Layout target struct. Includes the layout method, method arguments, and general i/o arguments.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct LayoutTarget {
-    /// Layout method.
-    pub method: layout::MethodEnum,
-
+pub struct LayoutTarget {   
     /// Input path for the STL file.
     #[serde(alias = "input", alias = "in", alias = "i")]
     pub input_path: String,
-
+    
     /// Output path for the layout file (must be json).
     #[serde(default, alias = "output", alias = "out", alias = "o")]
     pub output_path: Option<String>,
@@ -24,6 +21,9 @@ pub struct LayoutTarget {
     /// Force save the layout file, even if it's not the last stage targeted.
     #[serde(default, rename = "force_save")]
     pub save: bool,
+
+    /// Layout method.
+    pub method: layout::MethodEnum,
 }
 impl LayoutTarget {
     /// Construct a layout target from a config file.

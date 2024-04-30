@@ -63,7 +63,7 @@ impl Method {
 impl Default for Method {
     fn default() -> Self {
         Method{
-            circles: vec![CircleArgs::default()],
+            circles: vec![CircleArgs::default(); 2],
             symmetry_plane: Self::default_symmetry_plane(),
             clearance: Self::default_clearance(),
             epsilon: Self::default_epsilon(),

@@ -58,7 +58,7 @@ impl Method {
 impl Default for Method {
     fn default() -> Self {
         Method{
-            circles: vec![CircleArgs::default()],
+            circles: vec![CircleArgs::default(); 2],
             clearance: Self::default_clearance(),
             epsilon: Self::default_epsilon(),
             wire_radius: Self::default_wire_radius(),
