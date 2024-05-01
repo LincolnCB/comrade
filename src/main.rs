@@ -4,7 +4,7 @@ fn main() {
 
     match cli.subcommand {
         comrade::args::SubCommand::Example(example_args) => {
-            match comrade::example_config(example_args){
+            match comrade::example::display_config(example_args){
                 Ok(_) => {},
                 Err(err) => println!("{}", err),
             }
