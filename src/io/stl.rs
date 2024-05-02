@@ -61,11 +61,11 @@ pub fn load_stl(filename: &str) -> io::IoResult<Surface>{
 
     // Add faces to the surface, and add the faces to the edges
     for (face_id, tri_face) in stl.faces.into_iter().enumerate() {
-        let mut face_vertices = Vec::<usize>::new();
-        let mut face_edges = Vec::<usize>::new();
+        let mut face_vertices: [usize; 3] = [0; 3];
+        let mut face_edges: [usize; 3] = [0; 3];
         for i in 0..3 {
             let pid1 = tri_face.vertices[i];
-            face_vertices.push(pid1);
+            face_vertices[i] = pid1;
             let pid2 = tri_face.vertices[(i + 1) % 3];
             let edge_key = if pid1 < pid2 {
                 (pid1, pid2)
@@ -76,7 +76,7 @@ pub fn load_stl(filename: &str) -> io::IoResult<Surface>{
                 panic!("Edge {:?} not found!", edge_key);
             }
             let edge_index = edge_indices.get(&edge_key).unwrap();
-            face_edges.push(*edge_index);
+            face_edges[i] = *edge_index;
             if edges[*edge_index].adj_faces[0] == None {
                 edges[*edge_index].adj_faces[0] = Some(face_id);
             } else if edges[*edge_index].adj_faces[1] == None {
@@ -141,7 +141,7 @@ pub fn load_stl(filename: &str) -> io::IoResult<Surface>{
 
 /// Save a vector of triangles to a STL file.
 /// Uses the external `stl_io` crate.
-pub fn save_stl(triangles: &Vec<stl_io::Triangle>, output_path: &str) -> io::IoResult<()> {
+pub fn save_stl_from_triangles(triangles: &Vec<stl_io::Triangle>, output_path: &str) -> io::IoResult<()> {
     let mut f = io::create(output_path)?;
     match stl_io::write_stl(&mut f, triangles.iter())
     {
@@ -151,6 +151,26 @@ pub fn save_stl(triangles: &Vec<stl_io::Triangle>, output_path: &str) -> io::IoR
         },
     };
     Ok(())
+}
+
+/// Save a surface to an STL file.
+pub fn save_stl_from_surface(surface: &Surface, output_path: &str) -> io::IoResult<()> {
+    let mut triangles = Vec::<stl_io::Triangle>::new();
+    for face in surface.faces.iter() {
+        let v0 = &surface.vertices[face.vertices[0]].point;
+        let v1 = &surface.vertices[face.vertices[1]].point;
+        let v2 = &surface.vertices[face.vertices[2]].point;
+        let normal = face.normal;
+        triangles.push(stl_io::Triangle{
+            normal: stl_io::Normal::new([normal.x, normal.y, normal.z]),
+            vertices: [
+                stl_io::Vertex::new([v0.x, v0.y, v0.z]),
+                stl_io::Vertex::new([v1.x, v1.y, v1.z]),
+                stl_io::Vertex::new([v2.x, v2.y, v2.z]),
+            ]
+        });
+    }
+    save_stl_from_triangles(&triangles, output_path)
 }
 
 

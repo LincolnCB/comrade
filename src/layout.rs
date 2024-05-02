@@ -40,7 +40,7 @@ impl Layout {
 
 /// A coil.
 /// Contains a list of points.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[allow(dead_code)]
 pub struct Coil {
     pub center: Point,
@@ -193,7 +193,7 @@ impl Coil {
 }
 
 /// A point on a coil (includes adjacency and surface vectors).
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CoilVertex {
     pub point: Point,
     pub id: usize,

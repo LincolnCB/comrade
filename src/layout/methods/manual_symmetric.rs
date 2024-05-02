@@ -7,9 +7,12 @@
 use crate::layout;
 use crate::geo_3d::*;
 use layout::methods;
-use methods::helper::{sphere_intersect, clean_coil_by_angle, merge_segments, add_even_breaks_by_angle};
+use methods::helper::{sphere_intersect_symmetric, clean_coil_by_angle, merge_segments, add_even_breaks_by_angle};
+
+use crate::io::stl;
 
 use serde::{Serialize, Deserialize};
+use itertools::concat;
 
 /// Manual Symmetric Method struct.
 /// This struct contains all the parameters for the Manual Symmetric layout method.
@@ -36,7 +39,7 @@ pub struct Method {
 }
 impl Method {
     pub fn default_symmetry_plane() -> Plane {
-        Plane::new(GeoVector::xhat(), 0.0)
+        Plane::from_normal_and_offset(GeoVector::xhat(), 0.0)
     }
     pub fn default_clearance() -> f32 {
         1.29
@@ -126,22 +129,23 @@ impl methods::LayoutMethodTrait for Method {
         let mut layout_out = layout::Layout::new();
         let verbose = self.verbose;
 
-        // Iterate through the circles
+        // Grab the circle arguments
         let circles = &self.circles;
         let wire_radius = self.wire_radius;
         let epsilon = self.epsilon;
         let pre_shift = self.pre_shift;
-
-        // Store boundary points
+        
+        // Get the original boundary points, trimmed by the symmetry plane
         let boundary_points: Vec<Point> = surface.get_boundary_vertex_indices().iter()
-            // Get the point of the vertex
-            .map(|v| surface.vertices[*v].point)
-            // Filter out points that are too close to the symmetry plane
-            .filter(|point| {
-                let distance = self.symmetry_plane.distance_to_point(*point);
-                distance.abs() > epsilon
-            }).collect();
-
+        // Get the point of the vertex
+        .map(|v| surface.vertices[*v].point)
+        // Filter out points that were trimmed by the symmetry plane
+        .filter(|point| {
+            let distance = self.symmetry_plane.distance_to_point(point);
+            distance.abs() >= 0.0
+        }).collect();
+        
+        // Get the closest boundary point to a given point
         let closest_boundary_point = |point: &Point| -> Point {
             let mut closest = boundary_points[0];
             let mut closest_distance = (*point - closest).norm();
@@ -154,6 +158,48 @@ impl methods::LayoutMethodTrait for Method {
             }
             closest
         };
+        
+        // Replace the surface with the trimmed surface
+        let (trimmed_surface, _) = surface.trim_by_plane(&self.symmetry_plane, true);
+        let surface = &trimmed_surface;
+
+        // TODO TEMPORARY: Save the trimmed surface
+        stl::save_stl_from_surface(&surface, "LOCAL/trimmed_surface.stl");
+
+        // Separate the coils by their symmetry
+        let mut on_symmetry_circles = Vec::<CircleArgs>::new();
+        let mut pos_circles = Vec::<CircleArgs>::new();
+        let mut neg_circles = Vec::<CircleArgs>::new();
+        for (circle_num, circle) in circles.iter().enumerate() {
+            if circle.on_symmetry_plane {
+                // Make sure the circle is on the symmetry plane
+                let mut circle = circle.clone();
+                if self.symmetry_plane.distance_to_point(&circle.center).abs() > epsilon {
+                    println!("WARNING: Circle {} more than epsilon ({}) from symmetry plane, moving to symmetry plane", circle_num, epsilon);
+                }
+                circle.center = self.symmetry_plane.project_point(&circle.center);
+                on_symmetry_circles.push(circle);
+            } else {
+                // Make sure the circle is on the right side of the symmetry plane
+                let mut circle = circle.clone();
+                if self.symmetry_plane.distance_to_point(&circle.center) < 0.0 {
+                    println!("WARNING: Circle {} on wrong side of symmetry plane, flipping", circle_num);
+                    circle.center = circle.center.reflect_across(&self.symmetry_plane);
+                }
+                if self.symmetry_plane.distance_to_point(&circle.center).abs() < epsilon {
+                    println!("WARNING: Circle {} close to symmetry plane, may cause issues", circle_num);
+                }
+                pos_circles.push(circle);
+
+                // Add the flipped circle
+                let mut neg_circle = circle.clone();
+                neg_circle.center = neg_circle.center.reflect_across(&self.symmetry_plane);
+                neg_circles.push(neg_circle);
+            }
+        }
+
+        // Count the total number of circles
+        let total_circle_count = on_symmetry_circles.len() + pos_circles.len() + neg_circles.len();
 
         // Shrink initial radii to keep the coils within the boundary
         for (coil_id, circle) in circles.iter().enumerate() {
@@ -165,8 +211,9 @@ impl methods::LayoutMethodTrait for Method {
             }
         }
 
-        for (coil_num, circle_args) in circles.iter().enumerate() {
-            println!("Coil {}/{}...", (coil_num + 1), circles.len());
+        // Create the coils for the on-symmetry circles
+        for (i, circle_args) in on_symmetry_circles.iter().enumerate() {
+            println!("Coil {}/{} [on symmetry plane]...", (i + 1), total_circle_count);
             
             // Grab arguments from the circle arguments
             let coil_radius = circle_args.coil_radius;
@@ -174,7 +221,7 @@ impl methods::LayoutMethodTrait for Method {
 
             // Create the circle through surface intersection with sphere
             let (cid, points, point_normals) =
-                sphere_intersect(surface, center, coil_radius, epsilon);
+                sphere_intersect_symmetric(surface, center, coil_radius, epsilon, &self.symmetry_plane);
             let coil_normal = surface.vertices[cid].normal.normalize();
 
             if verbose { println!("Uncleaned point count: {}", points.len()) };
@@ -191,8 +238,58 @@ impl methods::LayoutMethodTrait for Method {
             layout_out.coils.push(coil);
         }
 
+        // Create the coils for the positive circles
+        for (i, circle_args) in pos_circles.iter().enumerate() {
+            println!("Coil {}/{} [positive side of symmetry plane]...", (i + on_symmetry_circles.len() + 1), total_circle_count);
+            
+            // Grab arguments from the circle arguments
+            let coil_radius = circle_args.coil_radius;
+            let center = circle_args.center;
+
+            // Create the circle through surface intersection with sphere
+            let (cid, points, point_normals) =
+                sphere_intersect_symmetric(surface, center, coil_radius, epsilon, &self.symmetry_plane);
+            let coil_normal = surface.vertices[cid].normal.normalize();
+
+            if verbose { println!("Uncleaned point count: {}", points.len()) };
+
+            let coil = clean_coil_by_angle(
+                center, coil_normal,
+                coil_radius, wire_radius,
+                points, point_normals,
+                pre_shift, verbose
+            )?;
+    
+            if verbose { println!("Cleaned point count: {}", coil.vertices.len()) };
+    
+            layout_out.coils.push(coil);
+        }
+
+        // Create the coils for the flipped circles
+        for i in 0..pos_circles.len() {
+            println!("Coil {}/{} [negative side of symmetry plane]...", 
+                (i + on_symmetry_circles.len() + pos_circles.len() + 1), total_circle_count);
+            let mut neg_coil = layout_out.coils[on_symmetry_circles.len() + i].clone();
+            neg_coil.center = neg_coil.center.reflect_across(&self.symmetry_plane);
+            neg_coil.normal = neg_coil.normal.reflect_across(&self.symmetry_plane.get_normal());
+
+            for vertex in neg_coil.vertices.iter_mut() {
+                vertex.point = vertex.point.reflect_across(&self.symmetry_plane);
+                vertex.surface_normal = vertex.surface_normal.reflect_across(&self.symmetry_plane.get_normal());
+                vertex.wire_radius_normal = vertex.wire_radius_normal.reflect_across(&self.symmetry_plane.get_normal());
+                let temp = vertex.next_id;
+                vertex.next_id = vertex.prev_id;
+                vertex.prev_id = temp;
+            }
+
+            layout_out.coils.push(neg_coil);
+        }
+
+        // Collect all the circles
+        let symmetrized_circles = concat(vec![on_symmetry_circles.clone(), pos_circles.clone(), pos_circles.clone()]);
+
         // Do overlaps
-        self.mousehole_overlap(&mut layout_out, &self.circles);
+        self.mousehole_overlap(&mut layout_out, &symmetrized_circles);
 
         // Do inductance estimates
         if verbose {
@@ -213,8 +310,8 @@ impl methods::LayoutMethodTrait for Method {
 
         // Add breaks
         for (coil_id, coil) in layout_out.coils.iter_mut().enumerate() {
-            let break_count = circles[coil_id].break_count;
-            let break_angle_offset_rad = circles[coil_id].break_angle_offset * std::f32::consts::PI / 180.0;
+            let break_count = symmetrized_circles[coil_id].break_count;
+            let break_angle_offset_rad = symmetrized_circles[coil_id].break_angle_offset * std::f32::consts::PI / 180.0;
             let zero_angle_vector = {
                 if coil.normal.normalize().dot(&self.zero_angle_vector.normalize()) < 0.95 {
                     self.zero_angle_vector

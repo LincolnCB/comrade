@@ -137,12 +137,12 @@ impl methods::MeshMethodTrait for Method {
             // Save each coil to a separate file
             let numbered_output_path = output_path.replace(".stl", &format!("_c{}.stl", coil_n));
             println!("Saving coil {} to {}...", coil_n, numbered_output_path);
-            io::stl::save_stl(&triangles, &numbered_output_path)?;
+            io::stl::save_stl_from_triangles(&triangles, &numbered_output_path)?;
         }
 
         // Save a full set of coils (often just for visualization)
         println!("Saving full array to {}", output_path);
-        io::stl::save_stl(&full_triangles, &output_path)?;
+        io::stl::save_stl_from_triangles(&full_triangles, &output_path)?;
 
         Ok(())
     }
