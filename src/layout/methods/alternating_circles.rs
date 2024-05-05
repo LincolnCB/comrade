@@ -1,5 +1,5 @@
 /*!
-*   Manual Symmetric Method
+*   Alternating Circles Method
 *
 *
 !*/
@@ -7,52 +7,67 @@
 use crate::layout;
 use crate::geo_3d::*;
 use layout::methods;
-use methods::helper::{sphere_intersect_symmetric, clean_coil_by_angle, merge_segments, add_even_breaks_by_angle};
+use methods::helper::{sphere_intersect, clean_coil_by_angle, merge_segments, add_even_breaks_by_angle};
 
 use serde::{Serialize, Deserialize};
-use itertools::concat;
 
-/// Manual Symmetric Method struct.
-/// This struct contains all the parameters for the Manual Symmetric layout method.
+/// Alternating Circles Method struct.
+/// This struct contains all the parameters for the Alternating Circles layout method.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Method {
+    // Circle intersection parameters
     circles: Vec<CircleArgs>,
-    #[serde(default = "Method::default_symmetry_plane", alias = "plane")]
-    symmetry_plane: Plane,
-    #[serde(default = "Method::default_clearance")]
-    clearance: f32,
-    #[serde(default = "Method::default_wire_radius")]
-    wire_radius: f32,
     #[serde(default = "Method::default_epsilon")]
     epsilon: f32,
     #[serde(default = "Method::default_pre_shift")]
     pre_shift: bool,
+
+    // Overlap handling parameters
+    #[serde(default = "Method::default_clearance")]
+    clearance: f32,
+    #[serde(default = "Method::default_wire_radius")]
+    wire_radius: f32,
     #[serde(default = "Method::default_zero_angle_vector")]
     zero_angle_vector: GeoVector,
     #[serde(default = "Method::default_backup_zero_angle_vector")]
     backup_zero_angle_vector: GeoVector,
+
+    // Iteration parameters
+    #[serde(default = "Method::default_iterations")]
+    iterations: usize,
+    #[serde(default = "Method::default_radius_freedom")]
+    radius_freedom: f32,
+    #[serde(default = "Method::default_center_freedom")]
+    center_freedom: f32,
+    #[serde(default = "Method::default_close_cutoff")]
+    close_cutoff: f32,
+    #[serde(default = "Method::default_far_cutoff")]
+    far_cutoff: f32,
+    #[serde(default = "Method::default_coupling_force_scale", alias = "coupling_scale")]
+    coupling_force_scale: f32,
+
+    // Verbosity
     #[serde(default = "Method::default_verbose")]
     verbose: bool,
+
+    // Save final cfg output
+    #[serde(default = "Method::default_final_cfg_output")]
+    final_cfg_output: Option<String>,
 }
 impl Method {
-    pub fn default_symmetry_plane() -> Plane {
-        Plane::from_normal_and_offset(GeoVector::xhat(), 0.0)
-    }
-    pub fn default_clearance() -> f32 {
-        1.29
-    }
-    pub fn default_verbose() -> bool {
-        false
-    }
-    pub fn default_wire_radius() -> f32 {
-        0.645
-    }
     pub fn default_epsilon() -> f32 {
         0.15
     }
     pub fn default_pre_shift() -> bool {
         true
+    }
+
+    pub fn default_clearance() -> f32 {
+        1.29
+    }
+    pub fn default_wire_radius() -> f32 {
+        0.645
     }
     pub fn default_zero_angle_vector() -> GeoVector {
         GeoVector::zhat()
@@ -60,21 +75,57 @@ impl Method {
     pub fn default_backup_zero_angle_vector() -> GeoVector {
         GeoVector::yhat()
     }
+
+    pub fn default_iterations() -> usize {
+        1
+    }
+    pub fn default_center_freedom() -> f32 {
+        0.5
+    }
+    pub fn default_radius_freedom() -> f32 {
+        0.15
+    }
+    pub fn default_close_cutoff() -> f32 {
+        1.1
+    }
+    pub fn default_far_cutoff() -> f32 {
+        1.2
+    }
+    pub fn default_coupling_force_scale() -> f32 {
+        1.0
+    }
+
+    pub fn default_verbose() -> bool {
+        false
+    }
+    pub fn default_final_cfg_output() -> Option<String> {
+        None
+    }
 }
-impl Default for Method {
+impl Default for Method{
     fn default() -> Self {
         Method{
             circles: vec![CircleArgs::default(); 2],
-            symmetry_plane: Self::default_symmetry_plane(),
-            clearance: Self::default_clearance(),
             epsilon: Self::default_epsilon(),
-            wire_radius: Self::default_wire_radius(),
             pre_shift: Self::default_pre_shift(),
+
+            clearance: Self::default_clearance(),
+            wire_radius: Self::default_wire_radius(),
             zero_angle_vector: Self::default_zero_angle_vector(),
             backup_zero_angle_vector: Self::default_backup_zero_angle_vector(),
+
+            iterations: Self::default_iterations(),
+            center_freedom: Self::default_center_freedom(),
+            radius_freedom: Self::default_radius_freedom(),
+            close_cutoff: Self::default_close_cutoff(),
+            far_cutoff: Self::default_far_cutoff(),
+            coupling_force_scale: Self::default_coupling_force_scale(),
+
             verbose: Self::default_verbose(),
+            final_cfg_output: Self::default_final_cfg_output(),
         }
     }
+
 }
 
 /// Single element arguments
@@ -87,8 +138,6 @@ struct CircleArgs {
     break_count: usize,
     #[serde(default = "CircleArgs::default_break_angle_offset", alias = "angle")]
     break_angle_offset: f32,
-    #[serde(default = "CircleArgs::default_on_symmetry_plane", alias = "on_sym")]
-    on_symmetry_plane: bool,
 }
 impl CircleArgs {
     fn default() -> Self {
@@ -97,7 +146,6 @@ impl CircleArgs {
             center: Self::default_center(),
             break_count: Self::default_break_count(),
             break_angle_offset: Self::default_break_angle_offset(),
-            on_symmetry_plane: Self::default_on_symmetry_plane(),
         }
     }
     pub fn default_coil_radius() -> f32 {
@@ -112,38 +160,20 @@ impl CircleArgs {
     pub fn default_break_angle_offset() -> f32 {
         0.0
     }
-    pub fn default_on_symmetry_plane() -> bool {
-        false
-    }
 }
 
 impl methods::LayoutMethodTrait for Method {
     /// Get the name of the layout method.
     fn get_method_display_name(&self) -> &'static str {
-        "Manual Symmetric"
+        "Alternating Circles"
     }
-    
-    fn do_layout(&self, surface: &Surface) -> layout::ProcResult<layout::Layout> {
-        let mut layout_out = layout::Layout::new();
-        let verbose = self.verbose;
 
-        // Grab the circle arguments
-        let circles = &self.circles;
-        let wire_radius = self.wire_radius;
-        let epsilon = self.epsilon;
-        let pre_shift = self.pre_shift;
-        
-        // Get the original boundary points, trimmed by the symmetry plane
-        let boundary_points: Vec<Point> = surface.get_boundary_vertex_indices().iter()
-        // Get the point of the vertex
-        .map(|v| surface.vertices[*v].point)
-        // Filter out points that were trimmed by the symmetry plane
-        .filter(|point| {
-            let distance = self.symmetry_plane.distance_to_point(point);
-            distance.abs() >= 0.0
-        }).collect();
-        
-        // Get the closest boundary point to a given point
+    fn do_layout(&self, surface: &Surface) -> layout::ProcResult<layout::Layout> {
+
+        let mut new_circles = self.circles.clone();
+
+        // Store boundary points
+        let boundary_points: Vec<Point> = surface.get_boundary_vertex_indices().iter().map(|v| surface.vertices[*v].point).collect();
         let closest_boundary_point = |point: &Point| -> Point {
             let mut closest = boundary_points[0];
             let mut closest_distance = (*point - closest).norm();
@@ -156,157 +186,160 @@ impl methods::LayoutMethodTrait for Method {
             }
             closest
         };
+
+        // Store if the coils are on the boundary
+        let mut on_boundary = vec![false; new_circles.len()];
         
-        // Replace the surface with the trimmed surface
-        let (trimmed_surface, _) = surface.trim_by_plane(&self.symmetry_plane, true);
-        let surface = &trimmed_surface;
-
-        // Separate the coils by their symmetry
-        let mut on_symmetry_circles = Vec::<CircleArgs>::new();
-        let mut pos_circles = Vec::<CircleArgs>::new();
-        let mut neg_circles = Vec::<CircleArgs>::new();
-        for (circle_num, circle) in circles.iter().enumerate() {
-            if circle.on_symmetry_plane {
-                // Make sure the circle is on the symmetry plane
-                let mut circle = circle.clone();
-                if self.symmetry_plane.distance_to_point(&circle.center).abs() > epsilon {
-                    println!("WARNING: Circle {} more than epsilon ({}) from symmetry plane, moving to symmetry plane", circle_num, epsilon);
-                }
-                circle.center = self.symmetry_plane.project_point(&circle.center);
-                on_symmetry_circles.push(circle);
-            } else {
-                // Make sure the circle is on the right side of the symmetry plane
-                let mut circle = circle.clone();
-                if self.symmetry_plane.distance_to_point(&circle.center) < 0.0 {
-                    println!("WARNING: Circle {} on wrong side of symmetry plane, flipping", circle_num);
-                    circle.center = circle.center.reflect_across(&self.symmetry_plane);
-                }
-                if self.symmetry_plane.distance_to_point(&circle.center).abs() < epsilon {
-                    println!("WARNING: Circle {} close to symmetry plane, may cause issues", circle_num);
-                }
-                pos_circles.push(circle);
-
-                // Add the flipped circle
-                let mut neg_circle = circle.clone();
-                neg_circle.center = neg_circle.center.reflect_across(&self.symmetry_plane);
-                neg_circles.push(neg_circle);
-            }
-        }
-
-        // Count the total number of circles
-        let total_circle_count = on_symmetry_circles.len() + pos_circles.len() + neg_circles.len();
-
-        // Shrink initial radii to keep the coils within the boundary
-        for (coil_id, circle) in circles.iter().enumerate() {
-            let boundary_point = closest_boundary_point(&circle.center);
-            let vec_to_boundary = circle.center - boundary_point;
-            let distance_to_boundary = vec_to_boundary.norm();
+        // Shrink initial radii to keep the coils within the boundary. Shift center if radius is too small.
+        for (coil_id, circle) in new_circles.iter_mut().enumerate() {
+            let mut boundary_point = closest_boundary_point(&circle.center);
+            let mut vec_to_boundary = circle.center - boundary_point;
+            let mut distance_to_boundary = vec_to_boundary.norm();
             if distance_to_boundary < circle.coil_radius {
-                println!("WARNING: Coil {} too close to boundary, radius of {:.2} but distance of {:.2}", coil_id, circle.coil_radius, distance_to_boundary);
+                let min_radius = circle.coil_radius * (1.0 - self.radius_freedom);
+                if distance_to_boundary < min_radius {
+                    circle.center = boundary_point + vec_to_boundary.normalize() * min_radius;
+                    println!("WARNING: Coil {} closer than minimum radius to boundary, center by {:.2} shifted to {:.2}",
+                        coil_id, (min_radius - distance_to_boundary), circle.center);
+                    boundary_point = closest_boundary_point(&circle.center);
+                    vec_to_boundary = circle.center - boundary_point;
+                    distance_to_boundary = vec_to_boundary.norm();
+                }
+                circle.coil_radius = distance_to_boundary;
+                on_boundary[coil_id] = true;
+                println!("WARNING: Coil {} too close to boundary, radius shrunk to {:.2}", coil_id, distance_to_boundary);
             }
         }
-
-        // Create the coils for the on-symmetry circles
-        for (i, circle_args) in on_symmetry_circles.iter().enumerate() {
-            println!("Coil {}/{} [on symmetry plane]...", (i + 1), total_circle_count);
             
-            // Grab arguments from the circle arguments
-            let coil_radius = circle_args.coil_radius;
-            let center = circle_args.center;
+        // Run a single pass
+        let mut layout_out = self.single_pass(surface, &new_circles)?;
 
-            // Create the circle through surface intersection with sphere
-            let (cid, points, point_normals) =
-                sphere_intersect_symmetric(surface, center, coil_radius, epsilon, &self.symmetry_plane);
-            let coil_normal = surface.vertices[cid].normal.normalize();
+        // Print initial statistics
+        if self.verbose && self.iterations > 0 {
+            println!("Initial Statistics:");
+            println!();
 
-            if verbose { println!("Uncleaned point count: {}", points.len()) };
-
-            let coil = clean_coil_by_angle(
-                center, coil_normal,
-                coil_radius, wire_radius,
-                points, point_normals,
-                pre_shift, verbose
-            )?;
-    
-            if verbose { println!("Cleaned point count: {}", coil.vertices.len()) };
-    
-            layout_out.coils.push(coil);
-        }
-
-        // Create the coils for the positive circles
-        for (i, circle_args) in pos_circles.iter().enumerate() {
-            println!("Coil {}/{} [positive side of symmetry plane]...", (i + on_symmetry_circles.len() + 1), total_circle_count);
-            
-            // Grab arguments from the circle arguments
-            let coil_radius = circle_args.coil_radius;
-            let center = circle_args.center;
-
-            // Create the circle through surface intersection with sphere
-            let (cid, points, point_normals) =
-                sphere_intersect_symmetric(surface, center, coil_radius, epsilon, &self.symmetry_plane);
-            let coil_normal = surface.vertices[cid].normal.normalize();
-
-            if verbose { println!("Uncleaned point count: {}", points.len()) };
-
-            let coil = clean_coil_by_angle(
-                center, coil_normal,
-                coil_radius, wire_radius,
-                points, point_normals,
-                pre_shift, verbose
-            )?;
-    
-            if verbose { println!("Cleaned point count: {}", coil.vertices.len()) };
-    
-            layout_out.coils.push(coil);
-        }
-
-        // Create the coils for the flipped circles
-        for i in 0..pos_circles.len() {
-            println!("Coil {}/{} [negative side of symmetry plane]...", 
-                (i + on_symmetry_circles.len() + pos_circles.len() + 1), total_circle_count);
-            let mut neg_coil = layout_out.coils[on_symmetry_circles.len() + i].clone();
-            neg_coil.center = neg_coil.center.reflect_across(&self.symmetry_plane);
-            neg_coil.normal = neg_coil.normal.reflect_across(&self.symmetry_plane.get_normal());
-
-            for vertex in neg_coil.vertices.iter_mut() {
-                vertex.point = vertex.point.reflect_across(&self.symmetry_plane);
-                vertex.surface_normal = vertex.surface_normal.reflect_across(&self.symmetry_plane.get_normal());
-                vertex.wire_radius_normal = vertex.wire_radius_normal.reflect_across(&self.symmetry_plane.get_normal());
-                let temp = vertex.next_id;
-                vertex.next_id = vertex.prev_id;
-                vertex.prev_id = temp;
-            }
-
-            layout_out.coils.push(neg_coil);
-        }
-
-        // Collect all the circles
-        let symmetrized_circles = concat(vec![on_symmetry_circles.clone(), pos_circles.clone(), pos_circles.clone()]);
-
-        // Do overlaps
-        self.mousehole_overlap(&mut layout_out, &symmetrized_circles);
-
-        // Do inductance estimates
-        if verbose {
-            for (coil_id, coil) in layout_out.coils.iter().enumerate() {
-                println!("Coil {} self-inductance: {:.2} nH", coil_id, coil.self_inductance(1.0));
-            }
-
-            println!("Mutual inductance estimate:");
+            println!("Distances:");
             for (coil_id, coil) in layout_out.coils.iter().enumerate() {
                 for (other_coil_id, other_coil) in layout_out.coils.iter().enumerate() {
                     if coil_id < other_coil_id {
-                        let inductance = coil.mutual_inductance(other_coil, 1.0);
-                        println!("Coil {} to Coil {}: {:.2} nH", coil_id, other_coil_id, inductance);
+                        let distance = (coil.center - other_coil.center).norm();
+                        let d_rel = distance / (new_circles[coil_id].coil_radius + new_circles[other_coil_id].coil_radius);
+                        println!("Coil {} to Coil {}: {:.2} mm ({:.3} relative)", coil_id, other_coil_id, distance, d_rel);
                     }
                 }
             }
+            println!();
+
+            println!("Coupling factor estimates:");
+            for (coil_id, coil) in layout_out.coils.iter().enumerate() {
+                for (other_coil_id, other_coil) in layout_out.coils.iter().enumerate() {
+                    if coil_id < other_coil_id {
+                        let coupling = coil.coupling_factor(other_coil, 1.0);
+                        print!("Coil {} to Coil {}:", coil_id, other_coil_id);
+                        if coupling.signum() > 0.0 {
+                            println!("  {:.3}", coupling);
+                        } else {
+                            println!(" {:.3}", coupling);
+                        }
+                    }
+                }
+            }
+            println!();
+
+            println!("Coils:");
+            for (coil_id, coil) in layout_out.coils.iter().enumerate() {
+                println!("Coil {}: Radius {:.2}, Center {}", coil_id, new_circles[coil_id].coil_radius, coil.center);
+            }
+            println!();
+        }
+
+        // Iterate to automatically decouple
+        for (i, _) in (0..self.iterations).enumerate() {
+            println!("Iteration {}/{}...", (i + 1), self.iterations);
+
+            // Generate step size -- linear decrease currently. TODO Probably should be exponential.
+            let step_size = 1.0 - (i as f32) / (self.iterations as f32) * 0.5;
+
+            // Update positions
+            new_circles = self.update_positions(
+                &new_circles,
+                &layout_out,
+                surface,
+                &boundary_points,
+                &mut on_boundary,
+                step_size
+            );
+            layout_out = self.single_pass(surface, &new_circles)?;
+
+            // Update radii
+            new_circles = self.update_radii(
+                &new_circles,
+                &layout_out,
+                &boundary_points,
+                &mut on_boundary,
+                step_size
+            );
+            layout_out = self.single_pass(surface, &new_circles)?;
+        }
+
+
+        // Print statistics
+        if self.verbose {
+
+            println!("Final Coils:");
+            for (coil_id, coil) in layout_out.coils.iter().enumerate() {
+                println!("Coil {}: Radius [{:.2}], Center [{:.2}], Length [{:.2}]", coil_id, new_circles[coil_id].coil_radius, coil.center, coil.wire_length());
+            }
+            println!();
+
+            println!("Distances:");
+            for (coil_id, coil) in layout_out.coils.iter().enumerate() {
+                for (other_coil_id, other_coil) in layout_out.coils.iter().enumerate() {
+                    if coil_id < other_coil_id {
+                        let distance = (coil.center - other_coil.center).norm();
+                        let d_rel = distance / (new_circles[coil_id].coil_radius + new_circles[other_coil_id].coil_radius);
+                        println!("Coil {} to Coil {}: {:.2} mm ({:.3} relative)", coil_id, other_coil_id, distance, d_rel);
+                    }
+                }
+            }
+            println!();
+
+            println!("Coupling factor estimates:");
+            for (coil_id, coil) in layout_out.coils.iter().enumerate() {
+                for (other_coil_id, other_coil) in layout_out.coils.iter().enumerate() {
+                    if coil_id < other_coil_id {
+                        let coupling = coil.coupling_factor(other_coil, 1.0);
+                        print!("Coil {} to Coil {}:", coil_id, other_coil_id);
+                        if coupling.signum() > 0.0 {
+                            println!("  {:.3}", coupling);
+                        } else {
+                            println!(" {:.3}", coupling);
+                        }
+                    }
+                }
+            }
+            println!();
+
+            println!("Self inductance estimates");
+            for (coil_id, coil) in layout_out.coils.iter().enumerate() {
+                let self_inductance = coil.self_inductance(1.0);
+                println!("Coil {}: {:.3}", coil_id, self_inductance);
+            }
+            println!();
+        }
+
+        if let Some(final_cfg_output) = self.final_cfg_output.as_ref() {
+            println!("Writing final cfg...");
+            crate::io::save_ser_to(final_cfg_output, &new_circles)?;
         }
 
         // Add breaks
+        println!("Adding breaks...");
         for (coil_id, coil) in layout_out.coils.iter_mut().enumerate() {
-            let break_count = symmetrized_circles[coil_id].break_count;
-            let break_angle_offset_rad = symmetrized_circles[coil_id].break_angle_offset * std::f32::consts::PI / 180.0;
+            println!("Coil {}/{}...", coil_id + 1, new_circles.len());
+            let break_count = new_circles[coil_id].break_count;
+            let break_angle_offset_rad = new_circles[coil_id].break_angle_offset * std::f32::consts::PI / 180.0;
             let zero_angle_vector = {
                 if coil.normal.normalize().dot(&self.zero_angle_vector.normalize()) < 0.95 {
                     self.zero_angle_vector
@@ -323,6 +356,246 @@ impl methods::LayoutMethodTrait for Method {
 }
 
 impl Method {
+
+    /// Do a single pass of the alternating circles method
+    fn single_pass(&self, surface: &Surface, circles: &Vec::<CircleArgs>) -> layout::ProcResult<layout::Layout> {
+        let mut layout_out = layout::Layout::new();
+        let verbose = self.verbose;
+
+        // Iterate through the circles
+        let wire_radius = self.wire_radius;
+        let epsilon = self.epsilon;
+        let pre_shift = self.pre_shift;
+
+        for (coil_id, circle_args) in circles.iter().enumerate() {
+            if verbose { println!("Coil {}/{}...", coil_id + 1, circles.len()); }
+            
+            // Grab arguments from the circle arguments
+            let coil_radius = circle_args.coil_radius;
+            
+            // Snap the center to the surface
+            let vec_to_surface = &circle_args.center - surface;
+            let center = circle_args.center - vec_to_surface;
+
+            // Create the circle through surface intersection with sphere
+            let (cid, points, point_normals) = sphere_intersect(surface, center, coil_radius, epsilon);
+            let coil_normal = surface.vertices[cid].normal;
+
+            let coil = clean_coil_by_angle(
+                center, coil_normal,
+                coil_radius, wire_radius,
+                points, point_normals,
+                pre_shift, false
+            )?;
+
+            layout_out.coils.push(coil);
+        }
+
+        // Do overlaps
+        self.mousehole_overlap(&mut layout_out, circles);
+
+        if verbose { println!() };
+
+        Ok(layout_out)
+    }
+
+    /// Get the closest point in a collection of points
+    fn closest_boundary_point<'a>(&self, point: &Point, boundary_points: &'a Vec::<Point>) -> &'a Point {
+        let mut closest = &boundary_points[0];
+        let mut closest_distance = (point - closest).norm();
+        for boundary_point in boundary_points.iter().skip(1) {
+            let distance = (point - boundary_point).norm();
+            if distance < closest_distance {
+                closest = boundary_point;
+                closest_distance = distance;
+            }
+        }
+        closest
+    }
+
+    /// Update the positions of the circles
+    fn update_positions(&self, 
+        circles: &Vec::<CircleArgs>,
+        layout_out: &layout::Layout,
+        surface: &Surface,
+        boundary_points: &Vec::<Point>,
+        on_boundary: &mut Vec::<bool>,
+        step_size: f32
+    ) -> Vec<CircleArgs> {
+        let mut new_circles = circles.clone();
+        assert!(new_circles.len() == layout_out.coils.len());
+
+        let mut coil_forces = vec![Vec::<GeoVector>::new(); layout_out.coils.len()];
+
+        // Calculate the forces on each coil
+        for (coil_id, coil) in layout_out.coils.iter().enumerate() {
+
+            // Get the parameters that will shift, and their original values
+            let mut center = coil.center;
+            let original_center = self.circles[coil_id].center;
+            let mut radius = circles[coil_id].coil_radius;
+            let original_radius = self.circles[coil_id].coil_radius;
+
+            // Check all coils of a higher id than the current coil
+            for (other_id, other_coil) in layout_out.coils.iter().enumerate() {
+                if other_id > coil_id {
+
+                    // Establish vectors and distances
+                    let other_radius = circles[other_id].coil_radius;
+                    let vec_from_other = center - other_coil.center;
+                    let distance_scale = radius + other_radius;
+                    let d_rel = vec_from_other.norm() / distance_scale;
+
+                    // Apply coupling forces from nearby coils
+                    if d_rel < self.far_cutoff {
+                        let k = coil.coupling_factor(other_coil, 1.0);
+                        
+                        // Add coupling forces to both coils (split in half)
+                        let d_rel_err = -(self.coupling_force_scale) * k;
+                        let coupling_force = if d_rel < self.close_cutoff {
+                            vec_from_other.normalize() * (-d_rel_err * distance_scale)
+                        } else {
+                            vec_from_other.normalize() * (d_rel_err * 0.5 * distance_scale)
+                        };
+                        coil_forces[coil_id].push(0.5 * coupling_force);
+                        coil_forces[other_id].push(-0.5 * coupling_force);
+                    }
+                }
+            }
+            
+            // Find the net force on the center
+            let mut delta_c = GeoVector::zero();
+            for force in coil_forces[coil_id].iter() {
+                let flat_force = force.rej_onto(&coil.normal).normalize() * force.norm();
+                delta_c = delta_c + flat_force;
+            }
+
+            // Check and update boundary condition
+            // If on the boundary, add a normal force keeping the coil from crossing the boundary
+            if on_boundary[coil_id] {
+                let boundary_point = self.closest_boundary_point(&center, boundary_points);
+                let flat_vec_to_boundary = (center - *boundary_point).rej_onto(&coil.normal).normalize();
+                let boundary_component = delta_c.proj_onto(&flat_vec_to_boundary);
+                if boundary_component.norm() >= 0.0 {
+                    delta_c = delta_c - boundary_component;
+                } else {
+                    on_boundary[coil_id] = false;
+                }
+            }
+
+            // Update the center
+            let center_bound = self.center_freedom * original_radius;
+            let total_delta = center + (delta_c.rej_onto(&coil.normal)) - original_center;
+            if total_delta.norm() > center_bound {
+                delta_c += total_delta.normalize() * (center_bound - total_delta.norm());
+            }
+            center = center + step_size * delta_c.rej_onto(&coil.normal);
+
+            // If center is too close to the boundary, move it away. Iterate 10 times and then shrink the radius
+            let boundary_point = self.closest_boundary_point(&center, boundary_points);
+            for i in 0..10 {
+                let vec_to_boundary = center - *boundary_point;
+                let distance_to_boundary = vec_to_boundary.norm();
+                if distance_to_boundary < radius {
+                    on_boundary[coil_id] = true;
+                    if i < 9 {center = *boundary_point + vec_to_boundary.normalize() * radius;}
+                    else {radius = distance_to_boundary;}
+                }
+            }
+
+            new_circles[coil_id].center = center - (&center - surface);
+        }
+
+        // Return the updated circles
+        new_circles
+    }
+
+    /// Update the radii of the circles
+    fn update_radii(
+        &self,
+        circles: &Vec::<CircleArgs>,
+        layout_out: &layout::Layout,
+        boundary_points: &Vec::<Point>,
+        on_boundary: &mut Vec::<bool>,
+        step_size: f32
+    ) -> Vec<CircleArgs> {
+        let mut new_circles = circles.clone();
+        assert!(new_circles.len() == layout_out.coils.len());
+
+        // Collect original and min/max radii
+        let mut original_radii = vec![0.0; layout_out.coils.len()];
+        let mut min_radii = vec![0.0; layout_out.coils.len()];
+        let mut max_radii = vec![0.0; layout_out.coils.len()];
+        for (coil_id, circle) in circles.iter().enumerate() {
+            original_radii[coil_id] = circle.coil_radius;
+            min_radii[coil_id] = original_radii[coil_id] * (1.0 - self.radius_freedom);
+            max_radii[coil_id] = original_radii[coil_id] * (1.0 + self.radius_freedom);
+        }
+        
+        // Calculate the forces on each coil
+        let mut net_radial_change = vec![0.0; layout_out.coils.len()];
+        for (coil_id, coil) in layout_out.coils.iter().enumerate() {
+
+            // Get previous values
+            let center = coil.center;
+            let mut radius = circles[coil_id].coil_radius;
+
+            // Check all coils of a higher id than the current coil
+            for (other_id, other_coil) in layout_out.coils.iter().enumerate() {
+                if other_id > coil_id {
+
+                    // Establish vectors and distances
+                    let other_radius = circles[other_id].coil_radius;
+                    let vec_from_other = center - other_coil.center;
+                    let distance_scale = radius + other_radius;
+                    let d_rel = vec_from_other.norm() / distance_scale;
+
+                    // Apply coupling forces from nearby coils
+                    if d_rel < self.far_cutoff {
+                        let k = coil.coupling_factor(other_coil, 1.0);
+                        
+                        // Add coupling forces to both coils
+                        let d_rel_err = -self.coupling_force_scale * k;
+                        let d_change = if d_rel < self.close_cutoff {
+                            -d_rel_err
+                        } else {
+                            d_rel_err * 0.5
+                        } * distance_scale;
+
+                        // Split the change between the two, depending on how off from the initial values the radii are.
+                        let this_r_rel_err = (radius - original_radii[coil_id])/original_radii[coil_id];
+                        let other_r_rel_err = (other_radius - original_radii[other_id])/original_radii[other_id];
+
+                        let r_scale = |r_rel_err| -> f32 {r_rel_err / self.radius_freedom * -d_change.signum() + 1.0 + 1.0e-6};
+                        let total = r_scale(this_r_rel_err) + r_scale(other_r_rel_err);
+
+                        net_radial_change[coil_id] -= d_change * r_scale(this_r_rel_err) / total;
+                        net_radial_change[other_id] -= d_change * r_scale(other_r_rel_err) / total;
+                    }
+                }
+            }
+
+            // Update the radius
+            radius += step_size * net_radial_change[coil_id];
+            if radius < min_radii[coil_id] {radius = min_radii[coil_id];}
+            else if radius > max_radii[coil_id] {radius = max_radii[coil_id];}
+
+            // Check boundary status, cap at boundary
+            let boundary_point = self.closest_boundary_point(&center, boundary_points);
+            let distance_to_boundary = (*boundary_point - center).norm();
+            if radius > distance_to_boundary {
+                radius = distance_to_boundary;
+                on_boundary[coil_id] = true;
+            } else {
+                on_boundary[coil_id] = false;
+            }
+
+            new_circles[coil_id].coil_radius = radius;
+        }
+
+        new_circles
+    }
+        
 
     /// Do overlaps between the coils
     fn mousehole_overlap(&self, layout_out: &mut layout::Layout, circles: &Vec::<CircleArgs>) {

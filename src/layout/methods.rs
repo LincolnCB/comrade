@@ -29,6 +29,7 @@ mod single_circle;
 mod manual_circles;
 mod manual_symmetric;
 mod iterative_circles;
+mod alternating_circles;
 
 /// Layout methods enum.
 /// To add a new method:
@@ -55,6 +56,10 @@ pub enum MethodEnum {
     /// Iterative circles layout, for specifying multiple circles by hand and doing local optimization.
     #[serde(rename = "iterative_circles")]
     IterativeCircles(iterative_circles::Method),
+
+    /// Alternating circles layout, alternating between radius and position optimization.
+    #[serde(rename = "alternating_circles")]
+    AlternatingCircles(alternating_circles::Method),
 }
 
 //
