@@ -158,6 +158,10 @@ impl methods::LayoutMethodTrait for Method {
         // Iteratively trim the boundary until the centers are a sufficient distance from the boundary
         let mut temp_points = surface.vertices.iter().map(|v| v.point).collect::<Vec<Point>>();
         let mut boundary_trim = 0.0;
+
+        if self.verbose {
+            println!("Selecting centers...");
+        }
         for _ in 0..5 {
             // Generate centers
             centers = k_means(&temp_points, self.circles, 1000, false);
@@ -202,13 +206,10 @@ impl methods::LayoutMethodTrait for Method {
             }
             radius /= 1.5 * centers.len() as f32;
             boundary_dist /= centers_near_boundary as f32;
-            println!("Radius: {:.2}", radius);
-            println!("Boundary dist: {:.2}", boundary_dist);
 
             if boundary_dist < radius {
                 println!("Trimming boundary...");
-                boundary_trim += 0.95 * (radius - boundary_dist);
-                println!("Boundary trim: {:.2}", boundary_trim);
+                boundary_trim += 0.9 * (radius - boundary_dist);
 
                 // Trim the points
                 temp_points = temp_points.iter().filter(|p| {
@@ -254,6 +255,7 @@ impl methods::LayoutMethodTrait for Method {
             radial_stiffness: self.radial_stiffness,
 
             verbose: self.verbose,
+            warn_on_shift: false,
             final_cfg_output: self.final_cfg_output.clone(),
         };
 

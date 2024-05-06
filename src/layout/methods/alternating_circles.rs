@@ -58,6 +58,8 @@ pub struct Method {
     // Verbosity
     #[serde(default = "Method::default_verbose")]
     pub verbose: bool,
+    #[serde(default = "Method::default_warn_on_shift")]
+    pub warn_on_shift: bool,
 
     // Save final cfg output
     #[serde(default = "Method::default_final_cfg_output")]
@@ -109,6 +111,9 @@ impl Method {
     pub fn default_verbose() -> bool {
         false
     }
+    pub fn default_warn_on_shift() -> bool {
+        true
+    }
     pub fn default_final_cfg_output() -> Option<String> {
         None
     }
@@ -134,6 +139,7 @@ impl Default for Method{
             radial_stiffness: Self::default_radial_stiffness(),
 
             verbose: Self::default_verbose(),
+            warn_on_shift: Self::default_warn_on_shift(),
             final_cfg_output: Self::default_final_cfg_output(),
         }
     }
@@ -202,8 +208,11 @@ impl methods::LayoutMethodTrait for Method {
                 circle.center = circle.center - (&circle.center - surface);
                 boundary_point = *closest_point(&circle.center, &boundary_points);
                 circle.coil_radius = (circle.center - boundary_point).norm();
-                println!("WARNING: Coil {} too close to boundary, center shifted by |{:.2}| to {:.2} and radius shrunk to {:.2}",
-                    coil_id, (original_center - circle.center).norm(), circle.center, circle.coil_radius);
+                if self.warn_on_shift {
+                    println!("WARNING: Coil {} too close to boundary, center shifted by |{:.2}| to {:.2} and radius shrunk to {:.2}",
+                        coil_id, (original_center - circle.center).norm(), circle.center, circle.coil_radius
+                    );
+                }
                 on_boundary[coil_id] = true;
             }
         }
