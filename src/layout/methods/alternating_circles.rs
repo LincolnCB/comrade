@@ -7,7 +7,13 @@
 use crate::layout;
 use crate::geo_3d::*;
 use layout::methods;
-use methods::helper::{sphere_intersect, clean_coil_by_angle, merge_segments, add_even_breaks_by_angle};
+use methods::helper::{
+    sphere_intersect,
+    clean_coil_by_angle,
+    merge_segments,
+    add_even_breaks_by_angle,
+    closest_point,
+};
 
 use serde::{Serialize, Deserialize};
 
@@ -17,45 +23,45 @@ use serde::{Serialize, Deserialize};
 #[serde(deny_unknown_fields)]
 pub struct Method {
     // Circle intersection parameters
-    circles: Vec<CircleArgs>,
+    pub circles: Vec<CircleArgs>,
     #[serde(default = "Method::default_epsilon")]
-    epsilon: f32,
+    pub epsilon: f32,
     #[serde(default = "Method::default_pre_shift")]
-    pre_shift: bool,
+    pub pre_shift: bool,
 
     // Overlap handling parameters
     #[serde(default = "Method::default_clearance")]
-    clearance: f32,
+    pub clearance: f32,
     #[serde(default = "Method::default_wire_radius")]
-    wire_radius: f32,
+    pub wire_radius: f32,
     #[serde(default = "Method::default_zero_angle_vector")]
-    zero_angle_vector: GeoVector,
+    pub zero_angle_vector: GeoVector,
     #[serde(default = "Method::default_backup_zero_angle_vector")]
-    backup_zero_angle_vector: GeoVector,
+    pub backup_zero_angle_vector: GeoVector,
 
     // Iteration parameters
     #[serde(default = "Method::default_iterations")]
-    iterations: usize,
+    pub iterations: usize,
     #[serde(default = "Method::default_initial_step")]
-    initial_step: f32,
+    pub initial_step: f32,
     #[serde(default = "Method::default_step_decrease")]
-    step_decrease: f32,
+    pub step_decrease: f32,
     #[serde(default = "Method::default_radius_freedom")]
-    radius_freedom: f32,
+    pub radius_freedom: f32,
     #[serde(default = "Method::default_center_freedom")]
-    center_freedom: f32,
+    pub center_freedom: f32,
     #[serde(default = "Method::default_close_cutoff")]
-    close_cutoff: f32,
+    pub close_cutoff: f32,
     #[serde(default = "Method::default_radial_stiffness", alias = "stiffness")]
-    radial_stiffness: f32,
+    pub radial_stiffness: f32,
 
     // Verbosity
     #[serde(default = "Method::default_verbose")]
-    verbose: bool,
+    pub verbose: bool,
 
     // Save final cfg output
     #[serde(default = "Method::default_final_cfg_output")]
-    final_cfg_output: Option<String>,
+    pub final_cfg_output: Option<String>,
 }
 impl Method {
     pub fn default_epsilon() -> f32 {
@@ -136,14 +142,14 @@ impl Default for Method{
 
 /// Single element arguments
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
-struct CircleArgs {
-    center: Point,
+pub struct CircleArgs {
+    pub center: Point,
     #[serde(default = "CircleArgs::default_coil_radius", alias = "radius")]
-    coil_radius: f32,
+    pub coil_radius: f32,
     #[serde(default = "CircleArgs::default_break_count", alias = "breaks")]
-    break_count: usize,
+    pub break_count: usize,
     #[serde(default = "CircleArgs::default_break_angle_offset", alias = "angle")]
-    break_angle_offset: f32,
+    pub break_angle_offset: f32,
 }
 impl CircleArgs {
     fn default() -> Self {
@@ -181,40 +187,24 @@ impl methods::LayoutMethodTrait for Method {
 
         // Store boundary points
         let boundary_points: Vec<Point> = surface.get_boundary_vertex_indices().iter().map(|v| surface.vertices[*v].point).collect();
-        let closest_boundary_point = |point: &Point| -> Point {
-            let mut closest = boundary_points[0];
-            let mut closest_distance = (*point - closest).norm();
-            for boundary_point in boundary_points.iter().skip(1) {
-                let distance = (point - boundary_point).norm();
-                if distance < closest_distance {
-                    closest = *boundary_point;
-                    closest_distance = distance;
-                }
-            }
-            closest
-        };
 
         // Store if the coils are on the boundary
         let mut on_boundary = vec![false; new_circles.len()];
         
         // Shrink initial radii to keep the coils within the boundary. Shift center if radius is too small.
         for (coil_id, circle) in new_circles.iter_mut().enumerate() {
-            let mut boundary_point = closest_boundary_point(&circle.center);
-            let mut vec_to_boundary = circle.center - boundary_point;
-            let mut distance_to_boundary = vec_to_boundary.norm();
+            let mut boundary_point = *closest_point(&circle.center, &boundary_points);
+            let vec_to_boundary = circle.center - boundary_point;
+            let distance_to_boundary = vec_to_boundary.norm();
             if distance_to_boundary < circle.coil_radius {
-                let min_radius = circle.coil_radius * (1.0 - self.radius_freedom);
-                if distance_to_boundary < min_radius {
-                    circle.center = boundary_point + vec_to_boundary.normalize() * min_radius;
-                    println!("WARNING: Coil {} closer than minimum radius to boundary, center by {:.2} shifted to {:.2}",
-                        coil_id, (min_radius - distance_to_boundary), circle.center);
-                    boundary_point = closest_boundary_point(&circle.center);
-                    vec_to_boundary = circle.center - boundary_point;
-                    distance_to_boundary = vec_to_boundary.norm();
-                }
-                circle.coil_radius = distance_to_boundary;
+                let original_center = circle.center;
+                circle.center = boundary_point + vec_to_boundary.normalize() * circle.coil_radius;
+                circle.center = circle.center - (&circle.center - surface);
+                boundary_point = *closest_point(&circle.center, &boundary_points);
+                circle.coil_radius = (circle.center - boundary_point).norm();
+                println!("WARNING: Coil {} too close to boundary, center shifted by |{:.2}| to {:.2} and radius shrunk to {:.2}",
+                    coil_id, (original_center - circle.center).norm(), circle.center, circle.coil_radius);
                 on_boundary[coil_id] = true;
-                println!("WARNING: Coil {} too close to boundary, radius shrunk to {:.2}", coil_id, distance_to_boundary);
             }
         }
 
@@ -234,35 +224,7 @@ impl methods::LayoutMethodTrait for Method {
         }
             
         // Run a single pass
-        let mut layout_out = self.single_pass(surface, &new_circles)?;
-
-        // Print initial statistics
-        if self.verbose && self.iterations > 0 {
-            println!("Initial Statistics:");
-            println!();
-
-            println!("Coupling factor estimates:");
-            for (coil_id, coil) in layout_out.coils.iter().enumerate() {
-                for (other_coil_id, other_coil) in layout_out.coils.iter().enumerate() {
-                    if coil_id < other_coil_id {
-                        let coupling = coil.coupling_factor(other_coil, 1.0);
-                        print!("Coil {} to Coil {}:", coil_id, other_coil_id);
-                        if coupling.signum() > 0.0 {
-                            println!("  {:.3}", coupling);
-                        } else {
-                            println!(" {:.3}", coupling);
-                        }
-                    }
-                }
-            }
-            println!();
-
-            println!("Coils:");
-            for (coil_id, coil) in layout_out.coils.iter().enumerate() {
-                println!("Coil {}: Radius {:.2}, Center {}", coil_id, new_circles[coil_id].coil_radius, coil.center);
-            }
-            println!();
-        }
+        let mut layout_out = self.single_pass(surface, &new_circles, false)?;
 
         // Iterate to automatically decouple
         let mut new_close_coils;
@@ -282,7 +244,7 @@ impl methods::LayoutMethodTrait for Method {
                 &mut on_boundary,
                 step_size
             );
-            layout_out = self.single_pass(surface, &new_circles)?;
+            layout_out = self.single_pass(surface, &new_circles, false)?;
 
             // Update radii
             (new_circles, objective, new_close_coils) = self.update_radii(
@@ -292,7 +254,7 @@ impl methods::LayoutMethodTrait for Method {
                 &mut on_boundary,
                 step_size
             );
-            layout_out = self.single_pass(surface, &new_circles)?;
+            layout_out = self.single_pass(surface, &new_circles, false)?;
 
             // Print statistics
             println!("Objective: {:.2}", (objective / new_close_coils as f32).sqrt());
@@ -380,7 +342,7 @@ impl methods::LayoutMethodTrait for Method {
 impl Method {
 
     /// Do a single pass of the alternating circles method
-    fn single_pass(&self, surface: &Surface, circles: &Vec::<CircleArgs>) -> layout::ProcResult<layout::Layout> {
+    fn single_pass(&self, surface: &Surface, circles: &Vec::<CircleArgs>, verbose: bool) -> layout::ProcResult<layout::Layout> {
         let mut layout_out = layout::Layout::new();
 
         // Iterate through the circles
@@ -388,7 +350,11 @@ impl Method {
         let epsilon = self.epsilon;
         let pre_shift = self.pre_shift;
 
-        for (_, circle_args) in circles.iter().enumerate() {
+        for (coil_id, circle_args) in circles.iter().enumerate() {
+
+            if verbose {
+                println!("Coil {}/{}...", coil_id + 1, circles.len());
+            }
             
             // Grab arguments from the circle arguments
             let coil_radius = circle_args.coil_radius;
@@ -415,20 +381,6 @@ impl Method {
         self.mousehole_overlap(&mut layout_out, circles);
 
         Ok(layout_out)
-    }
-
-    /// Get the closest point in a collection of points
-    fn closest_boundary_point<'a>(&self, point: &Point, boundary_points: &'a Vec::<Point>) -> &'a Point {
-        let mut closest = &boundary_points[0];
-        let mut closest_distance = (point - closest).norm();
-        for boundary_point in boundary_points.iter().skip(1) {
-            let distance = (point - boundary_point).norm();
-            if distance < closest_distance {
-                closest = boundary_point;
-                closest_distance = distance;
-            }
-        }
-        closest
     }
 
     /// Update the positions of the circles
@@ -502,7 +454,7 @@ impl Method {
             // Check and update boundary condition
             // If on the boundary, add a normal force keeping the coil from crossing the boundary
             if on_boundary[coil_id] {
-                let boundary_point = self.closest_boundary_point(&center, boundary_points);
+                let boundary_point = closest_point(&center, boundary_points);
                 let flat_vec_to_boundary = (center - *boundary_point).rej_onto(&coil.normal).normalize();
                 let boundary_component = delta_c.proj_onto(&flat_vec_to_boundary);
                 if boundary_component.norm() >= 0.0 {
@@ -521,7 +473,7 @@ impl Method {
             center = center + step_size * delta_c.rej_onto(&coil.normal);
 
             // If center is too close to the boundary, move it away. Iterate 10 times and then shrink the radius
-            let boundary_point = self.closest_boundary_point(&center, boundary_points);
+            let boundary_point = closest_point(&center, boundary_points);
             for i in 0..10 {
                 let vec_to_boundary = center - *boundary_point;
                 let distance_to_boundary = vec_to_boundary.norm();
@@ -611,7 +563,7 @@ impl Method {
             else if radius > max_radii[coil_id] {radius = max_radii[coil_id];}
 
             // Check boundary status, cap at boundary
-            let boundary_point = self.closest_boundary_point(&center, boundary_points);
+            let boundary_point = closest_point(&center, boundary_points);
             let distance_to_boundary = (*boundary_point - center).norm();
             if radius > distance_to_boundary {
                 radius = distance_to_boundary;

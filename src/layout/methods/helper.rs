@@ -2,6 +2,13 @@ use crate::layout;
 use crate::geo_3d::*;
 use std::f32::consts::PI;
 
+#[derive(Debug, Clone, Copy)]
+struct AngleFormat {
+    theta: Angle,
+    phi: Angle,
+    point_id: usize,
+}
+
 /// Find the points on a surface that intersect a sphere.
 /// Returns the id of the point closest to the center, 
 /// a vector of the intersected points, and the normals at those points.
@@ -102,13 +109,6 @@ pub fn sphere_intersect_symmetric(
 
     // Return the center id, new points, and new normals
     (cid, new_points, new_normals)
-}
-
-#[derive(Debug, Clone, Copy)]
-struct AngleFormat {
-    theta: Angle,
-    phi: Angle,
-    point_id: usize,
 }
 
 /// Clean a set of points by filtering
@@ -584,6 +584,104 @@ pub fn merge_segments(first_start: usize, first_end: usize, second_start: usize,
             },
         }
     )
+}
+
+pub fn k_means(points: &Vec<Point>, k: usize, max_iter: usize, verbose: bool) -> Vec<Point> {
+    let mut centers = Vec::<Point>::new();
+    let mut assignments = vec![0; points.len()];
+
+    // Initialize the centers (no rng for now)
+    centers.push(points[0]);
+    for _ in 1..k {
+        let mut max_dist = 0.0;
+        let mut max_id = 0;
+        for (point_id, point) in points.iter().enumerate() {
+            let mut min_dist = point.distance(&centers[0]);
+            for center in centers.iter() {
+                let dist = point.distance(center);
+                if dist < min_dist {
+                    min_dist = dist;
+                }
+            }
+            if min_dist > max_dist {
+                max_dist = min_dist;
+                max_id = point_id;
+            }
+        }
+        centers.push(points[max_id]);
+    }
+
+    // Iterate through the max number of iterations
+    for it in 0..max_iter {
+        // Assign points to centers
+        for (point_id, point) in points.iter().enumerate() {
+            let mut min_dist = point.distance(&centers[0]);
+            let mut min_center = 0;
+            for (center_id, center) in centers.iter().enumerate() {
+                let dist = point.distance(center);
+                if dist < min_dist {
+                    min_dist = dist;
+                    min_center = center_id;
+                }
+            }
+            assignments[point_id] = min_center;
+        }
+
+        // Update centers
+        let mut new_centers = Vec::<Point>::new();
+        for center_id in 0..k {
+            let mut center_sum = GeoVector::zero();
+            let mut count = 0;
+            for (point_id, assignment) in assignments.iter().enumerate() {
+                if *assignment == center_id {
+                    center_sum += points[point_id].into();
+                    count += 1;
+                }
+            }
+            if count > 0 {
+                center_sum /= count as f32;
+            }
+            new_centers.push(center_sum.into());
+        }
+
+        // Check for convergence
+        let mut max_change = 0.0;
+        for center_id in 0..k {
+            let dist = centers[center_id].distance(&new_centers[center_id]);
+            if dist > max_change {
+                max_change = dist;
+            }
+        }
+
+        if max_change < 1e-6 {
+            if verbose {
+                println!("K-means converged after {} iterations", it);
+            }
+            break;
+        }
+
+        centers = new_centers;
+
+        if verbose && it % 10 == 0 {
+            println!("K-means iteration {}: max change {}", it, max_change);
+        }
+    }
+
+    centers
+}
+
+/// Get the closest point in a collection of points
+pub fn closest_point<'a>(point: &Point, points: &'a Vec::<Point>) -> &'a Point {
+    let mut closest = &points[0];
+    let mut closest_distance = (point - closest).norm();
+    for test_point in points.iter().skip(1) {
+        let distance = (point - test_point).norm();
+        if distance < closest_distance {
+            closest = test_point;
+            closest_distance = distance;
+        }
+    }
+    closest
 }
 
 mod debug {

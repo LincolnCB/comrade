@@ -198,6 +198,15 @@ impl Sub<Plane> for Point {
         rhs.normal * dist
     }
 }
+impl std::convert::From<GeoVector> for Point {
+    fn from(vector: GeoVector) -> Self {
+        Point{
+            x: vector.x,
+            y: vector.y,
+            z: vector.z,
+        }
+    }
+}
 
 /// A vector in 3D space.
 /// Used for the normal vector of a point.

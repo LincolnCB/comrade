@@ -30,6 +30,7 @@ mod manual_circles;
 mod manual_symmetric;
 mod iterative_circles;
 mod alternating_circles;
+mod k_means_isometric;
 
 /// Layout methods enum.
 /// To add a new method:
@@ -60,6 +61,10 @@ pub enum MethodEnum {
     /// Alternating circles layout, alternating between radius and position optimization.
     #[serde(rename = "alternating_circles")]
     AlternatingCircles(alternating_circles::Method),
+
+    /// K-means isometric layout, for clustering points and creating circles from the clusters.
+    #[serde(rename = "k_means_isometric")]
+    KMeansIsometric(k_means_isometric::Method),
 }
 
 //
