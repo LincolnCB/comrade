@@ -59,13 +59,17 @@ pub fn load_stl(filename: &str) -> io::IoResult<Surface>{
         edge_indices.insert((edge.vertices[0], edge.vertices[1]), i);
     }
 
-    // Add faces to the surface, and add the faces to the edges
+    // Add faces to the surface, and add the adj_faces to the edges and vertices
     for (face_id, tri_face) in stl.faces.into_iter().enumerate() {
         let mut face_vertices: [usize; 3] = [0; 3];
         let mut face_edges: [usize; 3] = [0; 3];
         for i in 0..3 {
             let pid1 = tri_face.vertices[i];
             face_vertices[i] = pid1;
+            // Add the adj_face to the vertex
+            surface.vertices[pid1].adj_faces.push(face_id);
+
+            // Add the adj_face to the edge
             let pid2 = tri_face.vertices[(i + 1) % 3];
             let edge_key = if pid1 < pid2 {
                 (pid1, pid2)

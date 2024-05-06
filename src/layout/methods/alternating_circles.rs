@@ -36,16 +36,18 @@ pub struct Method {
     // Iteration parameters
     #[serde(default = "Method::default_iterations")]
     iterations: usize,
+    #[serde(default = "Method::default_initial_step")]
+    initial_step: f32,
+    #[serde(default = "Method::default_step_decrease")]
+    step_decrease: f32,
     #[serde(default = "Method::default_radius_freedom")]
     radius_freedom: f32,
     #[serde(default = "Method::default_center_freedom")]
     center_freedom: f32,
     #[serde(default = "Method::default_close_cutoff")]
     close_cutoff: f32,
-    #[serde(default = "Method::default_far_cutoff")]
-    far_cutoff: f32,
-    #[serde(default = "Method::default_coupling_force_scale", alias = "coupling_scale")]
-    coupling_force_scale: f32,
+    #[serde(default = "Method::default_radial_stiffness", alias = "stiffness")]
+    radial_stiffness: f32,
 
     // Verbosity
     #[serde(default = "Method::default_verbose")]
@@ -79,6 +81,12 @@ impl Method {
     pub fn default_iterations() -> usize {
         1
     }
+    pub fn default_initial_step() -> f32 {
+        1.0
+    }
+    pub fn default_step_decrease() -> f32 {
+        0.5
+    }
     pub fn default_center_freedom() -> f32 {
         0.5
     }
@@ -88,10 +96,7 @@ impl Method {
     pub fn default_close_cutoff() -> f32 {
         1.1
     }
-    pub fn default_far_cutoff() -> f32 {
-        1.2
-    }
-    pub fn default_coupling_force_scale() -> f32 {
+    pub fn default_radial_stiffness() -> f32 {
         1.0
     }
 
@@ -115,11 +120,12 @@ impl Default for Method{
             backup_zero_angle_vector: Self::default_backup_zero_angle_vector(),
 
             iterations: Self::default_iterations(),
+            initial_step: Self::default_initial_step(),
+            step_decrease: Self::default_step_decrease(),
             center_freedom: Self::default_center_freedom(),
             radius_freedom: Self::default_radius_freedom(),
             close_cutoff: Self::default_close_cutoff(),
-            far_cutoff: Self::default_far_cutoff(),
-            coupling_force_scale: Self::default_coupling_force_scale(),
+            radial_stiffness: Self::default_radial_stiffness(),
 
             verbose: Self::default_verbose(),
             final_cfg_output: Self::default_final_cfg_output(),
@@ -170,6 +176,7 @@ impl methods::LayoutMethodTrait for Method {
 
     fn do_layout(&self, surface: &Surface) -> layout::ProcResult<layout::Layout> {
 
+        // Clone the circles
         let mut new_circles = self.circles.clone();
 
         // Store boundary points
@@ -210,6 +217,21 @@ impl methods::LayoutMethodTrait for Method {
                 println!("WARNING: Coil {} too close to boundary, radius shrunk to {:.2}", coil_id, distance_to_boundary);
             }
         }
+
+        // Get initial close coils
+        let mut close_coils = 0;
+        for (coil_id, coil) in new_circles.iter().enumerate() {
+            for (other_coil_id, other_coil) in new_circles.iter().enumerate() {
+                if coil_id < other_coil_id {
+                    let vec_from_other = coil.center - other_coil.center;
+                    let distance_scale = coil.coil_radius + other_coil.coil_radius;
+                    let d_rel = vec_from_other.norm() / distance_scale;
+                    if d_rel < self.close_cutoff {
+                        close_coils += 1;
+                    }
+                }
+            }
+        }
             
         // Run a single pass
         let mut layout_out = self.single_pass(surface, &new_circles)?;
@@ -217,18 +239,6 @@ impl methods::LayoutMethodTrait for Method {
         // Print initial statistics
         if self.verbose && self.iterations > 0 {
             println!("Initial Statistics:");
-            println!();
-
-            println!("Distances:");
-            for (coil_id, coil) in layout_out.coils.iter().enumerate() {
-                for (other_coil_id, other_coil) in layout_out.coils.iter().enumerate() {
-                    if coil_id < other_coil_id {
-                        let distance = (coil.center - other_coil.center).norm();
-                        let d_rel = distance / (new_circles[coil_id].coil_radius + new_circles[other_coil_id].coil_radius);
-                        println!("Coil {} to Coil {}: {:.2} mm ({:.3} relative)", coil_id, other_coil_id, distance, d_rel);
-                    }
-                }
-            }
             println!();
 
             println!("Coupling factor estimates:");
@@ -255,11 +265,13 @@ impl methods::LayoutMethodTrait for Method {
         }
 
         // Iterate to automatically decouple
+        let mut new_close_coils;
+        let mut objective;
         for (i, _) in (0..self.iterations).enumerate() {
             println!("Iteration {}/{}...", (i + 1), self.iterations);
 
             // Generate step size -- linear decrease currently. TODO Probably should be exponential.
-            let step_size = 1.0 - (i as f32) / (self.iterations as f32) * 0.5;
+            let step_size = self.initial_step / (1.0 + self.step_decrease * i as f32);
 
             // Update positions
             new_circles = self.update_positions(
@@ -273,7 +285,7 @@ impl methods::LayoutMethodTrait for Method {
             layout_out = self.single_pass(surface, &new_circles)?;
 
             // Update radii
-            new_circles = self.update_radii(
+            (new_circles, objective, new_close_coils) = self.update_radii(
                 &new_circles,
                 &layout_out,
                 &boundary_points,
@@ -281,11 +293,20 @@ impl methods::LayoutMethodTrait for Method {
                 step_size
             );
             layout_out = self.single_pass(surface, &new_circles)?;
+
+            // Print statistics
+            println!("Objective: {:.3}", objective);
+            if close_coils != new_close_coils {
+                println!("WARNING: Number of close coils changed! ({} -> {})", close_coils, new_close_coils);
+            }
+            println!();
+            close_coils = new_close_coils;
         }
 
 
         // Print statistics
         if self.verbose {
+            let mut objective = 0.0;
 
             println!("Final Coils:");
             for (coil_id, coil) in layout_out.coils.iter().enumerate() {
@@ -293,28 +314,24 @@ impl methods::LayoutMethodTrait for Method {
             }
             println!();
 
-            println!("Distances:");
-            for (coil_id, coil) in layout_out.coils.iter().enumerate() {
-                for (other_coil_id, other_coil) in layout_out.coils.iter().enumerate() {
-                    if coil_id < other_coil_id {
-                        let distance = (coil.center - other_coil.center).norm();
-                        let d_rel = distance / (new_circles[coil_id].coil_radius + new_circles[other_coil_id].coil_radius);
-                        println!("Coil {} to Coil {}: {:.2} mm ({:.3} relative)", coil_id, other_coil_id, distance, d_rel);
-                    }
-                }
-            }
-            println!();
-
             println!("Coupling factor estimates:");
             for (coil_id, coil) in layout_out.coils.iter().enumerate() {
-                for (other_coil_id, other_coil) in layout_out.coils.iter().enumerate() {
-                    if coil_id < other_coil_id {
+                for (other_id, other_coil) in layout_out.coils.iter().enumerate() {
+                    if coil_id < other_id {
                         let coupling = coil.coupling_factor(other_coil, 1.0);
-                        print!("Coil {} to Coil {}:", coil_id, other_coil_id);
+                        print!("Coil {} to Coil {}:", coil_id, other_id);
                         if coupling.signum() > 0.0 {
                             println!("  {:.3}", coupling);
                         } else {
                             println!(" {:.3}", coupling);
+                        }
+
+                        // Track in objective if close
+                        let vec_from_other = coil.center - other_coil.center;
+                        let distance_scale = new_circles[coil_id].coil_radius + new_circles[other_id].coil_radius;
+                        let d_rel = vec_from_other.norm() / distance_scale;
+                        if d_rel < self.close_cutoff {
+                            objective += coupling * coupling * 1.0e6;
                         }
                     }
                 }
@@ -326,6 +343,9 @@ impl methods::LayoutMethodTrait for Method {
                 let self_inductance = coil.self_inductance(1.0);
                 println!("Coil {}: {:.3}", coil_id, self_inductance);
             }
+            println!();
+
+            println!("Objective: {:.3}", objective);
             println!();
         }
 
@@ -360,15 +380,13 @@ impl Method {
     /// Do a single pass of the alternating circles method
     fn single_pass(&self, surface: &Surface, circles: &Vec::<CircleArgs>) -> layout::ProcResult<layout::Layout> {
         let mut layout_out = layout::Layout::new();
-        let verbose = self.verbose;
 
         // Iterate through the circles
         let wire_radius = self.wire_radius;
         let epsilon = self.epsilon;
         let pre_shift = self.pre_shift;
 
-        for (coil_id, circle_args) in circles.iter().enumerate() {
-            if verbose { println!("Coil {}/{}...", coil_id + 1, circles.len()); }
+        for (_, circle_args) in circles.iter().enumerate() {
             
             // Grab arguments from the circle arguments
             let coil_radius = circle_args.coil_radius;
@@ -393,8 +411,6 @@ impl Method {
 
         // Do overlaps
         self.mousehole_overlap(&mut layout_out, circles);
-
-        if verbose { println!() };
 
         Ok(layout_out)
     }
@@ -427,6 +443,14 @@ impl Method {
 
         let mut coil_forces = vec![Vec::<GeoVector>::new(); layout_out.coils.len()];
 
+        // Collect radial error 
+        let mut radial_err = vec![0.0; layout_out.coils.len()];
+        let mut rel_radial_err = vec![0.0; layout_out.coils.len()];
+        for (coil_id, circle) in circles.iter().enumerate() {
+            radial_err[coil_id] = circle.coil_radius - self.circles[coil_id].coil_radius;
+            rel_radial_err[coil_id] = radial_err[coil_id] / self.circles[coil_id].coil_radius;
+        }
+
         // Calculate the forces on each coil
         for (coil_id, coil) in layout_out.coils.iter().enumerate() {
 
@@ -435,6 +459,7 @@ impl Method {
             let original_center = self.circles[coil_id].center;
             let mut radius = circles[coil_id].coil_radius;
             let original_radius = self.circles[coil_id].coil_radius;
+
 
             // Check all coils of a higher id than the current coil
             for (other_id, other_coil) in layout_out.coils.iter().enumerate() {
@@ -447,18 +472,20 @@ impl Method {
                     let d_rel = vec_from_other.norm() / distance_scale;
 
                     // Apply coupling forces from nearby coils
-                    if d_rel < self.far_cutoff {
+                    if d_rel < self.close_cutoff {
                         let k = coil.coupling_factor(other_coil, 1.0);
                         
                         // Add coupling forces to both coils (split in half)
-                        let d_rel_err = -(self.coupling_force_scale) * k;
-                        let coupling_force = if d_rel < self.close_cutoff {
-                            vec_from_other.normalize() * (-d_rel_err * distance_scale)
-                        } else {
-                            vec_from_other.normalize() * (d_rel_err * 0.5 * distance_scale)
-                        };
-                        coil_forces[coil_id].push(0.5 * coupling_force);
-                        coil_forces[other_id].push(-0.5 * coupling_force);
+                        let d_rel_target = d_rel + k;
+                        let d_change = d_rel_target * (-radial_err[coil_id] + -radial_err[other_id]) * self.radial_stiffness + k * distance_scale;
+                        let offset_force = d_change * vec_from_other.normalize();
+
+                        // Split the change between the two, LESS movement for the one with more radial error.
+                        let r_scale = |r_rel_err| -> f32 {f32::powf(2.0, self.radial_stiffness * r_rel_err / self.radius_freedom * d_change.signum())};
+                        let total = r_scale(rel_radial_err[coil_id]) + r_scale(rel_radial_err[other_id]);
+                        
+                        coil_forces[coil_id].push(offset_force * r_scale(rel_radial_err[coil_id]) / total);
+                        coil_forces[other_id].push(-offset_force * r_scale(rel_radial_err[other_id]) / total);
                     }
                 }
             }
@@ -518,18 +545,23 @@ impl Method {
         boundary_points: &Vec::<Point>,
         on_boundary: &mut Vec::<bool>,
         step_size: f32
-    ) -> Vec<CircleArgs> {
+    ) -> (Vec<CircleArgs>, f32, usize) {
         let mut new_circles = circles.clone();
         assert!(new_circles.len() == layout_out.coils.len());
 
+        // Initialize objective function and number of close coils
+        let mut objective = 0.0;
+        let mut close_coils = 0;
+
         // Collect original and min/max radii
-        let mut original_radii = vec![0.0; layout_out.coils.len()];
+        let mut rel_radial_err = vec![0.0; layout_out.coils.len()];
         let mut min_radii = vec![0.0; layout_out.coils.len()];
         let mut max_radii = vec![0.0; layout_out.coils.len()];
         for (coil_id, circle) in circles.iter().enumerate() {
-            original_radii[coil_id] = circle.coil_radius;
-            min_radii[coil_id] = original_radii[coil_id] * (1.0 - self.radius_freedom);
-            max_radii[coil_id] = original_radii[coil_id] * (1.0 + self.radius_freedom);
+            let original_radius = self.circles[coil_id].coil_radius;
+            rel_radial_err[coil_id] = (circle.coil_radius - original_radius) / original_radius;
+            min_radii[coil_id] = original_radius * (1.0 - self.radius_freedom);
+            max_radii[coil_id] = original_radius * (1.0 + self.radius_freedom);
         }
         
         // Calculate the forces on each coil
@@ -551,26 +583,22 @@ impl Method {
                     let d_rel = vec_from_other.norm() / distance_scale;
 
                     // Apply coupling forces from nearby coils
-                    if d_rel < self.far_cutoff {
+                    if d_rel < self.close_cutoff {
                         let k = coil.coupling_factor(other_coil, 1.0);
+
+                        // Track close coils and add to objective function
+                        close_coils += 1;
+                        objective += k * k * 1.0e6;
                         
                         // Add coupling forces to both coils
-                        let d_rel_err = -self.coupling_force_scale * k;
-                        let d_change = if d_rel < self.close_cutoff {
-                            -d_rel_err
-                        } else {
-                            d_rel_err * 0.5
-                        } * distance_scale;
+                        let d_change = k * distance_scale;
 
-                        // Split the change between the two, depending on how off from the initial values the radii are.
-                        let this_r_rel_err = (radius - original_radii[coil_id])/original_radii[coil_id];
-                        let other_r_rel_err = (other_radius - original_radii[other_id])/original_radii[other_id];
+                        // Split the change between the two, MORE radial change for the one with more radial error.
+                        let r_scale = |r_rel_err| -> f32 {f32::powf(2.0, self.radial_stiffness * r_rel_err / self.radius_freedom * -d_change.signum())};
+                        let total = r_scale(rel_radial_err[coil_id]) + r_scale(rel_radial_err[other_id]);
 
-                        let r_scale = |r_rel_err| -> f32 {r_rel_err / self.radius_freedom * -d_change.signum() + 1.0 + 1.0e-6};
-                        let total = r_scale(this_r_rel_err) + r_scale(other_r_rel_err);
-
-                        net_radial_change[coil_id] -= d_change * r_scale(this_r_rel_err) / total;
-                        net_radial_change[other_id] -= d_change * r_scale(other_r_rel_err) / total;
+                        net_radial_change[coil_id] -= d_change * r_scale(rel_radial_err[coil_id]) / total;
+                        net_radial_change[other_id] -= d_change * r_scale(rel_radial_err[other_id]) / total;
                     }
                 }
             }
@@ -593,7 +621,7 @@ impl Method {
             new_circles[coil_id].coil_radius = radius;
         }
 
-        new_circles
+        (new_circles, objective, close_coils)
     }
         
 
