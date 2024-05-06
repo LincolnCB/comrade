@@ -58,11 +58,6 @@ impl Point {
         surface.vertices[self.nearest_point_idx(surface)].point
     }
 
-    /// Project this point onto the nearest face of the surface.
-    pub fn project_to_surface_face(&self, surface: &Surface) -> Point {
-        *self - (self - surface)
-    }
-
     /// Check if a point is in the triangular prism defined by extruding a face in both directions
     pub fn is_above_surface_face(&self, surface: &Surface, face_idx: usize) -> bool {
         let face = &surface.faces[face_idx];
@@ -80,6 +75,32 @@ impl Point {
         let sign_3 = halfplane_sign(self, &surface.vertices[face.vertices[2]].point, &surface.vertices[face.vertices[0]].point);
 
         sign_1 == sign_2 && sign_2 == sign_3
+    }
+
+    /// Project a point onto a triangular face
+    pub fn project_to_surface_face(&self, surface: &Surface, face_idx: usize) -> Point {
+        let face = &surface.faces[face_idx];
+        let normal = face.normal;
+
+        // Project the point onto the plane of the face
+        let mut proj_point = *self - (*self - surface.vertices[face.vertices[0]].point).proj_onto(&normal);
+
+        // For each edge, check if the point is outside the edge
+        // If so, project the point onto the edge
+        for i in 0..3 {
+            let p1 = surface.vertices[face.vertices[i]].point;
+            let p2 = surface.vertices[face.vertices[(i + 1) % 3]].point;
+            let p3 = surface.vertices[face.vertices[(i + 2) % 3]].point;
+
+            let edge = p2 - p1;
+            let vec_to_point = proj_point - p1;
+            let cross = edge.cross(&normal);
+            if cross.dot(&vec_to_point).signum() != cross.dot(&(p3 - p1)).signum() {
+                proj_point = proj_point - vec_to_point.proj_onto(&cross);
+            }
+        }
+
+        proj_point
     }
 
     /// Reflect this point across a plane.
@@ -157,36 +178,16 @@ impl Sub<&Surface> for &Point {
     type Output = GeoVector;
 
     fn sub(self, surface: &Surface) -> GeoVector {
-        let min_point_idx = self.nearest_point_idx(surface);
+        let mut proj_point = self.nearest_point(surface);
 
-        let vertex = &surface.vertices[min_point_idx];
-        let vec_to_point = *self - vertex.point;
-
-        // Check if the point is above any of the faces
-        // If above multiple (concave towards the point), use the closest face
-        let mut min_face_idx: Option<f32> = None;
-        let mut min_dist: Option<f32> = None;
-        for face_idx in vertex.adj_faces.iter() {
-            if self.is_above_surface_face(surface, *face_idx) {
-                let face = &surface.faces[*face_idx as usize];
-                let dist = vec_to_point.dot(&face.normal);
-                if min_dist.is_none() || dist < min_dist.unwrap() {
-                    min_dist = Some(dist);
-                    min_face_idx = Some(*face_idx as f32);
-                }
+        for face_idx in 0..surface.faces.len() {
+            let proj = self.project_to_surface_face(surface, face_idx);
+            if proj.distance(self) < proj_point.distance(self) {
+                proj_point = proj;
             }
         }
 
-        // If the point is above a face, return the vector to the face
-        // Otherwise, return the vector to the nearest point
-        if let Some(face_idx) = min_face_idx {
-            let face = &surface.faces[face_idx as usize];
-            let face_normal = face.normal;
-            return vec_to_point.proj_onto(&face_normal);
-        } else {
-            return vec_to_point;
-        }
-
+        *self - proj_point
     }
 }
 impl Sub<Plane> for Point {

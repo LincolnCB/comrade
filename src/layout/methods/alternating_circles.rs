@@ -295,7 +295,7 @@ impl methods::LayoutMethodTrait for Method {
             layout_out = self.single_pass(surface, &new_circles)?;
 
             // Print statistics
-            println!("Objective: {:.3}", objective);
+            println!("Objective: {:.2}", (objective / new_close_coils as f32).sqrt());
             if close_coils != new_close_coils {
                 println!("WARNING: Number of close coils changed! ({} -> {})", close_coils, new_close_coils);
             }
@@ -307,6 +307,7 @@ impl methods::LayoutMethodTrait for Method {
         // Print statistics
         if self.verbose {
             let mut objective = 0.0;
+            let mut close_coils = 0;
 
             println!("Final Coils:");
             for (coil_id, coil) in layout_out.coils.iter().enumerate() {
@@ -331,6 +332,7 @@ impl methods::LayoutMethodTrait for Method {
                         let distance_scale = new_circles[coil_id].coil_radius + new_circles[other_id].coil_radius;
                         let d_rel = vec_from_other.norm() / distance_scale;
                         if d_rel < self.close_cutoff {
+                            close_coils += 1;
                             objective += coupling * coupling * 1.0e6;
                         }
                     }
@@ -345,7 +347,7 @@ impl methods::LayoutMethodTrait for Method {
             }
             println!();
 
-            println!("Objective: {:.3}", objective);
+            println!("Objective: {:.2}", (objective / close_coils as f32).sqrt());
             println!();
         }
 
