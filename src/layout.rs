@@ -214,6 +214,7 @@ pub fn do_layout(layout_target: &LayoutTarget) -> ProcResult<Layout> {
 
     // Run the layout method
     println!("Running layout method: {}...", layout_method.get_method_display_name());
+    println!();
     layout_method.do_layout(&surface)
 }
 

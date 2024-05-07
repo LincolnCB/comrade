@@ -588,7 +588,6 @@ pub fn merge_segments(first_start: usize, first_end: usize, second_start: usize,
 
 pub fn k_means(points: &Vec<Point>, k: usize, max_iter: usize, verbose: bool) -> Vec<Point> {
     let mut centers = Vec::<Point>::new();
-    let mut assignments = vec![0; points.len()];
 
     // Initialize the centers (no rng for now)
     centers.push(points[0]);
@@ -610,6 +609,15 @@ pub fn k_means(points: &Vec<Point>, k: usize, max_iter: usize, verbose: bool) ->
         }
         centers.push(points[max_id]);
     }
+
+    k_means_initialized(points, &centers, max_iter, verbose)
+}
+
+pub fn k_means_initialized(points: &Vec<Point>, starting_centers: &Vec<Point>, max_iter: usize, verbose: bool) -> Vec<Point> {
+    // Clone initial points
+    let mut centers = starting_centers.clone();
+    let mut assignments = vec![0; points.len()];
+    let k = centers.len();
 
     // Iterate through the max number of iterations
     for it in 0..max_iter {

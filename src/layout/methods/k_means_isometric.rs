@@ -11,6 +11,7 @@ use methods::alternating_circles::Method as AlternatingCirclesMethod;
 use methods::alternating_circles::CircleArgs as Circle;
 use methods::helper::{
     k_means,
+    k_means_initialized,
     closest_point,
 };
 
@@ -21,14 +22,20 @@ use serde::{Serialize, Deserialize};
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Method {
-    // Circle intersection parameters
+    // K-means parameters
     #[serde(default = "Method::default_circles")]
     circles: usize,
+    #[serde(default = "Method::default_symmetry_plane", alias = "plane")]
+    symmetry_plane: Option<Plane>,
+    #[serde(default = "Method::default_initial_centers")]
+    initial_centers: Option<Vec<Point>>,
+
+    // Circle intersection parameters
     #[serde(default = "Method::default_epsilon")]
     epsilon: f32,
     #[serde(default = "Method::default_pre_shift")]
     pre_shift: bool,
-
+    
     // Overlap handling parameters
     #[serde(default = "Method::default_clearance")]
     clearance: f32,
@@ -38,7 +45,7 @@ pub struct Method {
     zero_angle_vector: GeoVector,
     #[serde(default = "Method::default_backup_zero_angle_vector")]
     backup_zero_angle_vector: GeoVector,
-
+    
     // Iteration parameters
     #[serde(default = "Method::default_iterations")]
     iterations: usize,
@@ -54,11 +61,17 @@ pub struct Method {
     close_cutoff: f32,
     #[serde(default = "Method::default_radial_stiffness", alias = "stiffness")]
     radial_stiffness: f32,
-
+    
     // Verbosity
     #[serde(default = "Method::default_verbose")]
     verbose: bool,
+    #[serde(default = "Method::default_visualize")]
+    visualize: bool,
 
+    // Save final centers output
+    #[serde(default = "Method::default_centers_output")]
+    centers_output: Option<String>,
+    
     // Save final cfg output
     #[serde(default = "Method::default_final_cfg_output")]
     final_cfg_output: Option<String>,
@@ -67,6 +80,13 @@ impl Method {
     pub fn default_circles() -> usize {
         12
     }
+    pub fn default_symmetry_plane() -> Option<Plane> {
+        Some(Plane::from_normal_and_offset(GeoVector::xhat(), 0.0))
+    }
+    pub fn default_initial_centers() -> Option<Vec<Point>> {
+        None
+    }
+    
     pub fn default_epsilon() -> f32 {
         0.15
     }
@@ -112,6 +132,13 @@ impl Method {
     pub fn default_verbose() -> bool {
         false
     }
+    pub fn default_visualize() -> bool {
+        false
+    }
+
+    pub fn default_centers_output() -> Option<String> {
+        None
+    }
     pub fn default_final_cfg_output() -> Option<String> {
         None
     }
@@ -120,6 +147,9 @@ impl Default for Method{
     fn default() -> Self {
         Method{
             circles: Self::default_circles(),
+            symmetry_plane: Self::default_symmetry_plane(),
+            initial_centers: Self::default_initial_centers(),
+
             epsilon: Self::default_epsilon(),
             pre_shift: Self::default_pre_shift(),
 
@@ -137,6 +167,9 @@ impl Default for Method{
             radial_stiffness: Self::default_radial_stiffness(),
 
             verbose: Self::default_verbose(),
+            visualize: Self::default_visualize(),
+
+            centers_output: Self::default_centers_output(),
             final_cfg_output: Self::default_final_cfg_output(),
         }
     }
@@ -164,7 +197,15 @@ impl methods::LayoutMethodTrait for Method {
         }
         for _ in 0..5 {
             // Generate centers
-            centers = k_means(&temp_points, self.circles, 1000, false);
+            if self.symmetry_plane.is_none() {
+                if let Some(initial_centers) = &self.initial_centers {
+                    centers = k_means_initialized(&temp_points, initial_centers, 1000, false);
+                } else {
+                    centers = k_means(&temp_points, self.circles, 1000, false);
+                }
+            } else {
+                centers = self.k_means_symmetric(&temp_points, 1000);
+            }
 
             // Calculate radius
             radius = 0.0;
@@ -209,6 +250,7 @@ impl methods::LayoutMethodTrait for Method {
 
             if boundary_dist < radius {
                 println!("Trimming boundary...");
+                println!();
                 boundary_trim += 0.9 * (radius - boundary_dist);
 
                 // Trim the points
@@ -227,13 +269,26 @@ impl methods::LayoutMethodTrait for Method {
             }
         }
 
+        // Just display the centers if visualize
+        radius = if self.visualize { 5.0 } else { radius };
+
+        // Save centers if requested
+        if let Some(output_path) = &self.centers_output {
+            crate::io::save_ser_to(output_path, &centers)?;
+        }
+
         // Map to circles
         let circles = centers.iter().map(|c| Circle{
-                center: *c, 
-                coil_radius: radius, 
-                break_count: Circle::default_break_count(),
-                break_angle_offset: Circle::default_break_angle_offset(),
-            }).collect();
+            center: *c, 
+            coil_radius: radius, 
+            break_count: Circle::default_break_count(),
+            break_angle_offset: Circle::default_break_angle_offset(),
+        }).collect();
+
+        let iterations = if self.visualize { 0 } else { self.iterations };
+        if iterations != self.iterations {
+            println!("WARNING: Visualization mode enabled, setting iterations to 0.")
+        }
 
         // Create method
         let method = AlternatingCirclesMethod{
@@ -246,7 +301,7 @@ impl methods::LayoutMethodTrait for Method {
             zero_angle_vector: self.zero_angle_vector,
             backup_zero_angle_vector: self.backup_zero_angle_vector,
 
-            iterations: self.iterations,
+            iterations: iterations,
             initial_step: self.initial_step,
             step_decrease: self.step_decrease,
             center_freedom: self.center_freedom,
@@ -262,4 +317,146 @@ impl methods::LayoutMethodTrait for Method {
         // Run method
         method.do_layout(surface)
     }
+}
+
+impl Method {
+    fn k_means_symmetric(&self, points: &Vec<Point>, max_iter: usize) -> Vec<Point> {
+
+        assert!(self.symmetry_plane.is_some(), "Symmetry plane must be defined for symmetric k-means.");
+
+        // Initialize the centers
+        let centers = if let Some(initial_centers) = &self.initial_centers {
+            if self.verbose {
+                println!("Using initial centers...");
+            }
+            k_means_initialized(points, &initial_centers, max_iter, false)
+        } else {
+            if self.verbose {
+                println!("Initializing centers...");
+            }
+            k_means(points, self.circles, max_iter, false)
+        };
+
+        // Symmetrize the centers
+        if self.verbose {
+            println!("Symmetrizing...");
+            println!();
+        }
+        let mut symmetrized_centers_detailed = self.symmetrize_centers(&centers);
+
+        // Trim asymmetric points
+        if self.verbose {
+            println!("Start: Trimming asymmetric points...");
+        }
+        let mut asymmetry = symmetrized_centers_detailed.iter().map(|(_, _, sign)| *sign).sum::<i32>();
+        if self.verbose {
+            println!("Asymmetry: {}", asymmetry);
+            println!("Original count: {}", centers.len());
+        }
+        let mut symmetrized_centers: Vec<Point> = if asymmetry < 0 {
+            symmetrized_centers_detailed.iter().skip(asymmetry.abs() as usize).map(|(p, _, _)| *p).collect()
+        } else if asymmetry > 0 {
+            symmetrized_centers_detailed.iter().take(centers.len() - (asymmetry.abs() as usize)).map(|(p, _, _)| *p).collect()
+        } else {
+            symmetrized_centers_detailed.iter().map(|(p, _, _)| *p).collect()
+        };
+        if self.verbose {
+            println!("Final count: {}", symmetrized_centers.len());
+            println!();
+        }
+
+        for it in 0..max_iter {
+            if self.verbose && (it + 1) % (max_iter as f32 / 10.0) as usize == 0 {
+                println!("Iteration: {} / {}", it + 1, max_iter);
+            }
+            // Single iteration of k-means
+            let mut new_centers = k_means_initialized(points, &symmetrized_centers, 1, false);
+
+            // Symmetrize the centers
+            symmetrized_centers_detailed = self.symmetrize_centers(&new_centers);
+            new_centers = symmetrized_centers_detailed.iter().map(|(p, _, _)| *p).collect();
+            
+            // Check for convergence
+            let mut converged = true;
+            for i in 0..symmetrized_centers.len() {
+                if symmetrized_centers[i].distance(&new_centers[i]) > 1e-3 {
+                    converged = false;
+                    break;
+                }
+            }
+
+            // Update centers
+            symmetrized_centers = new_centers;
+
+            if converged {
+                break;
+            }
+        }
+
+        // Final trim
+        if self.verbose {
+            println!("End: Trimming asymmetric points...");
+        }
+        asymmetry = symmetrized_centers_detailed.iter().map(|(_, _, sign)| *sign).sum::<i32>();
+        if self.verbose {
+            println!("Asymmetry: {}", asymmetry);
+            println!("Original count: {}", centers.len());
+        }
+        symmetrized_centers = if asymmetry < 0 {
+            symmetrized_centers_detailed.iter().skip(asymmetry.abs() as usize).map(|(p, _, _)| *p).collect()
+        } else if asymmetry > 0 {
+            symmetrized_centers_detailed.iter().take(centers.len() - (asymmetry.abs() as usize)).map(|(p, _, _)| *p).collect()
+        } else {
+            symmetrized_centers_detailed.iter().map(|(p, _, _)| *p).collect()
+        };
+        if self.verbose {
+            println!("Final count: {}", symmetrized_centers.len());
+            println!();
+        }
+
+        symmetrized_centers
+    }
+
+    fn symmetrize_centers(&self, centers: &Vec<Point>) -> Vec<(Point, f32, i32)> {
+        let symmetry_plane = self.symmetry_plane.expect("Symmetry plane must be defined for symmetric k-means.");
+
+        let sym_centers = centers.iter().map(|c| c.reflect_across(&symmetry_plane)).collect::<Vec<Point>>();
+        let mut collected_info = Vec::<(Point, f32, i32)>::new();
+        for (id, center) in centers.iter().enumerate() {
+            let mut info = (center.clone(), std::f32::MAX, 0);
+
+            let mut min_dist = std::f32::MAX;
+            let mut merge_point = *center;
+            let mut merge_id = id;
+            for (sym_id, sym_center) in sym_centers.iter().enumerate() {
+                let dist = center.distance(sym_center);
+                if dist < min_dist {
+                    min_dist = dist;
+                    merge_point = *sym_center;
+                    merge_id = sym_id;
+                }
+            }
+            info.0 = *center + (merge_point - *center) / 2.0;
+            info.1 = min_dist;
+
+            // Determine the sign of the reflection
+            info.2 = if merge_id == id {
+                0
+            } else if (*center - symmetry_plane).dot(&symmetry_plane.get_normal()) > 0.0 {
+                1
+            } else {
+                -1
+            };
+
+            collected_info.push(info);
+        }
+
+        // Sort by signed distance
+        collected_info.sort_by(|(_, d1, s1), (_, d2, s2)| {
+            (d1 * *s1 as f32).partial_cmp(&(d2 * *s2 as f32)).unwrap()
+        });
+
+        collected_info
+    }
+
 }
