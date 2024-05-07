@@ -338,7 +338,6 @@ impl methods::LayoutMethodTrait for Method {
         // Add breaks
         println!("Adding breaks...");
         for (coil_id, coil) in layout_out.coils.iter_mut().enumerate() {
-            println!("Coil {}/{}...", coil_id + 1, new_circles.len());
             let break_count = new_circles[coil_id].break_count;
             let break_angle_offset_rad = new_circles[coil_id].break_angle_offset * std::f32::consts::PI / 180.0;
             let zero_angle_vector = {

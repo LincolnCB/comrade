@@ -56,7 +56,6 @@ impl methods::MeshMethodTrait for Method {
 
         // Mesh each coil
         for (coil_n, coil) in layout.coils.iter().enumerate() {
-            println!("Coil {}/{}...", (coil_n + 1), layout.coils.len());
 
             let radius = coil.wire_radius + self.radius_offset;
 
