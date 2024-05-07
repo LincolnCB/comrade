@@ -65,6 +65,10 @@ pub struct Method {
     // Verbosity
     #[serde(default = "Method::default_verbose")]
     verbose: bool,
+    #[serde(default = "Method::default_statistics")]
+    statistics: bool,
+    
+    // Visualization (no optimization, just display the centers as small loops)
     #[serde(default = "Method::default_visualize")]
     visualize: bool,
 
@@ -132,10 +136,13 @@ impl Method {
     pub fn default_verbose() -> bool {
         false
     }
+    pub fn default_statistics() -> bool {
+        false
+    }
+    
     pub fn default_visualize() -> bool {
         false
     }
-
     pub fn default_centers_output() -> Option<String> {
         None
     }
@@ -167,8 +174,9 @@ impl Default for Method{
             radial_stiffness: Self::default_radial_stiffness(),
 
             verbose: Self::default_verbose(),
+            statistics: Self::default_statistics(),
+            
             visualize: Self::default_visualize(),
-
             centers_output: Self::default_centers_output(),
             final_cfg_output: Self::default_final_cfg_output(),
         }
@@ -311,6 +319,8 @@ impl methods::LayoutMethodTrait for Method {
 
             verbose: self.verbose,
             warn_on_shift: false,
+            statistics: self.statistics,
+
             final_cfg_output: self.final_cfg_output.clone(),
         };
 

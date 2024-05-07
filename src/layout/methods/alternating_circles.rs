@@ -60,6 +60,8 @@ pub struct Method {
     pub verbose: bool,
     #[serde(default = "Method::default_warn_on_shift")]
     pub warn_on_shift: bool,
+    #[serde(default = "Method::default_statistics")]
+    pub statistics: bool,
 
     // Save final cfg output
     #[serde(default = "Method::default_final_cfg_output")]
@@ -114,6 +116,10 @@ impl Method {
     pub fn default_warn_on_shift() -> bool {
         true
     }
+    pub fn default_statistics() -> bool {
+        false
+    }
+
     pub fn default_final_cfg_output() -> Option<String> {
         None
     }
@@ -140,6 +146,8 @@ impl Default for Method{
 
             verbose: Self::default_verbose(),
             warn_on_shift: Self::default_warn_on_shift(),
+            statistics: Self::default_statistics(),
+
             final_cfg_output: Self::default_final_cfg_output(),
         }
     }
@@ -276,7 +284,7 @@ impl methods::LayoutMethodTrait for Method {
 
 
         // Print statistics
-        if self.verbose {
+        if self.statistics {
             let mut objective = 0.0;
             let mut close_coils = 0;
 
