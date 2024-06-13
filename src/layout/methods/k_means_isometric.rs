@@ -84,8 +84,11 @@ impl Method {
     pub fn default_circles() -> usize {
         12
     }
-    pub fn default_symmetry_plane() -> Option<Plane> {
+    pub fn example_symmetry_plane() -> Option<Plane> {
         Some(Plane::from_normal_and_offset(GeoVector::xhat(), 0.0))
+    }
+    pub fn default_symmetry_plane() -> Option<Plane> {
+        None
     }
     pub fn default_initial_centers() -> Option<Vec<Point>> {
         None
@@ -154,7 +157,7 @@ impl Default for Method{
     fn default() -> Self {
         Method{
             circles: Self::default_circles(),
-            symmetry_plane: Self::default_symmetry_plane(),
+            symmetry_plane: Self::example_symmetry_plane(),
             initial_centers: Self::default_initial_centers(),
 
             epsilon: Self::default_epsilon(),
