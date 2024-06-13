@@ -90,6 +90,14 @@ impl Method {
     pub fn default_symmetry_plane() -> Option<Plane> {
         None
     }
+    pub fn example_initial_centers() -> Option<Vec<Point>> {
+        Some(vec![
+            Point::new(0.0, 0.0, 0.0),
+            Point::new(1.0, 0.0, 0.0),
+            Point::new(0.0, 1.0, 0.0),
+            Point::new(1.0, 1.0, 0.0),
+        ])
+    }
     pub fn default_initial_centers() -> Option<Vec<Point>> {
         None
     }
@@ -146,8 +154,14 @@ impl Method {
     pub fn default_visualize() -> bool {
         false
     }
+    pub fn example_centers_output() -> Option<String> {
+        Some("PATH/TO/OUTPUT/centers.[json|yaml|toml]".to_string())
+    }
     pub fn default_centers_output() -> Option<String> {
         None
+    }
+    pub fn example_final_cfg_output() -> Option<String> {
+        Some("PATH/TO/OUTPUT/cinal_cfg.[json|yaml|toml]".to_string())
     }
     pub fn default_final_cfg_output() -> Option<String> {
         None
@@ -158,7 +172,7 @@ impl Default for Method{
         Method{
             circles: Self::default_circles(),
             symmetry_plane: Self::example_symmetry_plane(),
-            initial_centers: Self::default_initial_centers(),
+            initial_centers: Self::example_initial_centers(),
 
             epsilon: Self::default_epsilon(),
             pre_shift: Self::default_pre_shift(),
@@ -180,8 +194,8 @@ impl Default for Method{
             statistics: Self::default_statistics(),
             
             visualize: Self::default_visualize(),
-            centers_output: Self::default_centers_output(),
-            final_cfg_output: Self::default_final_cfg_output(),
+            centers_output: Self::example_centers_output(),
+            final_cfg_output: Self::example_final_cfg_output(),
         }
     }
 
