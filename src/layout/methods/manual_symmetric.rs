@@ -122,7 +122,7 @@ impl methods::LayoutMethodTrait for Method {
     fn get_method_display_name(&self) -> &'static str {
         "Manual Symmetric"
     }
-    
+
     fn do_layout(&self, surface: &Surface) -> layout::ProcResult<layout::Layout> {
         let mut layout_out = layout::Layout::new();
         let verbose = self.verbose;
@@ -281,7 +281,7 @@ impl methods::LayoutMethodTrait for Method {
         }
 
         // Collect all the circles
-        let symmetrized_circles = concat(vec![on_symmetry_circles.clone(), pos_circles.clone(), pos_circles.clone()]);
+        let symmetrized_circles = concat(vec![on_symmetry_circles.clone(), pos_circles.clone(), neg_circles.clone()]);
 
         // Do overlaps
         self.mousehole_overlap(&mut layout_out, &symmetrized_circles);
@@ -329,7 +329,7 @@ impl Method {
         let intersections = self.get_intersections(layout_out, 2.0, circles);
         
         // Structure for managing intersecting segments
-        #[derive(Clone)]
+        #[derive(Clone, Debug)]
         struct IntersectionSegment {
             start: usize,
             end: usize,
@@ -368,26 +368,26 @@ impl Method {
             // Get all the intersections between a coil and a coil of higher coil id than it. 
             let mut any_intersections = false;
             for other_id in coil_id+1..circles.len() {
-                let other_intersection = &intersections[coil_id][other_id];
+                let other_intersections = &intersections[coil_id][other_id];
 
                 // Ignore loops entirely contained within other loops
-                if coil.vertices.len() - other_intersection.len() < 2 {
+                if coil.vertices.len() - other_intersections.len() < 2 {
                     continue;
                 }
 
-                if other_intersection.len() > 0 {
+                if other_intersections.len() > 0 {
                     any_intersections = true;
                     
-                    let mut start = other_intersection[0];
+                    let mut start = other_intersections[0];
                     let mut end;
                     
                     // Check for wraparound
-                    let mut i_max = other_intersection.len();
-                    if other_intersection[0] == 0 {
-                        for (rev_id, p) in other_intersection.iter().rev().enumerate() {
+                    let mut i_max = other_intersections.len();
+                    if other_intersections[0] == 0 {
+                        for (rev_id, p) in other_intersections.iter().rev().enumerate() {
                             if *p != coil.vertices.len() - 1 - rev_id {
-                                i_max = other_intersection.len() - rev_id;
-                                start = other_intersection[i_max % other_intersection.len()];
+                                i_max = other_intersections.len() - rev_id;
+                                start = other_intersections[i_max % other_intersections.len()];
                                 break;
                             }
                         } 
@@ -395,8 +395,8 @@ impl Method {
 
                     // Define the segments for this other coil
                     for i in 1..i_max {
-                        let p = other_intersection[i];
-                        let prev_p = other_intersection[i - 1];
+                        let p = other_intersections[i];
+                        let prev_p = other_intersections[i - 1];
                         if p > prev_p + 1 {
                             end = prev_p;
                             let length = padded_segment_length(start, end);
@@ -409,7 +409,7 @@ impl Method {
                             start = p;
                         }
                     }
-                    end = other_intersection[i_max - 1];
+                    end = other_intersections[i_max - 1];
                     let length = padded_segment_length(start, end);
                     segments.push(IntersectionSegment{
                         start,
@@ -544,7 +544,6 @@ impl Method {
             } else {
                 merged_segments.push(current_segment);
             }
-                
 
             // Offset the segments
             for segment in merged_segments.iter_mut() {
