@@ -482,7 +482,7 @@ impl fmt::Display for Plane {
 
 /// An updated surface
 // TODO: expand docs
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Surface {
     pub vertices: Vec<SurfaceVertex>,
     pub edges: Vec<SurfaceEdge>,
@@ -659,7 +659,7 @@ impl Surface {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SurfaceVertex {
     pub point: Point,
     pub normal: GeoVector,
@@ -677,7 +677,7 @@ impl SurfaceVertex {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct SurfaceEdge {
     pub vertices: [usize; 2],
     pub adj_faces: [Option::<usize>; 2],
@@ -694,7 +694,7 @@ impl SurfaceEdge {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SurfaceFace {
     pub vertices: [usize; 3],
     pub edges: [usize; 3],

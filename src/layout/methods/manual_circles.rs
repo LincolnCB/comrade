@@ -114,8 +114,7 @@ impl methods::LayoutMethodTrait for Method {
         let mut layout_out = layout::Layout::new();
         let verbose = self.verbose;
 
-        // Iterate through the circles
-        let circles = &self.circles;
+        // Grab the circle arguments
         let wire_radius = self.wire_radius;
         let epsilon = self.epsilon;
         let pre_shift = self.pre_shift;
@@ -136,7 +135,7 @@ impl methods::LayoutMethodTrait for Method {
         };
 
         // Shrink initial radii to keep the coils within the boundary
-        for (coil_id, circle) in circles.iter().enumerate() {
+        for (coil_id, circle) in self.circles.iter().enumerate() {
             let boundary_point = closest_boundary_point(&circle.center);
             let vec_to_boundary = circle.center - boundary_point;
             let distance_to_boundary = vec_to_boundary.norm();
@@ -145,8 +144,8 @@ impl methods::LayoutMethodTrait for Method {
             }
         }
 
-        for (coil_num, circle_args) in circles.iter().enumerate() {
-            println!("Coil {}/{}...", (coil_num + 1), circles.len());
+        for (coil_num, circle_args) in self.circles.iter().enumerate() {
+            println!("Coil {}/{}...", (coil_num + 1), self.circles.len());
             
             // Grab arguments from the circle arguments
             let coil_radius = circle_args.coil_radius;
@@ -165,9 +164,9 @@ impl methods::LayoutMethodTrait for Method {
                 points, point_normals,
                 pre_shift, verbose
             )?;
-    
+
             if verbose { println!("Cleaned point count: {}", coil.vertices.len()) };
-    
+
             layout_out.coils.push(coil);
         }
 
@@ -193,8 +192,8 @@ impl methods::LayoutMethodTrait for Method {
 
         // Add breaks
         for (coil_id, coil) in layout_out.coils.iter_mut().enumerate() {
-            let break_count = circles[coil_id].break_count;
-            let break_angle_offset_rad = circles[coil_id].break_angle_offset * std::f32::consts::PI / 180.0;
+            let break_count = self.circles[coil_id].break_count;
+            let break_angle_offset_rad = self.circles[coil_id].break_angle_offset * std::f32::consts::PI / 180.0;
             let zero_angle_vector = {
                 if coil.normal.normalize().dot(&self.zero_angle_vector.normalize()) < 0.95 {
                     self.zero_angle_vector
