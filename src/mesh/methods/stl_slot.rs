@@ -107,7 +107,7 @@ impl methods::MeshMethodTrait for Method {
 
             // For each corner, mesh the section to the next corner
             for slice_id in 0..coil.vertices.len() {
-                let next_slice_id = slice_id + 1 % corner_slices.len();
+                let next_slice_id = (slice_id + 1) % corner_slices.len();
                 let slice = &corner_slices[slice_id];
                 let next_slice = &corner_slices[next_slice_id];
 

@@ -1,6 +1,6 @@
 /*!
 *   Alternating Circles Method with Symmetry
-*
+*   Inclusion of Symmetry Plane assumes that the surface is roughly symmetric about the plane.
 *
 !*/
 
@@ -9,7 +9,6 @@ use crate::geo_3d::*;
 use layout::methods;
 use methods::helper::{
     sphere_intersect,
-    sphere_intersect_symmetric,
     clean_coil_by_angle,
     merge_segments,
     add_even_breaks_by_angle,
@@ -265,20 +264,10 @@ impl methods::LayoutMethodTrait for Method {
         let mut new_circles = original_circles.clone();
 
         // Store boundary points
-        let boundary_points: Vec<Point> = if let Some(symmetry_plane) = &self.symmetry_plane {
-            // Get the original boundary points, trimmed by the symmetry plane
-            surface.get_boundary_vertex_indices().iter()
-            // Get the point of the vertex
-            .map(|v| surface.vertices[*v].point)
-            // Filter out points that were trimmed by the symmetry plane
-            .filter(|point| {
-                let distance = symmetry_plane.distance_to_point(point);
-                distance.abs() >= 1.0e-6
-            }).collect()
-        } else {
-            surface.get_boundary_vertex_indices().iter()
-            .map(|v| surface.vertices[*v].point).collect()
-        };
+        let boundary_points: Vec<Point> = surface.get_boundary_vertex_indices().iter()
+            .map(|v| surface.vertices[*v].point).collect();
+
+        println!("Boundary point count: {}", boundary_points.len());
 
         // Store if the coils are on the boundary
         let mut on_boundary = vec![false; new_circles.len()];
@@ -320,7 +309,13 @@ impl methods::LayoutMethodTrait for Method {
             
         // Run a single pass
         let mut layout_out = if let Some(symmetry_plane) = &self.symmetry_plane {
-            self.lay_out_coils_sym(surface, symmetry_plane, &sym_circles, &pos_circles, &neg_circles, false)?
+            self.lay_out_coils_sym(
+                surface,
+                symmetry_plane,
+                &sym_circles,
+                &pos_circles,
+                &neg_circles,
+                false)?
         } else {
             self.lay_out_coils(surface, &new_circles, false)?
         };
@@ -488,7 +483,13 @@ impl methods::LayoutMethodTrait for Method {
 impl Method {
 
     /// Do a single pass of spherical intersection on the circles
-    fn lay_out_coils(&self, surface: &Surface, circles: &Vec::<CircleArgs>, verbose: bool) -> layout::ProcResult<layout::Layout> {
+    fn lay_out_coils(
+        &self,
+        surface: &Surface,
+        circles: &Vec::<CircleArgs>,
+        verbose: bool
+    ) -> layout::ProcResult<layout::Layout> {
+
         let mut layout_out = layout::Layout::new();
 
         for (coil_id, circle_args) in circles.iter().enumerate() {
@@ -531,13 +532,14 @@ impl Method {
     /// Do a single pass of symmetric coil intersection
     fn lay_out_coils_sym(
         &self, 
-        sym_surface: &Surface, 
+        surface: &Surface, 
         symmetry_plane: &Plane,
         sym_circles: &Vec::<CircleArgs>, 
         pos_circles: &Vec::<CircleArgs>, 
         neg_circles: &Vec::<CircleArgs>, 
         verbose: bool
     ) -> layout::ProcResult<layout::Layout> {
+
         let mut layout_out = layout::Layout::new();
 
         // Create the coils for the on-symmetry circles
@@ -549,8 +551,8 @@ impl Method {
 
             // Create the circle through surface intersection with sphere
             let (cid, points, point_normals) =
-                sphere_intersect_symmetric(sym_surface, center, coil_radius, self.epsilon, &symmetry_plane);
-            let coil_normal = sym_surface.vertices[cid].normal.normalize();
+                sphere_intersect(surface, center, coil_radius, self.epsilon);
+            let coil_normal = surface.vertices[cid].normal.normalize();
 
             if verbose { println!("Uncleaned point count: {}", points.len()) };
 
@@ -579,8 +581,8 @@ impl Method {
 
             // Create the circle through surface intersection with sphere
             let (cid, points, point_normals) =
-                sphere_intersect_symmetric(sym_surface, center, coil_radius, self.epsilon, &symmetry_plane);
-            let coil_normal = sym_surface.vertices[cid].normal.normalize();
+                sphere_intersect(surface, center, coil_radius, self.epsilon);
+            let coil_normal = surface.vertices[cid].normal.normalize();
 
             if verbose { println!("Uncleaned point count: {}", points.len()) };
 
@@ -631,6 +633,7 @@ impl Method {
         on_boundary: &mut Vec::<bool>,
         step_size: f32
     ) -> Vec<CircleArgs> {
+
         let mut new_circles = circles.clone();
         assert!(new_circles.len() == layout_out.coils.len());
 
@@ -652,7 +655,6 @@ impl Method {
             let original_center = original_circles[coil_id].center;
             let mut radius = circles[coil_id].coil_radius;
             let original_radius = original_circles[coil_id].coil_radius;
-
 
             // Check all coils of a higher id than the current coil
             for (other_id, other_coil) in layout_out.coils.iter().enumerate() {
@@ -745,6 +747,7 @@ impl Method {
         on_boundary: &mut Vec::<bool>,
         step_size: f32
     ) -> (Vec<CircleArgs>, Vec<CircleArgs>, Vec<CircleArgs>) {
+
         let mut new_circles = concat(vec![sym_circles.clone(), pos_circles.clone(), neg_circles.clone()]);
 
         // Update the positions
@@ -791,6 +794,7 @@ impl Method {
         on_boundary: &mut Vec::<bool>,
         step_size: f32
     ) -> (Vec<CircleArgs>, f32, usize) {
+
         let mut new_circles = circles.clone();
         assert!(new_circles.len() == layout_out.coils.len());
 
@@ -882,6 +886,7 @@ impl Method {
         on_boundary: &mut Vec::<bool>,
         step_size: f32
     ) -> (Vec<CircleArgs>, Vec<CircleArgs>, Vec<CircleArgs>, f32, usize) {
+
         let mut new_circles = concat(vec![sym_circles.clone(), pos_circles.clone(), neg_circles.clone()]);
 
         let objective;

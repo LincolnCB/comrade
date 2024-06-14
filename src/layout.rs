@@ -90,7 +90,7 @@ impl Coil {
     pub fn wire_length(&self) -> f32 {
         let mut length = 0.0;
         for (id, vertex) in self.vertices.iter().enumerate() {
-            length += vertex.point.distance(&self.vertices[id + 1 % self.vertices.len()].point);
+            length += vertex.point.distance(&self.vertices[(id + 1) % self.vertices.len()].point);
         }
         length
     }
@@ -126,7 +126,7 @@ impl Coil {
         for (id, vertex) in self.vertices.iter().enumerate() {
             // Lay out the first coil segment
             let p0 = vertex.point;
-            let p1 = self.vertices[id + 1 % self.vertices.len()].point;
+            let p1 = self.vertices[(id + 1) % self.vertices.len()].point;
             let np = (p1 - p0).normalize();
             let dp = p0.distance(&p1);
             let i_max = (dp / dl).floor() as u32;
@@ -136,7 +136,7 @@ impl Coil {
             for (other_id, other_vertex) in other.vertices.iter().enumerate() {
                 // Lay out the second coil segment
                 let q0 = other_vertex.point;
-                let q1 = other.vertices[other_id + 1 % other.vertices.len()].point;
+                let q1 = other.vertices[(other_id + 1) % other.vertices.len()].point;
                 let nq = (q1 - q0).normalize();
                 let dq = q0.distance(&q1);
                 let j_max = (dq / dl).floor() as u32;
