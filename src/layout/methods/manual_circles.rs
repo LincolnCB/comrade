@@ -281,25 +281,18 @@ impl methods::LayoutMethodTrait for Method {
                 layout_out.coils.push(coil);
             }
 
-            // Create the coils for the flipped circles
-            for i in 0..pos_circles.len() {
-                println!("Coil {}/{} [negative side of symmetry plane]...", 
-                    (i + sym_circles.len() + pos_circles.len() + 1), total_circle_count);
-                let mut neg_coil = layout_out.coils[sym_circles.len() + i].clone();
-                neg_coil.center = neg_coil.center.reflect_across(&symmetry_plane);
-                neg_coil.normal = neg_coil.normal.reflect_across(&symmetry_plane.get_normal());
-
-                for vertex in neg_coil.vertices.iter_mut() {
-                    vertex.point = vertex.point.reflect_across(&symmetry_plane);
-                    vertex.surface_normal = vertex.surface_normal.reflect_across(&symmetry_plane.get_normal());
-                    vertex.wire_radius_normal = vertex.wire_radius_normal.reflect_across(&symmetry_plane.get_normal());
-                    let temp = vertex.next_id;
-                    vertex.next_id = vertex.prev_id;
-                    vertex.prev_id = temp;
-                }
-
-                layout_out.coils.push(neg_coil);
-            }
+        // Create the coils for the flipped circles
+        for i in 0..pos_circles.len() {
+            let coil = &layout_out.coils[sym_circles.len() + i];
+            let neg_coil = layout::Coil::new(
+                coil.center.reflect_across(&symmetry_plane),
+                coil.normal.reflect_across(&symmetry_plane.get_normal()),
+                coil.vertices.iter().map(|vertex| vertex.point.reflect_across(&symmetry_plane)).rev().collect(),
+                coil.wire_radius,
+                coil.vertices.iter().map(|vertex| vertex.surface_normal.reflect_across(&symmetry_plane.get_normal())).rev().collect()
+            )?;
+            layout_out.coils.push(neg_coil);
+        }
 
             // Collect all the circles
             concat(vec![sym_circles.clone(), pos_circles.clone(), neg_circles.clone()])

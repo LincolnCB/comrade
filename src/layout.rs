@@ -75,14 +75,9 @@ impl Coil {
         let mut coil_vertices = Vec::<CoilVertex>::new();
 
         for (point_id, point) in points.iter().enumerate() {
-            let next_id = (point_id + 1) % points.len();
-            let prev_id = (point_id + points.len() - 1) % points.len();
 
             coil_vertices.push(CoilVertex{
                 point: point.clone(),
-                id: point_id,
-                next_id,
-                prev_id,
                 surface_normal: point_normals[point_id].clone(),
                 wire_radius_normal: point_normals[point_id].clone(),
             });
@@ -94,8 +89,8 @@ impl Coil {
     /// Calculate the wire length of the coil, in mm
     pub fn wire_length(&self) -> f32 {
         let mut length = 0.0;
-        for vertex in self.vertices.iter() {
-            length += vertex.point.distance(&self.vertices[vertex.next_id].point);
+        for (id, vertex) in self.vertices.iter().enumerate() {
+            length += vertex.point.distance(&self.vertices[id + 1 % self.vertices.len()].point);
         }
         length
     }
@@ -128,20 +123,20 @@ impl Coil {
         let mut lambda = 0.0;
         let dl_sq = dl * dl;
 
-        for vertex in self.vertices.iter() {
+        for (id, vertex) in self.vertices.iter().enumerate() {
             // Lay out the first coil segment
             let p0 = vertex.point;
-            let p1 = self.vertices[vertex.next_id].point;
+            let p1 = self.vertices[id + 1 % self.vertices.len()].point;
             let np = (p1 - p0).normalize();
             let dp = p0.distance(&p1);
             let i_max = (dp / dl).floor() as u32;
             let dp_remainder = dp - (i_max as f32) * dl;
             let dp_remainder_normalized = dp_remainder / dp;
 
-            for other_vertex in other.vertices.iter() {
+            for (other_id, other_vertex) in other.vertices.iter().enumerate() {
                 // Lay out the second coil segment
                 let q0 = other_vertex.point;
-                let q1 = other.vertices[other_vertex.next_id].point;
+                let q1 = other.vertices[other_id + 1 % other.vertices.len()].point;
                 let nq = (q1 - q0).normalize();
                 let dq = q0.distance(&q1);
                 let j_max = (dq / dl).floor() as u32;
@@ -196,9 +191,6 @@ impl Coil {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CoilVertex {
     pub point: Point,
-    pub id: usize,
-    pub next_id: usize,
-    pub prev_id: usize,
     pub surface_normal: GeoVector,
     pub wire_radius_normal: GeoVector,
 }

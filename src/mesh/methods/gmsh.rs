@@ -146,7 +146,7 @@ impl methods::MeshMethodTrait for Method {
             let mut distance = 0.0;
             while distance < 2.0 * self.lc {
                 let previously_checked_id = upper_capacitor_break_id;
-                upper_capacitor_break_id = coil.vertices[upper_capacitor_break_id].next_id;
+                upper_capacitor_break_id = upper_capacitor_break_id + 1 % coil.vertices.len();
                 distance += (coil.vertices[upper_capacitor_break_id].point - coil.vertices[previously_checked_id].point).norm();
                 if coil.breaks.len() > 1 && upper_capacitor_break_id == coil.breaks[0] {
                     mesh::err_str("Math error: Nearby capacitor break (positive idx direction) not found before first break -- lc too large")?;
@@ -158,7 +158,7 @@ impl methods::MeshMethodTrait for Method {
             let mut distance = 0.0;
             while distance < 2.0 * self.lc {
                 let previously_checked_id = lower_capacitor_break_id;
-                lower_capacitor_break_id = coil.vertices[lower_capacitor_break_id].prev_id;
+                lower_capacitor_break_id = lower_capacitor_break_id - 1 % coil.vertices.len();
                 distance += (coil.vertices[lower_capacitor_break_id].point - coil.vertices[previously_checked_id].point).norm();
                 if coil.breaks.len() > 1 && lower_capacitor_break_id == coil.breaks[coil.breaks.len() - 1] {
                     mesh::err_str("Math error: Nearby capacitor break (negative idx direction) not found before last break -- lc too large")?;
