@@ -302,13 +302,27 @@ impl methods::LayoutMethodTrait for Method {
             crate::io::save_ser_to(output_path, &centers)?;
         }
 
+
         // Map to circles
-        let circles = centers.iter().map(|c| Circle{
-            center: *c, 
-            coil_radius: radius, 
-            break_count: Circle::default_break_count(),
-            break_angle_offset: Circle::default_break_angle_offset(),
-        }).collect();
+        let circles = if let Some(symmetry_plane) = &self.symmetry_plane {
+            centers.iter()
+            .filter(|c| symmetry_plane.distance_to_point(c) >= -1e-6)
+            .map(|c| Circle{
+                center: *c, 
+                coil_radius: radius, 
+                break_count: Circle::default_break_count(),
+                break_angle_offset: Circle::default_break_angle_offset(),
+                on_symmetry_plane: symmetry_plane.distance_to_point(c).abs() < 1e-6,
+            }).collect()
+        } else {
+            centers.iter().map(|c| Circle{
+                center: *c, 
+                coil_radius: radius, 
+                break_count: Circle::default_break_count(),
+                break_angle_offset: Circle::default_break_angle_offset(),
+                on_symmetry_plane: false,
+            }).collect()
+        };
 
         let iterations = if self.visualize { 0 } else { self.iterations };
         if iterations != self.iterations {
@@ -317,6 +331,8 @@ impl methods::LayoutMethodTrait for Method {
 
         // Create method
         let method = AlternatingCirclesMethod{
+            symmetry_plane: self.symmetry_plane,
+
             circles,
             epsilon: self.epsilon,
             pre_shift: self.pre_shift,

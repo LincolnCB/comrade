@@ -1,6 +1,6 @@
 /*!
-*   Alternating Circles Method with Symmetry
-*   Inclusion of Symmetry Plane assumes that the surface is roughly symmetric about the plane.
+*   Alternating Circles Method
+*
 *
 !*/
 
@@ -16,17 +16,12 @@ use methods::helper::{
 };
 
 use serde::{Serialize, Deserialize};
-use itertools::concat;
 
 /// Alternating Circles Method struct.
 /// This struct contains all the parameters for the Alternating Circles layout method.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Method {
-    // Optional symmetry plane
-    #[serde(default = "Method::default_symmetry_plane", alias = "plane")]
-    symmetry_plane: Option<Plane>,
-
     // Circle intersection parameters
     pub circles: Vec<CircleArgs>,
     #[serde(default = "Method::default_epsilon")]
@@ -73,13 +68,6 @@ pub struct Method {
     pub final_cfg_output: Option<String>,
 }
 impl Method {
-    pub fn example_symmetry_plane() -> Option<Plane> {
-        Some(Plane::from_normal_and_offset(GeoVector::xhat(), 0.0))
-    }
-    pub fn default_symmetry_plane() -> Option<Plane> {
-        None
-    }
-
     pub fn default_epsilon() -> f32 {
         0.15
     }
@@ -132,9 +120,6 @@ impl Method {
         false
     }
 
-    pub fn example_final_cfg_output() -> Option<String> {
-        Some("PATH/TO/FINAL/CFG.[json|yaml|toml]".to_string())
-    }
     pub fn default_final_cfg_output() -> Option<String> {
         None
     }
@@ -142,8 +127,6 @@ impl Method {
 impl Default for Method{
     fn default() -> Self {
         Method{
-            symmetry_plane: Self::example_symmetry_plane(),
-
             circles: vec![CircleArgs::default(); 2],
             epsilon: Self::default_epsilon(),
             pre_shift: Self::default_pre_shift(),
@@ -165,9 +148,10 @@ impl Default for Method{
             warn_on_shift: Self::default_warn_on_shift(),
             statistics: Self::default_statistics(),
 
-            final_cfg_output: Self::example_final_cfg_output(),
+            final_cfg_output: Self::default_final_cfg_output(),
         }
     }
+
 }
 
 /// Single element arguments
@@ -180,8 +164,6 @@ pub struct CircleArgs {
     pub break_count: usize,
     #[serde(default = "CircleArgs::default_break_angle_offset", alias = "angle")]
     pub break_angle_offset: f32,
-    #[serde(default = "CircleArgs::default_on_symmetry_plane", alias = "on_sym")]
-    on_symmetry_plane: bool,
 }
 impl CircleArgs {
     fn default() -> Self {
@@ -190,7 +172,6 @@ impl CircleArgs {
             center: Self::default_center(),
             break_count: Self::default_break_count(),
             break_angle_offset: Self::default_break_angle_offset(),
-            on_symmetry_plane: Self::default_on_symmetry_plane(),
         }
     }
     pub fn default_coil_radius() -> f32 {
@@ -205,69 +186,21 @@ impl CircleArgs {
     pub fn default_break_angle_offset() -> f32 {
         0.0
     }
-    pub fn default_on_symmetry_plane() -> bool {
-        false
-    }
 }
 
 impl methods::LayoutMethodTrait for Method {
     /// Get the name of the layout method.
     fn get_method_display_name(&self) -> &'static str {
-        "Alternating Circles (Optional Symmetry)"
+        "Alternating Circles"
     }
 
     fn do_layout(&self, surface: &Surface) -> layout::ProcResult<layout::Layout> {
 
-        // Initialize potential symmetrical circles
-        let mut sym_circles = Vec::<CircleArgs>::new();
-        let mut pos_circles = Vec::<CircleArgs>::new();
-        let mut neg_circles = Vec::<CircleArgs>::new();
-
-        // Collect and clone the circles, with extra effort for symmetry
-        let original_circles = if let Some(symmetry_plane) = &self.symmetry_plane {
-            // Separate the coils by their symmetry
-            for (circle_num, circle) in self.circles.iter().enumerate() {
-                if circle.on_symmetry_plane {
-                    // Make sure the circle is on the symmetry plane
-                    let mut circle = circle.clone();
-                    if symmetry_plane.distance_to_point(&circle.center).abs() > self.epsilon {
-                        println!("WARNING: Circle {} more than epsilon ({}) from symmetry plane, moving to symmetry plane", circle_num, self.epsilon);
-                    }
-                    circle.center = symmetry_plane.project_point(&circle.center);
-                    sym_circles.push(circle);
-                } else {
-                    // Make sure the circle is on the right side of the symmetry plane
-                    let mut circle = circle.clone();
-                    if symmetry_plane.distance_to_point(&circle.center) < 0.0 {
-                        println!("WARNING: Circle {} on wrong side of symmetry plane, flipping", circle_num);
-                        circle.center = circle.center.reflect_across(&symmetry_plane);
-                    }
-                    if symmetry_plane.distance_to_point(&circle.center).abs() < self.epsilon {
-                        println!("WARNING: Circle {} close to symmetry plane, may cause issues", circle_num);
-                    }
-                    pos_circles.push(circle);
-
-                    // Add the flipped circle
-                    let mut neg_circle = circle.clone();
-                    neg_circle.center = neg_circle.center.reflect_across(&symmetry_plane);
-                    neg_circles.push(neg_circle);
-                }
-            }
-
-            // Collect all the circles
-            concat(vec![sym_circles.clone(), pos_circles.clone(), neg_circles.clone()])
-        } else {
-            // Copy the circles
-            self.circles.clone()
-        };
-
-        let mut new_circles = original_circles.clone();
+        // Clone the circles
+        let mut new_circles = self.circles.clone();
 
         // Store boundary points
-        let boundary_points: Vec<Point> = surface.get_boundary_vertex_indices().iter()
-            .map(|v| surface.vertices[*v].point).collect();
-
-        println!("Boundary point count: {}", boundary_points.len());
+        let boundary_points: Vec<Point> = surface.get_boundary_vertex_indices().iter().map(|v| surface.vertices[*v].point).collect();
 
         // Store if the coils are on the boundary
         let mut on_boundary = vec![false; new_circles.len()];
@@ -308,17 +241,7 @@ impl methods::LayoutMethodTrait for Method {
         }
             
         // Run a single pass
-        let mut layout_out = if let Some(symmetry_plane) = &self.symmetry_plane {
-            self.lay_out_coils_sym(
-                surface,
-                symmetry_plane,
-                &sym_circles,
-                &pos_circles,
-                &neg_circles,
-                false)?
-        } else {
-            self.lay_out_coils(surface, &new_circles, false)?
-        };
+        let mut layout_out = self.single_pass(surface, &new_circles, false)?;
 
         // Iterate to automatically decouple
         let mut new_close_coils;
@@ -329,74 +252,26 @@ impl methods::LayoutMethodTrait for Method {
             // Generate step size -- linear decrease currently. TODO Probably should be exponential.
             let step_size = self.initial_step / (1.0 + self.step_decrease * i as f32);
 
-            if let Some(symmetry_plane) = &self.symmetry_plane {
-                // Update positions
-                (sym_circles, pos_circles, neg_circles) = self.update_positions_sym(
-                    &sym_circles,
-                    &pos_circles,
-                    &neg_circles,
-                    &original_circles,
-                    &layout_out,
-                    surface,
-                    symmetry_plane,
-                    &boundary_points,
-                    &mut on_boundary,
-                    step_size
-                );
-                layout_out = self.lay_out_coils_sym(
-                    surface,
-                    symmetry_plane,
-                    &sym_circles,
-                    &pos_circles,
-                    &neg_circles,
-                    false
-                )?;
-                    
-                // Update radii
-                (sym_circles, pos_circles, neg_circles, objective, new_close_coils) = self.update_radii_sym(
-                    &sym_circles,
-                    &pos_circles,
-                    &neg_circles,
-                    &original_circles,
-                    &layout_out,
-                    &boundary_points,
-                    &mut on_boundary,
-                    step_size
-                );
-                layout_out = self.lay_out_coils_sym(
-                    surface,
-                    symmetry_plane,
-                    &sym_circles,
-                    &pos_circles,
-                    &neg_circles,
-                    false
-                )?;
+            // Update positions
+            new_circles = self.update_positions(
+                &new_circles,
+                &layout_out,
+                surface,
+                &boundary_points,
+                &mut on_boundary,
+                step_size
+            );
+            layout_out = self.single_pass(surface, &new_circles, false)?;
 
-
-            } else {
-                // Update positions
-                new_circles = self.update_positions(
-                    &new_circles,
-                    &original_circles,
-                    &layout_out,
-                    surface,
-                    &boundary_points,
-                    &mut on_boundary,
-                    step_size
-                );
-                layout_out = self.lay_out_coils(surface, &new_circles, false)?;
-    
-                // Update radii
-                (new_circles, objective, new_close_coils) = self.update_radii(
-                    &new_circles,
-                    &original_circles,
-                    &layout_out,
-                    &boundary_points,
-                    &mut on_boundary,
-                    step_size
-                );
-                layout_out = self.lay_out_coils(surface, &new_circles, false)?;
-            }
+            // Update radii
+            (new_circles, objective, new_close_coils) = self.update_radii(
+                &new_circles,
+                &layout_out,
+                &boundary_points,
+                &mut on_boundary,
+                step_size
+            );
+            layout_out = self.single_pass(surface, &new_circles, false)?;
 
             // Print statistics
             println!("Objective: {:.2}", (objective / new_close_coils as f32).sqrt());
@@ -482,15 +357,14 @@ impl methods::LayoutMethodTrait for Method {
 
 impl Method {
 
-    /// Do a single pass of spherical intersection on the circles
-    fn lay_out_coils(
-        &self,
-        surface: &Surface,
-        circles: &Vec::<CircleArgs>,
-        verbose: bool
-    ) -> layout::ProcResult<layout::Layout> {
-
+    /// Do a single pass of the alternating circles method
+    fn single_pass(&self, surface: &Surface, circles: &Vec::<CircleArgs>, verbose: bool) -> layout::ProcResult<layout::Layout> {
         let mut layout_out = layout::Layout::new();
+
+        // Iterate through the circles
+        let wire_radius = self.wire_radius;
+        let epsilon = self.epsilon;
+        let pre_shift = self.pre_shift;
 
         for (coil_id, circle_args) in circles.iter().enumerate() {
 
@@ -506,18 +380,14 @@ impl Method {
             let center = circle_args.center - vec_to_surface;
 
             // Create the circle through surface intersection with sphere
-            let (cid, points, point_normals) = sphere_intersect(surface, center, coil_radius, self.epsilon);
+            let (cid, points, point_normals) = sphere_intersect(surface, center, coil_radius, epsilon);
             let coil_normal = surface.vertices[cid].normal;
 
             let coil = clean_coil_by_angle(
-                center,
-                coil_normal,
-                coil_radius, 
-                self.wire_radius,
-                points,
-                point_normals,
-                self.pre_shift,
-                false
+                center, coil_normal,
+                coil_radius, wire_radius,
+                points, point_normals,
+                pre_shift, false
             )?;
 
             layout_out.coils.push(coil);
@@ -529,111 +399,15 @@ impl Method {
         Ok(layout_out)
     }
 
-    /// Do a single pass of symmetric coil intersection
-    fn lay_out_coils_sym(
-        &self, 
-        surface: &Surface, 
-        symmetry_plane: &Plane,
-        sym_circles: &Vec::<CircleArgs>, 
-        pos_circles: &Vec::<CircleArgs>, 
-        neg_circles: &Vec::<CircleArgs>, 
-        verbose: bool
-    ) -> layout::ProcResult<layout::Layout> {
-
-        let mut layout_out = layout::Layout::new();
-
-        // Create the coils for the on-symmetry circles
-        for (_, circle_args) in sym_circles.iter().enumerate() {
-            
-            // Grab arguments from the circle arguments
-            let coil_radius = circle_args.coil_radius;
-            let center = circle_args.center;
-
-            // Create the circle through surface intersection with sphere
-            let (cid, points, point_normals) =
-                sphere_intersect(surface, center, coil_radius, self.epsilon);
-            let coil_normal = surface.vertices[cid].normal.normalize();
-
-            if verbose { println!("Uncleaned point count: {}", points.len()) };
-
-            let coil = clean_coil_by_angle(
-                center,
-                coil_normal,
-                coil_radius,
-                self.wire_radius,
-                points,
-                point_normals,
-                self.pre_shift,
-                false
-            )?;
-    
-            if verbose { println!("Cleaned point count: {}", coil.vertices.len()) };
-    
-            layout_out.coils.push(coil);
-        }
-
-        // Create the coils for the positive circles
-        for (_, circle_args) in pos_circles.iter().enumerate() {
-            
-            // Grab arguments from the circle arguments
-            let coil_radius = circle_args.coil_radius;
-            let center = circle_args.center;
-
-            // Create the circle through surface intersection with sphere
-            let (cid, points, point_normals) =
-                sphere_intersect(surface, center, coil_radius, self.epsilon);
-            let coil_normal = surface.vertices[cid].normal.normalize();
-
-            if verbose { println!("Uncleaned point count: {}", points.len()) };
-
-            let coil = clean_coil_by_angle(
-                center,
-                coil_normal,
-                coil_radius,
-                self.wire_radius,
-                points,
-                point_normals,
-                self.pre_shift,
-                false
-            )?;
-    
-            if verbose { println!("Cleaned point count: {}", coil.vertices.len()) };
-    
-            layout_out.coils.push(coil);
-        }
-
-        // Create the coils for the flipped circles
-        for i in 0..pos_circles.len() {
-            let coil = &layout_out.coils[sym_circles.len() + i];
-            let neg_coil = layout::Coil::new(
-                coil.center.reflect_across(&symmetry_plane),
-                coil.normal.reflect_across(&symmetry_plane.get_normal()),
-                coil.vertices.iter().map(|vertex| vertex.point.reflect_across(&symmetry_plane)).rev().collect(),
-                coil.wire_radius,
-                coil.vertices.iter().map(|vertex| vertex.surface_normal.reflect_across(&symmetry_plane.get_normal())).rev().collect()
-            )?;
-            layout_out.coils.push(neg_coil);
-        }
-
-        // Do overlaps
-        let circles = concat(vec![sym_circles.clone(), pos_circles.clone(), neg_circles.clone()]);
-        self.mousehole_overlap(&mut layout_out, &circles);
-
-        Ok(layout_out)
-    }
-
     /// Update the positions of the circles
-    fn update_positions(
-        &self, 
+    fn update_positions(&self, 
         circles: &Vec::<CircleArgs>,
-        original_circles: &Vec::<CircleArgs>,
         layout_out: &layout::Layout,
         surface: &Surface,
         boundary_points: &Vec::<Point>,
         on_boundary: &mut Vec::<bool>,
         step_size: f32
     ) -> Vec<CircleArgs> {
-
         let mut new_circles = circles.clone();
         assert!(new_circles.len() == layout_out.coils.len());
 
@@ -643,8 +417,8 @@ impl Method {
         let mut radial_err = vec![0.0; layout_out.coils.len()];
         let mut rel_radial_err = vec![0.0; layout_out.coils.len()];
         for (coil_id, circle) in circles.iter().enumerate() {
-            radial_err[coil_id] = circle.coil_radius - original_circles[coil_id].coil_radius;
-            rel_radial_err[coil_id] = radial_err[coil_id] / original_circles[coil_id].coil_radius;
+            radial_err[coil_id] = circle.coil_radius - self.circles[coil_id].coil_radius;
+            rel_radial_err[coil_id] = radial_err[coil_id] / self.circles[coil_id].coil_radius;
         }
 
         // Calculate the forces on each coil
@@ -652,9 +426,10 @@ impl Method {
 
             // Get the parameters that will shift, and their original values
             let mut center = coil.center;
-            let original_center = original_circles[coil_id].center;
+            let original_center = self.circles[coil_id].center;
             let mut radius = circles[coil_id].coil_radius;
-            let original_radius = original_circles[coil_id].coil_radius;
+            let original_radius = self.circles[coil_id].coil_radius;
+
 
             // Check all coils of a higher id than the current coil
             for (other_id, other_coil) in layout_out.coils.iter().enumerate() {
@@ -731,70 +506,16 @@ impl Method {
         // Return the updated circles
         new_circles
     }
-    
-    /// Update the positions of the circles with symmetry
-    /// Returns the symmetric, positive, and negative circles
-    fn update_positions_sym(
-        &self,
-        sym_circles: &Vec::<CircleArgs>,
-        pos_circles: &Vec::<CircleArgs>,
-        neg_circles: &Vec::<CircleArgs>,
-        original_circles: &Vec::<CircleArgs>,
-        layout_out: &layout::Layout,
-        surface: &Surface,
-        symmetry_plane: &Plane,
-        boundary_points: &Vec::<Point>,
-        on_boundary: &mut Vec::<bool>,
-        step_size: f32
-    ) -> (Vec<CircleArgs>, Vec<CircleArgs>, Vec<CircleArgs>) {
-
-        let mut new_circles = concat(vec![sym_circles.clone(), pos_circles.clone(), neg_circles.clone()]);
-
-        // Update the positions
-        new_circles = self.update_positions(&new_circles, original_circles, layout_out, surface, boundary_points, on_boundary, step_size);
-
-        // Split the circles back into their respective groups
-        let mut new_sym_circles = Vec::<CircleArgs>::new();
-        let mut new_pos_circles = Vec::<CircleArgs>::new();
-        let mut new_neg_circles = Vec::<CircleArgs>::new();
-        for (i, circle) in new_circles.iter().enumerate() {
-            if i < sym_circles.len() {
-                new_sym_circles.push(*circle);
-            } else if i < sym_circles.len() + pos_circles.len() {
-                new_pos_circles.push(*circle);
-            } else {
-                new_neg_circles.push(*circle);
-            }
-        }
-
-        // Project the symmetric circles onto the symmetry plane, then again onto the surface
-        for circle in new_sym_circles.iter_mut() {
-            circle.center = symmetry_plane.project_point(&circle.center);
-            circle.center = circle.center - (&circle.center - surface).rej_onto(&symmetry_plane.get_normal());
-        }
-
-        // Average the positive and negative circles (flipped) to keep them symmetric
-        for (pos_circle, neg_circle) in new_pos_circles.iter_mut().zip(new_neg_circles.iter_mut()) {
-            pos_circle.center = ((GeoVector::from(pos_circle.center) + GeoVector::from(neg_circle.center.reflect_across(&symmetry_plane))) / 2.0).into();
-            neg_circle.center = pos_circle.center.reflect_across(&symmetry_plane);
-        }
-
-        // Return the updated circles
-        (new_sym_circles, new_pos_circles, new_neg_circles)
-    }
 
     /// Update the radii of the circles
-    /// Returns the updated circles, the objective function, and the number of close coils
     fn update_radii(
         &self,
         circles: &Vec::<CircleArgs>,
-        original_circles: &Vec::<CircleArgs>,
         layout_out: &layout::Layout,
         boundary_points: &Vec::<Point>,
         on_boundary: &mut Vec::<bool>,
         step_size: f32
     ) -> (Vec<CircleArgs>, f32, usize) {
-
         let mut new_circles = circles.clone();
         assert!(new_circles.len() == layout_out.coils.len());
 
@@ -807,7 +528,7 @@ impl Method {
         let mut min_radii = vec![0.0; layout_out.coils.len()];
         let mut max_radii = vec![0.0; layout_out.coils.len()];
         for (coil_id, circle) in circles.iter().enumerate() {
-            let original_radius = original_circles[coil_id].coil_radius;
+            let original_radius = self.circles[coil_id].coil_radius;
             rel_radial_err[coil_id] = (circle.coil_radius - original_radius) / original_radius;
             min_radii[coil_id] = original_radius * (1.0 - self.radius_freedom);
             max_radii[coil_id] = original_radius * (1.0 + self.radius_freedom);
@@ -872,51 +593,7 @@ impl Method {
 
         (new_circles, objective, close_coils)
     }
-
-    /// Update the radii of the circles with symmetry
-    /// Returns the symmetric, positive, and negative circles; the objective function; and the number of close coils
-    fn update_radii_sym(
-        &self,
-        sym_circles: &Vec::<CircleArgs>,
-        pos_circles: &Vec::<CircleArgs>,
-        neg_circles: &Vec::<CircleArgs>,
-        original_circles: &Vec::<CircleArgs>,
-        layout_out: &layout::Layout,
-        boundary_points: &Vec::<Point>,
-        on_boundary: &mut Vec::<bool>,
-        step_size: f32
-    ) -> (Vec<CircleArgs>, Vec<CircleArgs>, Vec<CircleArgs>, f32, usize) {
-
-        let mut new_circles = concat(vec![sym_circles.clone(), pos_circles.clone(), neg_circles.clone()]);
-
-        let objective;
-        let close_coils;
-
-        (new_circles, objective, close_coils) = self.update_radii(&new_circles, original_circles, layout_out, boundary_points, on_boundary, step_size);
-
-        // Split the circles back into their respective groups
-        let mut new_sym_circles = Vec::<CircleArgs>::new();
-        let mut new_pos_circles = Vec::<CircleArgs>::new();
-        let mut new_neg_circles = Vec::<CircleArgs>::new();
-        for (i, circle) in new_circles.iter().enumerate() {
-            if i < sym_circles.len() {
-                new_sym_circles.push(*circle);
-            } else if i < sym_circles.len() + pos_circles.len() {
-                new_pos_circles.push(*circle);
-            } else {
-                new_neg_circles.push(*circle);
-            }
-        }
-
-        // Average the positive and negative circles (flipped) to keep them symmetric
-        for (pos_circle, neg_circle) in new_pos_circles.iter_mut().zip(new_neg_circles.iter_mut()) {
-            pos_circle.coil_radius = (pos_circle.coil_radius + neg_circle.coil_radius) / 2.0;
-            neg_circle.coil_radius = pos_circle.coil_radius;
-        }
-
-        // Return the updated circles
-        (new_sym_circles, new_pos_circles, new_neg_circles, objective, close_coils)
-    }
+        
 
     /// Do overlaps between the coils
     fn mousehole_overlap(&self, layout_out: &mut layout::Layout, circles: &Vec::<CircleArgs>) {

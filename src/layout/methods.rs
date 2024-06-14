@@ -29,7 +29,6 @@ mod single_circle;
 mod manual_circles;
 mod iterative_circles;
 mod alternating_circles;
-mod alternating_symmetric;
 mod k_means_isometric;
 
 /// Layout methods enum.
@@ -54,13 +53,13 @@ pub enum MethodEnum {
     #[serde(rename = "iterative_circles")]
     IterativeCircles(iterative_circles::Method),
 
-    /// Alternating circles layout, alternating between radius and position optimization.
-    #[serde(rename = "alternating_circles")]
-    AlternatingCircles(alternating_circles::Method),
+    // /// Alternating circles layout, alternating between radius and position optimization.
+    // #[serde(rename = "alternating_circles")]
+    // AlternatingCircles(alternating_circles::Method),
 
     /// Alternating symmetric circles layout, alternating between radius and position optimization with symmetry.
-    #[serde(rename = "alternating_symmetric")]
-    AlternatingSymmetric(alternating_symmetric::Method),
+    #[serde(rename = "alternating_circles")]
+    AlternatingCircles(alternating_circles::Method),
 
     /// K-means isometric layout, for clustering points and creating circles from the clusters.
     #[serde(rename = "k_means_isometric")]
