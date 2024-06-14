@@ -55,62 +55,6 @@ pub fn sphere_intersect(
     (cid, new_points, new_normals)
 }
 
-/// Find the points on a surface that intersect a sphere, with a symmetry plane.
-/// Takes a half-surface and a symmetry plane, as well as a center point on the right side of the plane.
-/// Returns the id of the point closest to the center,
-/// a vector of the intersected points, and the normals at those points.
-pub fn sphere_intersect_symmetric(
-    surface: &Surface,
-    center: Point,
-    radius: f32,
-    epsilon: f32,
-    symmetry_plane: &Plane,
-) -> (usize, Vec::<Point>, Vec::<GeoVector>) {
-    assert!(symmetry_plane.distance_to_point(&center) >= 0.0);
-
-    // Initialize the return values
-    let mut new_points = Vec::<Point>::new();
-    let mut new_normals = Vec::<GeoVector>::new();
-
-    let mut cid = 0;
-    let mut min_dist_to_center = surface.vertices[0].point.distance(&center);
-
-    // For each point in the surface
-    for (point_id, surface_vertex) in surface.vertices.iter().enumerate() {
-        let point = surface_vertex.point;
-
-        // If the distance is within epsilon of the radius
-        if (radius - point.distance(&center)).abs() <= epsilon {
-            // Add the point to the new points list
-            new_points.push(point);
-
-            // Add the point's normal to the new normals list
-            new_normals.push(surface.vertices[point_id].normal.normalize());
-        }
-        if (radius - point.reflect_across(&symmetry_plane).distance(&center)).abs() <= epsilon {
-            // Add the point to the new points list
-            new_points.push(point.reflect_across(&symmetry_plane));
-
-            // Flip the normal and add it to the new normals list
-            new_normals.push(surface.vertices[point_id].normal.reflect_across(&symmetry_plane.get_normal()));
-        }
-
-        // Track the closest point to the center
-        if point.distance(&center) < min_dist_to_center {
-            min_dist_to_center = point.distance(&center);
-            cid = point_id;
-        }
-    }
-
-    if new_normals.iter().any(|n| n.has_nan()) {
-        println!("Normals: {:?}", new_normals);
-        panic!("BUG! helper::sphere_intersect_symmetric: NaN normal found in new_normals");
-    }
-
-    // Return the center id, new points, and new normals
-    (cid, new_points, new_normals)
-}
-
 /// Clean a set of points by filtering
 #[allow(dead_code)]
 pub fn clean_coil_by_angle(

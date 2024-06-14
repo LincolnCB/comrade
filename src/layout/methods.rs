@@ -25,9 +25,6 @@ pub mod helper;
 //
 
 // Add the source module for the layout methods here
-mod single_circle;
-mod manual_circles;
-mod iterative_circles;
 mod alternating_circles;
 mod k_means_isometric;
 
@@ -40,22 +37,6 @@ mod k_means_isometric;
 #[enum_dispatch(LayoutMethodTrait)]
 #[serde(tag = "name", content = "args")]
 pub enum MethodEnum {
-
-    /// Basic circular layout, based on Monika Sliwak's MATLAB prototype.
-    #[serde(rename = "single_circle")]
-    SingleCircle(single_circle::Method),
-
-    /// Manual circles layout with optional symmetry plane. 
-    #[serde(rename = "manual_circles")]
-    ManualCircles(manual_circles::Method),
-
-    /// Iterative circles layout, for specifying multiple circles by hand and doing local optimization.
-    #[serde(rename = "iterative_circles")]
-    IterativeCircles(iterative_circles::Method),
-
-    // /// Alternating circles layout, alternating between radius and position optimization.
-    // #[serde(rename = "alternating_circles")]
-    // AlternatingCircles(alternating_circles::Method),
 
     /// Alternating symmetric circles layout, alternating between radius and position optimization with symmetry.
     #[serde(rename = "alternating_circles")]
