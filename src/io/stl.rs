@@ -102,12 +102,12 @@ pub fn load_stl(filename: &str) -> io::IoResult<Surface>{
         let area = (s * (s - a) * (s - b) * (s - c)).sqrt();
 
         surface.faces.push(
-            SurfaceFace{
-                vertices: face_vertices,
-                edges: face_edges,
-                normal: face_normal,
+            SurfaceFace::new(
+                face_vertices,
+                face_edges,
+                face_normal,
                 area,
-            }
+            )
         );
     }
 
@@ -135,7 +135,7 @@ pub fn load_stl(filename: &str) -> io::IoResult<Surface>{
         for edge_index in vertex.adj_edges.iter() {
             let edge = &surface.edges[*edge_index];
             let face = &surface.faces[edge.adj_faces[0].unwrap()];
-            normal += face.normal;
+            normal += face.get_normal();
         }
         vertex.normal = normal.normalize();
     }
@@ -164,7 +164,7 @@ pub fn save_stl_from_surface(surface: &Surface, output_path: &str) -> io::IoResu
         let v0 = &surface.vertices[face.vertices[0]].point;
         let v1 = &surface.vertices[face.vertices[1]].point;
         let v2 = &surface.vertices[face.vertices[2]].point;
-        let normal = face.normal;
+        let normal = face.get_normal();
         triangles.push(stl_io::Triangle{
             normal: stl_io::Normal::new([normal.x, normal.y, normal.z]),
             vertices: [
