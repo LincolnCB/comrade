@@ -196,7 +196,8 @@ impl SurfaceVertex {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone)]
+#[derive(PartialEq)]
 pub struct SurfaceEdge {
     pub vertices: [usize; 2],
     pub adj_faces: [Option::<usize>; 2],

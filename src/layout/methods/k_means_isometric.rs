@@ -19,7 +19,8 @@ use serde::{Serialize, Deserialize};
 
 /// Alternating Circles Method struct.
 /// This struct contains all the parameters for the Alternating Circles layout method.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug)]
+#[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Method {
     // K-means parameters

@@ -7,7 +7,8 @@ use layout::LayoutMethodTrait;
 use serde::{Serialize, Deserialize};
 
 /// Layout target struct. Includes the layout method, method arguments, and general i/o arguments.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
+#[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LayoutTarget {   
     /// Input path for the STL file.

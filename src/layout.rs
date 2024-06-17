@@ -27,7 +27,8 @@ pub use methods::{
 /// Layout struct.
 /// This struct contains all the necessary results from the layout process.
 /// Returned from the layout process, used as input to the matching process.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
+#[derive(Serialize, Deserialize)]
 pub struct Layout {
     pub coils: Vec<Coil>,
 }
@@ -40,7 +41,8 @@ impl Layout {
 
 /// A coil.
 /// Contains a list of points.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize)]
 #[allow(dead_code)]
 pub struct Coil {
     pub center: Point,
@@ -188,7 +190,8 @@ impl Coil {
 }
 
 /// A point on a coil (includes adjacency and surface vectors).
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize)]
 pub struct CoilVertex {
     pub point: Point,
     pub surface_normal: GeoVector,

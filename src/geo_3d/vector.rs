@@ -11,7 +11,8 @@ use crate::geo_3d::{Angle, Point};
 
 /// A vector in 3D space.
 /// Used for the normal vector of a point.
-#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize)]
 pub struct GeoVector {
     pub x: f32,
     pub y: f32,

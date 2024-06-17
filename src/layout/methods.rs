@@ -32,7 +32,8 @@ mod k_means_isometric;
 /// To add a new method:
 /// include it here
 /// and make sure the source implements the `LayoutMethodTrait` trait.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Debug)]
+#[derive(Serialize, Deserialize)]
 #[derive(EnumIter)]
 #[enum_dispatch(LayoutMethodTrait)]
 #[serde(tag = "name", content = "args")]

@@ -28,7 +28,8 @@ mod load_marie_output;
 /// To add a new method:
 /// include it here
 /// and make sure the source implements the `SimMethodTrait` trait.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize)]
 #[derive(EnumIter)]
 #[enum_dispatch(SimMethodTrait)]
 #[serde(tag = "name", content = "args")]

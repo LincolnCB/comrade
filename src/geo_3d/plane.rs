@@ -5,7 +5,8 @@ use crate::geo_3d::{Point, GeoVector};
 
 /// A plane in 3D space.
 /// Contains a normal vector and an offset.
-#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize)]
 pub struct Plane {
     normal: GeoVector,
     pub offset: f32,

@@ -6,7 +6,8 @@ use serde::{Serialize, Deserialize};
 
 /// Method struct for "simulation" by just loading previously calculated MARIE output.
 /// This struct contains all the parameters needed to load a MARIE output file.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Method {
     // No fields yet

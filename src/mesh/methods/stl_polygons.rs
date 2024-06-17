@@ -11,7 +11,8 @@ use std::f32::consts::PI;
 
 /// STL Polygons Method struct.
 /// This struct contains all the parameters for the STL Polygons meshing method.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Method {
     #[serde(default = "Method::default_radius_offset", alias = "offset")]

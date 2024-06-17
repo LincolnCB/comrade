@@ -20,7 +20,8 @@ use itertools::concat;
 
 /// Alternating Circles Method struct.
 /// This struct contains all the parameters for the Alternating Circles layout method.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug)]
+#[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Method {
     // Optional symmetry plane
@@ -171,7 +172,8 @@ impl Default for Method{
 }
 
 /// Single element arguments
-#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize)]
 pub struct CircleArgs {
     pub center: Point,
     #[serde(default = "CircleArgs::default_coil_radius", alias = "radius")]

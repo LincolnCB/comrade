@@ -7,7 +7,8 @@ use crate::sim::SimMethodTrait;
 use serde::{Serialize, Deserialize};
 
 /// Simulation target struct. Includes the simulation method and method arguments, as well as general i/o arguments.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
+#[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SimTarget {
     /// Input path for the simulation file.

@@ -33,7 +33,8 @@ mod gmsh;
 /// To add a new method:
 /// include it here
 /// and make sure the source implements the `MeshMethodTrait` trait.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize)]
 #[derive(EnumIter)]
 #[enum_dispatch(MeshMethodTrait)]
 #[serde(tag = "name", content = "args")]

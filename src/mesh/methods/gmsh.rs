@@ -14,7 +14,8 @@ use std::f32::consts::PI;
 
 /// GMSH Method struct.
 /// This struct contains all the parameters for the GMSH meshing method.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Method {
     #[serde(default = "Method::default_single_surface")]

@@ -10,7 +10,8 @@ use crate::geo_3d::{GeoVector, Plane, Surface};
 /// A point in 3D space.
 /// Contains the coordinates of the point.
 /// Has basic math support for adding and subtracting vectors.
-#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize)]
 pub struct Point {
     pub x: f32,
     pub y: f32,

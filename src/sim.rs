@@ -20,7 +20,8 @@ pub use methods::{
 /// Simulation output struct.
 /// This struct contains all the necessary results from the simulation process.
 /// Returned from the simulation process, used as input to the matching process.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
+#[derive(Serialize, Deserialize)]
 pub struct SimOutput {
     pub coil_values: Vec<CoilRLC>,
 }
@@ -33,7 +34,8 @@ impl SimOutput {
 
 /// Coil RLC values struct.
 /// This struct contains the resistance, inductance, and capacitance values for a coil.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
+#[derive(Serialize, Deserialize)]
 pub struct CoilRLC {
     pub resistance: f64,
     pub inductance: f64,

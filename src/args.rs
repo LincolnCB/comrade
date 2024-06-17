@@ -16,7 +16,8 @@ pub use proc_errors::{
 };
 
 /// Constrained Optimization for Magnetic Resonance Array Design tool.
-#[derive(Debug, Parser)]
+#[derive(Debug)]
+#[derive(Parser)]
 #[clap(
     version,
     name = "comrade",
@@ -34,7 +35,8 @@ pub struct ComradeCli {
     pub subcommand: SubCommand,
 }
 
-#[derive(Debug, Clone, Subcommand)]
+#[derive(Debug, Clone)]
+#[derive(Subcommand)]
 pub enum SubCommand {
     /// Run the comrade process.
     #[command(name = "run")]
@@ -45,7 +47,8 @@ pub enum SubCommand {
 }
 
 /// Run command arguments.
-#[derive(Debug, Args, Clone)]
+#[derive(Debug, Clone)]
+#[derive(Args)]
 pub struct RunArgs {
     pub start_stage: RunStage,
     
@@ -73,7 +76,8 @@ pub struct RunArgs {
     pub matching_cfg: Option<String>,
 }
 
-#[derive(Debug, Args, Clone)]
+#[derive(Debug, Clone)]
+#[derive(Args)]
 pub struct ExampleArgs {
     /// Stage to dump example for.
     pub stage: RunStage,
@@ -130,7 +134,8 @@ impl std::fmt::Display for RunStage {
 }
 
 /// Shared arguments, used in all commands. Compiled with clap.
-#[derive(Debug, Args, Clone)]
+#[derive(Debug, Clone)]
+#[derive(Args)]
 pub struct SharedArgs {
 
     // #[arg(short, long = "larmor")]

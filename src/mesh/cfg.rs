@@ -7,7 +7,8 @@ use crate::mesh::MeshMethodTrait;
 use serde::{Serialize, Deserialize};
 
 /// Mesh target struct. Includes the mesh method, method arguments, and general i/o arguments.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
+#[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MeshTarget {
     /// Input path for the layout file (must be json).
