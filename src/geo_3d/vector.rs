@@ -53,9 +53,14 @@ impl GeoVector {
         }
     }
 
+    /// Get the magnitude squared of the vector.
+    pub fn norm_sq(&self) -> f32 {
+        self.x*self.x + self.y*self.y + self.z*self.z
+    }
+
     /// Get the magnitude of the vector.
     pub fn norm(&self) -> f32 {
-        (self.x*self.x + self.y*self.y + self.z*self.z).sqrt()
+        self.norm_sq().sqrt()
     }
 
     /// Get the angle between two vectors.

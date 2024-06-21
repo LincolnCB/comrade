@@ -18,7 +18,7 @@ use methods::helper::{
 use serde::{Serialize, Deserialize};
 use itertools::concat;
 
-/// Alternating Circles Method struct.
+/// Alternating Circles method struct.
 /// This struct contains all the parameters for the Alternating Circles layout method.
 #[derive(Debug)]
 #[derive(Serialize, Deserialize)]

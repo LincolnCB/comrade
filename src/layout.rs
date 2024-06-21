@@ -114,15 +114,23 @@ impl Coil {
         self.mutual_inductance(&self, dl) + self.wire_length() * correction_factor
     }
 
-    /// Calculate the mutual inductance between two coils, in nH.
+    /// Calculate the mutual inductance between two coils, as well as the gradient
+    /// with respect to the x, y, and z coordinates of the first coil.
+    /// Returns a tuple of (M [nH], dMx [nH/mm], dMy [nH/mm], dMz [nH/mm]).
+    /// The gradient with respect to the second coil position will be the negative of gradient returned here.
     /// dl is the maximum length infinitessimal approximation within a segment.
     /// For example, for a wire segment of length 2.3 * dl,
     /// there will be two segments of length dl and one of length 0.3 * dl.
     /// This value will have no effect on the calculation if longer than a given segment length.
-    pub fn mutual_inductance(&self, other: &Coil, dl: f32) -> f32 {
+    pub fn mutual_inductance_info(&self, other: &Coil, dl: f32, calc_val: bool, calc_dxyz: bool, calc_dr: bool) -> (Option<f32>, Option<f32>, Option<f32>, Option<f32>, Option<f32>) {
         let d_thresh = 0.25; // Threshold for distance between points
 
         let mut lambda = 0.0;
+        let mut lambda_dx = 0.0;
+        let mut lambda_dy = 0.0;
+        let mut lambda_dz = 0.0;
+        let mut lambda_dr = 0.0;
+        // dl * dl is reused often, so calculate it once
         let dl_sq = dl * dl;
 
         for (id, vertex) in self.vertices.iter().enumerate() {
@@ -134,6 +142,27 @@ impl Coil {
             let i_max = (dp / dl).floor() as u32;
             let dp_remainder = dp - (i_max as f32) * dl;
             let dp_remainder_normalized = dp_remainder / dp;
+
+            let mut update = |p: Point, q: Point, scale: f32| {
+                if calc_val {
+                    lambda += scale / p.distance(&q);
+                }
+                if calc_dxyz || calc_dr {
+                    let dist_cub = p.distance(&q).powi(3);
+                    let d_scale = scale / dist_cub;
+                    let dx = d_scale * (q.x - p.x);
+                    let dy = d_scale * (q.y - p.y);
+                    let dz = d_scale * (q.z - p.z);
+                    if calc_dxyz {
+                        lambda_dx += dx;
+                        lambda_dy += dy;
+                        lambda_dz += dz;
+                    }
+                    if calc_dr {
+                        lambda_dr += GeoVector::new(dx, dy, dz).proj_onto(&(p-self.center)).norm();
+                    }
+                }
+            };
 
             for (other_id, other_vertex) in other.vertices.iter().enumerate() {
                 // Lay out the second coil segment
@@ -147,6 +176,7 @@ impl Coil {
 
                 // Get the dot product of the two normalized segments
                 let dot = np.dot(&nq);
+                // dl * dl * dot is reused often, so calculate it once
                 let dl_sq_dot = dl_sq * dot;
 
                 // Iterate over sub-segments
@@ -155,13 +185,13 @@ impl Coil {
                     for j in 0..j_max {
                         let q = q0 + nq * (j as f32 + 0.5) * dl;
                         if p.distance(&q) > d_thresh * (self.wire_radius + other.wire_radius) {
-                            lambda += dl_sq_dot / p.distance(&q)
+                            update(p, q, dl_sq_dot);
                         }
                     }
                     // Remainder for second segment
                     let q = q0 + nq * (1.0 - 0.5 * dq_remainder_normalized) * dq;
                     if p.distance(&q) > d_thresh * (self.wire_radius + other.wire_radius) {
-                        lambda += dl * dq_remainder * dot / p.distance(&q);
+                        update(p, q, dl * dq_remainder * dot);
                     }
                 }
                 // Remainder for first segment
@@ -169,18 +199,38 @@ impl Coil {
                 for j in 0..j_max {
                     let q = q0 + nq * (j as f32 + 0.5) * dl;
                     if p.distance(&q) > d_thresh * (self.wire_radius + other.wire_radius) {
-                        lambda += dl * dp_remainder * dot / p.distance(&q);
+                        update(p, q, dp_remainder * dl * dot);
                     }
                 }
                 // Remainder for both segments
                 let q = q0 + nq * (1.0 - 0.5 * dq_remainder_normalized);
                 if p.distance(&q) > d_thresh * (self.wire_radius + other.wire_radius) {
-                    lambda += dp_remainder * dq_remainder * dot / p.distance(&q);
+                    update(p, q, dp_remainder * dq_remainder * dot);
                 }
             }
         }
         // Multiply by the constant factor of mu0/4pi. mu0 is already in units of nH/mm.
-        MU0 * lambda / (4.0 * PI)
+        let out = |l, calc| -> Option<f32> {
+            if calc {
+                Some(MU0 * l / (4.0 * PI))
+            } else {
+                None
+            }
+        };
+
+        (out(lambda, calc_val), out(lambda_dx, calc_dxyz), out(lambda_dy, calc_dxyz), out(lambda_dz, calc_dxyz), out(lambda_dr, calc_dr))
+    }
+
+    /// Wrapper to calculate the mutual inductance between two coils, in nH.
+    pub fn mutual_inductance(&self, other: &Coil, dl: f32) -> f32 {
+        let (m, _, _, _, _) = self.mutual_inductance_info(other, dl, true, false, false);
+        m.unwrap()
+    }
+
+    /// Wrapper to calculate the full info of the mutual inductance between two coils.
+    pub fn mutual_inductance_full(&self, other: &Coil, dl: f32) -> (f32, f32, f32, f32, f32) {
+        let (m, dx, dy, dz, dr) = self.mutual_inductance_info(other, dl, true, true, true);
+        (m.unwrap(), dx.unwrap(), dy.unwrap(), dz.unwrap(), dr.unwrap())
     }
 
     /// Calculate the coupling factor between two coils.

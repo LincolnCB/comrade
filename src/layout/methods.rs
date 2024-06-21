@@ -25,6 +25,7 @@ pub mod helper;
 //
 
 // Add the source module for the layout methods here
+mod gradient_circles;
 mod alternating_circles;
 mod k_means_isometric;
 
@@ -38,6 +39,10 @@ mod k_means_isometric;
 #[enum_dispatch(LayoutMethodTrait)]
 #[serde(tag = "name", content = "args")]
 pub enum MethodEnum {
+
+    /// Gradient-based circles layout, using gradient descent to optimize circle positions.
+    #[serde(rename = "gradient_circles")]
+    GradientCircles(gradient_circles::Method),
 
     /// Alternating symmetric circles layout, alternating between radius and position optimization with symmetry.
     #[serde(rename = "alternating_circles")]
