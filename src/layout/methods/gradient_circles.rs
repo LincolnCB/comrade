@@ -27,6 +27,8 @@ pub struct Method {
     // Optional symmetry plane
     #[serde(default = "Method::default_symmetry_plane", alias = "plane")]
     pub symmetry_plane: Option<Plane>,
+    #[serde(default = "Method::default_layout_in_path", rename = "layout_in")]
+    pub layout_in_path: Option<String>,
 
     // Circle intersection parameters
     pub circles: Vec<CircleArgs>,
@@ -80,6 +82,12 @@ impl Method {
     pub fn default_symmetry_plane() -> Option<Plane> {
         None
     }
+    pub fn example_layout_in_path() -> Option<String> {
+        Some("PATH/TO/INITIAL/CFG.json".to_string())
+    }
+    pub fn default_layout_in_path() -> Option<String> {
+        None
+    }
 
     pub fn default_epsilon() -> f32 {
         0.15
@@ -102,7 +110,10 @@ impl Method {
     }
 
     pub fn default_iterations() -> usize {
-        1
+        0
+    }
+    pub fn example_iterations() -> usize {
+        5
     }
     pub fn default_initial_step() -> f32 {
         64.0
@@ -144,6 +155,7 @@ impl Default for Method{
     fn default() -> Self {
         Method{
             symmetry_plane: Self::example_symmetry_plane(),
+            layout_in_path: Self::example_layout_in_path(),
 
             circles: vec![CircleArgs::default(); 2],
             epsilon: Self::default_epsilon(),
@@ -154,7 +166,7 @@ impl Default for Method{
             zero_angle_vector: Self::default_zero_angle_vector(),
             backup_zero_angle_vector: Self::default_backup_zero_angle_vector(),
 
-            iterations: Self::default_iterations(),
+            iterations: Self::example_iterations(),
             initial_step: Self::default_initial_step(),
             step_halflife: Self::default_step_halflife(),
             center_freedom: Self::default_center_freedom(),
@@ -224,6 +236,14 @@ impl methods::LayoutMethodTrait for Method {
         let mut sym_circles = Vec::<CircleArgs>::new();
         let mut pos_circles = Vec::<CircleArgs>::new();
         let mut neg_circles = Vec::<CircleArgs>::new();
+
+        // Load the static layout if provided
+        let static_layout = if let Some(layout_in_path) = &self.layout_in_path {
+            println!("Loading initial layout...");
+            Some(crate::io::load_deser_from::<layout::Layout>(layout_in_path)?)
+        } else {
+            None
+        };
 
         // Collect and clone the circles, with extra effort for symmetry
         let original_circles = if let Some(symmetry_plane) = &self.symmetry_plane {
@@ -305,6 +325,19 @@ impl methods::LayoutMethodTrait for Method {
                     }
                 }
             }
+
+            // Include static coils
+            if let Some(static_layout) = static_layout.as_ref() {
+                for static_coil in static_layout.coils.iter() {
+                    for vertex in static_coil.vertices.iter() {
+                        let vec_from_static = coil.center - vertex.point;
+                        if vec_from_static.norm() / coil.coil_radius < self.close_cutoff {
+                            close_coils += 1;
+                            break;
+                        }
+                    }
+                }
+            }
         }
             
         // Run a single pass
@@ -339,6 +372,7 @@ impl methods::LayoutMethodTrait for Method {
                     &neg_circles,
                     &original_circles,
                     &layout_out,
+                    &static_layout,
                     surface,
                     symmetry_plane,
                     &boundary_points,
@@ -361,6 +395,7 @@ impl methods::LayoutMethodTrait for Method {
                     &neg_circles,
                     &original_circles,
                     &layout_out,
+                    &static_layout,
                     &boundary_points,
                     &mut on_boundary,
                     step_size
@@ -381,6 +416,7 @@ impl methods::LayoutMethodTrait for Method {
                     &new_circles,
                     &original_circles,
                     &layout_out,
+                    &static_layout,
                     surface,
                     &boundary_points,
                     &mut on_boundary,
@@ -393,6 +429,7 @@ impl methods::LayoutMethodTrait for Method {
                     &new_circles,
                     &original_circles,
                     &layout_out,
+                    &static_layout,
                     &boundary_points,
                     &mut on_boundary,
                     step_size
@@ -424,6 +461,9 @@ impl methods::LayoutMethodTrait for Method {
 
             println!("Coupling factor estimates:");
             for (coil_id, coil) in layout_out.coils.iter().enumerate() {
+                // TODO: Make more efficient by calculating the self inductance once
+                // TODO: Include intersecting static coils in close_coils and objective function
+
                 for (other_id, other_coil) in layout_out.coils.iter().enumerate() {
                     if coil_id < other_id {
                         let coupling = coil.coupling_factor(other_coil, 1.0);
@@ -631,6 +671,7 @@ impl Method {
         circles: &Vec::<CircleArgs>,
         original_circles: &Vec::<CircleArgs>,
         layout_out: &layout::Layout,
+        static_layout: &Option<layout::Layout>,
         surface: &Surface,
         boundary_points: &Vec::<Point>,
         on_boundary: &mut Vec::<bool>,
@@ -641,13 +682,20 @@ impl Method {
         assert!(new_circles.len() == layout_out.coils.len());
 
         let mut coil_forces = vec![Vec::<GeoVector>::new(); layout_out.coils.len()];
+        let mut self_inductances = vec![0.0; layout_out.coils.len()];
+        let mut static_self_inductances: Vec::<Option<f32>> = if let Some(static_layout) = static_layout.as_ref() {
+            vec![None; static_layout.coils.len()]
+        } else {
+            vec![]
+        };
 
-        // Collect radial error 
+        // Collect radial error and self inductance
         let mut radial_err = vec![0.0; layout_out.coils.len()];
         let mut rel_radial_err = vec![0.0; layout_out.coils.len()];
         for (coil_id, circle) in circles.iter().enumerate() {
             radial_err[coil_id] = circle.coil_radius - original_circles[coil_id].coil_radius;
             rel_radial_err[coil_id] = radial_err[coil_id] / original_circles[coil_id].coil_radius;
+            self_inductances[coil_id] = layout_out.coils[coil_id].self_inductance(1.0);
         }
 
         // Calculate the forces on each coil
@@ -669,19 +717,54 @@ impl Method {
 
                     // Apply coupling forces from nearby coils
                     if vec_from_other.norm() / (radius + other_radius) < self.close_cutoff {
-                        let (m, dx, dy, dz, _) = coil.mutual_inductance_full(other_coil, 1.0);
 
-                        // L1L2
-                        let self_inductance_product = coil.self_inductance(1.0) * other_coil.self_inductance(1.0);
+                        // Get coupling and gradient
+                        let (m, dx, dy, dz, _) = coil.mutual_inductance_full(other_coil, 1.0);   
 
                         // Adjust the center by the linearization of the mutual inductance
                         // dk^2/dx = 2k * dk/dx = 2(m/sqrt(L1L2)) * dm/dx / sqrt(L1L2) = 2m * dm/dx / L1L2
-                        let adjustment = GeoVector::new(dx, dy, dz).proj_onto(&vec_from_other)
-                            * -step_size * 2.0 * m / self_inductance_product;
+                        let adjustment = -step_size * 2.0 * m * GeoVector::new(dx, dy, dz)
+                            / (self_inductances[coil_id] * self_inductances[other_id]);
 
                         // Add the force to the coil
                         coil_forces[coil_id].push(adjustment);
                         coil_forces[other_id].push(-adjustment);
+                    }
+                }
+            }
+
+            // Check all static coils
+            if let Some(static_layout) = static_layout.as_ref() {
+                for (static_id, static_coil) in static_layout.coils.iter().enumerate() {
+                    let mut intersect = false;
+
+                    // Calculate intersection exactly to allow for non-spherical static coils
+                    for vertex in static_coil.vertices.iter() {
+                        let vec_from_static = center - vertex.point;
+                        if vec_from_static.norm() / radius < self.close_cutoff {
+                            intersect = true;
+                            break;
+                        }
+                    }
+
+                    // Apply coupling forces from nearby static coil
+                    if intersect {
+
+                        // Get coupling and gradient
+                        let (m, dx, dy, dz, _) = coil.mutual_inductance_full(static_coil, 1.0);   
+
+                        // Grab the self inductance, if not already calculated
+                        if static_self_inductances[static_id].is_none() {
+                            static_self_inductances[static_id] = Some(coil.self_inductance(1.0));
+                        }
+
+                        // Adjust the center by the linearization of the mutual inductance
+                        // dk^2/dx = 2k * dk/dx = 2(m/sqrt(L1L2)) * dm/dx / sqrt(L1L2) = 2m * dm/dx / L1L2
+                        let adjustment = -step_size * 2.0 * m * GeoVector::new(dx, dy, dz)
+                            / (self_inductances[coil_id] * static_self_inductances[static_id].unwrap());
+
+                        // Add the force to the coil
+                        coil_forces[coil_id].push(adjustment);
                     }
                 }
             }
@@ -742,6 +825,7 @@ impl Method {
         neg_circles: &Vec::<CircleArgs>,
         original_circles: &Vec::<CircleArgs>,
         layout_out: &layout::Layout,
+        static_layout: &Option<layout::Layout>,
         surface: &Surface,
         symmetry_plane: &Plane,
         boundary_points: &Vec::<Point>,
@@ -752,7 +836,16 @@ impl Method {
         let mut new_circles = concat(vec![sym_circles.clone(), pos_circles.clone(), neg_circles.clone()]);
 
         // Update the positions
-        new_circles = self.update_positions(&new_circles, original_circles, layout_out, surface, boundary_points, on_boundary, step_size);
+        new_circles = self.update_positions(
+            &new_circles,
+            original_circles,
+            layout_out,
+            static_layout,
+            surface,
+            boundary_points,
+            on_boundary,
+            step_size
+        );
 
         // Split the circles back into their respective groups
         let mut new_sym_circles = Vec::<CircleArgs>::new();
@@ -791,6 +884,7 @@ impl Method {
         circles: &Vec::<CircleArgs>,
         original_circles: &Vec::<CircleArgs>,
         layout_out: &layout::Layout,
+        static_layout: &Option<layout::Layout>,
         boundary_points: &Vec::<Point>,
         on_boundary: &mut Vec::<bool>,
         step_size: f32
@@ -803,7 +897,14 @@ impl Method {
         let mut objective = 0.0;
         let mut close_coils = 0;
 
-        // Collect original and min/max radii
+        let mut self_inductances = vec![0.0; layout_out.coils.len()];
+        let mut static_self_inductances: Vec::<Option<f32>> = if let Some(static_layout) = static_layout.as_ref() {
+            vec![None; static_layout.coils.len()]
+        } else {
+            vec![]
+        };
+
+        // Collect original and min/max radii, as well as coil self inductances
         let mut rel_radial_err = vec![0.0; layout_out.coils.len()];
         let mut min_radii = vec![0.0; layout_out.coils.len()];
         let mut max_radii = vec![0.0; layout_out.coils.len()];
@@ -812,6 +913,7 @@ impl Method {
             rel_radial_err[coil_id] = (circle.coil_radius - original_radius) / original_radius;
             min_radii[coil_id] = original_radius * (1.0 - self.radius_freedom);
             max_radii[coil_id] = original_radius * (1.0 + self.radius_freedom);
+            self_inductances[coil_id] = layout_out.coils[coil_id].self_inductance(1.0);
         }
         
         // Calculate the forces on each coil
@@ -833,25 +935,66 @@ impl Method {
                     // Apply coupling forces from nearby coils
                     if vec_from_other.norm() / (radius + other_radius) < self.close_cutoff {
 
+                        // Get coupling and gradient
                         let (m, _, _, _, dr) = coil.mutual_inductance_full(other_coil, 1.0);
-
-                        // L1L2
-                        let self_inductance_product = coil.self_inductance(1.0) * other_coil.self_inductance(1.0);
 
                         // Track close coils and add to objective function
                         if other_id > coil_id {
                             close_coils += 1;
-                            objective += m * m * 1.0e6 / self_inductance_product;
+                            objective += m * m * 1.0e6 / (self_inductances[coil_id] * self_inductances[other_id]);
                         }
 
                         // Adjust the center by the linearization of the mutual inductance
                         // dk^2/dr = 2k * dk/dr = 2(m/sqrt(L1L2)) * dm/dr / sqrt(L1L2) = 2m * dm/dr / L1L2
                         // Include regularization term: radius_reg * (r - r0)
                         let adjustment = -step_size * 
-                            (dr * 2.0 * m / self_inductance_product + self.radius_reg * rel_radial_err[coil_id]);
+                            (2.0 * m * dr / (self_inductances[coil_id] * self_inductances[other_id]) 
+                            + self.radius_reg * rel_radial_err[coil_id]);
 
                         // Add the force to the coil
                         net_radial_change[coil_id] += adjustment;
+                    }
+                }
+            }
+
+            // Check all static coils
+            if let Some(static_layout) = static_layout.as_ref() {
+                for (static_id, static_coil) in static_layout.coils.iter().enumerate() {
+                    let mut intersect = false;
+
+                    // Calculate intersection exactly to allow for non-spherical static coils
+                    for vertex in static_coil.vertices.iter() {
+                        let vec_from_static = center - vertex.point;
+                        if vec_from_static.norm() / radius < self.close_cutoff {
+                            intersect = true;
+                            break;
+                        }
+                    }
+
+                    // Apply coupling forces from nearby static coil
+                    if intersect {
+
+                        // Get coupling and gradient
+                        let (m, _, _, _, dr) = coil.mutual_inductance_full(static_coil, 1.0);
+
+                        // Grab the self inductance, if not already calculated
+                        if static_self_inductances[static_id].is_none() {
+                            static_self_inductances[static_id] = Some(coil.self_inductance(1.0));
+                        }
+
+                        // Adjust the center by the linearization of the mutual inductance
+                        // dk^2/dr = 2k * dk/dr = 2(m/sqrt(L1L2)) * dm/dr / sqrt(L1L2) = 2m * dm/dr / L1L2
+                        // Include regularization term: radius_reg * (r - r0)
+                        let adjustment = -step_size * 
+                            (2.0 * m * dr / (self_inductances[coil_id] * static_self_inductances[static_id].unwrap())
+                            + self.radius_reg * rel_radial_err[coil_id]);
+
+                        // Add the force to the coil
+                        net_radial_change[coil_id] += adjustment;
+
+                        // Track the objective function as well
+                        close_coils += 1;
+                        objective += m * m * 1.0e6 / (self_inductances[coil_id] * static_self_inductances[static_id].unwrap());
                     }
                 }
             }
@@ -886,6 +1029,7 @@ impl Method {
         neg_circles: &Vec::<CircleArgs>,
         original_circles: &Vec::<CircleArgs>,
         layout_out: &layout::Layout,
+        static_layout: &Option<layout::Layout>,
         boundary_points: &Vec::<Point>,
         on_boundary: &mut Vec::<bool>,
         step_size: f32
@@ -896,7 +1040,15 @@ impl Method {
         let objective;
         let close_coils;
 
-        (new_circles, objective, close_coils) = self.update_radii(&new_circles, original_circles, layout_out, boundary_points, on_boundary, step_size);
+        (new_circles, objective, close_coils) = self.update_radii(
+            &new_circles,
+            original_circles,
+            layout_out,
+            static_layout,
+            boundary_points,
+            on_boundary,
+            step_size
+        );
 
         // Split the circles back into their respective groups
         let mut new_sym_circles = Vec::<CircleArgs>::new();
