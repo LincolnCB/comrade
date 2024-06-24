@@ -28,6 +28,7 @@ pub mod helper;
 mod gradient_circles;
 mod alternating_circles;
 mod k_means_isometric;
+mod adam_circles;
 
 /// Layout methods enum.
 /// To add a new method:
@@ -39,6 +40,10 @@ mod k_means_isometric;
 #[enum_dispatch(LayoutMethodTrait)]
 #[serde(tag = "name", content = "args")]
 pub enum MethodEnum {
+
+    /// Adam circles layout, using the Adam optimization algorithm.
+    #[serde(rename = "adam_circles")]
+    AdamCircles(adam_circles::Method),
 
     /// Gradient-based circles layout, using gradient descent to optimize circle positions.
     #[serde(rename = "gradient_circles")]

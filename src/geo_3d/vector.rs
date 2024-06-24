@@ -127,6 +127,42 @@ impl GeoVector {
     pub fn has_nan(&self) -> bool {
         self.x.is_nan() || self.y.is_nan() || self.z.is_nan()
     }
+
+    /// Elementwise power of the vector.
+    pub fn el_powf(&self, power: f32) -> GeoVector {
+        GeoVector{
+            x: self.x.powf(power),
+            y: self.y.powf(power),
+            z: self.z.powf(power),
+        }
+    }
+
+    /// Elementwise addition of a float to the vector
+    pub fn el_add(&self, value: f32) -> GeoVector {
+        GeoVector{
+            x: self.x + value,
+            y: self.y + value,
+            z: self.z + value,
+        }
+    }
+
+    /// Elementwise multiplication of a vector by another vector
+    pub fn el_mul(&self, other: &GeoVector) -> GeoVector {
+        GeoVector{
+            x: self.x * other.x,
+            y: self.y * other.y,
+            z: self.z * other.z,
+        }
+    }
+
+    /// Elementwise division of a vector by another vector
+    pub fn el_div(&self, other: &GeoVector) -> GeoVector {
+        GeoVector{
+            x: self.x / other.x,
+            y: self.y / other.y,
+            z: self.z / other.z,
+        }
+    }
 }
 impl Add for GeoVector {
     type Output = Self;

@@ -227,6 +227,12 @@ impl Coil {
         m.unwrap()
     }
 
+    /// Wrapper to calculate the mutual inductance between two coils, as well as the gradient wrt only the radius
+    pub fn mutual_inductance_dradius(&self, other: &Coil, dl: f32) -> (f32, f32) {
+        let (m, _, _, _, dr) = self.mutual_inductance_info(other, dl, true, false, true);
+        (m.unwrap(), dr.unwrap())
+    }
+
     /// Wrapper to calculate the full info of the mutual inductance between two coils.
     pub fn mutual_inductance_full(&self, other: &Coil, dl: f32) -> (f32, f32, f32, f32, f32) {
         let (m, dx, dy, dz, dr) = self.mutual_inductance_info(other, dl, true, true, true);
