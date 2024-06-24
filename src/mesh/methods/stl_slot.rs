@@ -21,6 +21,8 @@ pub struct Method {
     poly_num: usize,
     #[serde(default = "Method::default_slot_depth")]
     slot_depth: f32,
+    #[serde(default = "Method::default_save_individual", alias = "individual")]
+    save_individual: bool,
 }
 impl Method {
     pub fn default_radius_offset() -> f32 {
@@ -32,6 +34,9 @@ impl Method {
     pub fn default_slot_depth() -> f32 {
         10.0
     }
+    pub fn default_save_individual() -> bool {
+        false
+    }
 }
 impl Default for Method {
     fn default() -> Self {
@@ -39,6 +44,7 @@ impl Default for Method {
             radius_offset: Method::default_radius_offset(),
             poly_num: Method::default_poly_num(),
             slot_depth: Method::default_slot_depth(),
+            save_individual: Method::default_save_individual(),
         }
     }
 }
@@ -133,11 +139,11 @@ impl methods::MeshMethodTrait for Method {
                     full_triangles.push(stl_triangle(&n1, v1, w1, w0));
                 }
             }
-
-            // Save each coil to a separate file
-            let numbered_output_path = output_path.replace(".stl", &format!("_c{}.stl", coil_n));
-            println!("Saving coil {} to {}...", coil_n, numbered_output_path);
-            io::stl::save_stl_from_triangles(&triangles, &numbered_output_path)?;
+            if self.save_individual {
+                // Save each coil to a separate file
+                let numbered_output_path = output_path.replace(".stl", &format!("_c{}.stl", coil_n));
+                io::stl::save_stl_from_triangles(&triangles, &numbered_output_path)?;
+            }
         }
 
         // Save a full set of coils (often just for visualization)

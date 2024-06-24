@@ -27,7 +27,7 @@ pub struct Method {
     // Optional symmetry plane
     #[serde(default = "Method::default_symmetry_plane", alias = "plane")]
     pub symmetry_plane: Option<Plane>,
-    #[serde(default = "Method::default_layout_in_path", rename = "layout_in")]
+    #[serde(default = "Method::default_layout_in_path", rename = "layout_in", alias = "static_layout")]
     pub layout_in_path: Option<String>,
 
     // Circle intersection parameters
@@ -763,8 +763,8 @@ impl Method {
                         let adjustment = -step_size * 2.0 * m * GeoVector::new(dx, dy, dz)
                             / (self_inductances[coil_id] * static_self_inductances[static_id].unwrap());
 
-                        // Add the force to the coil
-                        coil_forces[coil_id].push(adjustment);
+                        // Add the force to the coil, twice as much because the other is static
+                        coil_forces[coil_id].push(2.0 * adjustment);
                     }
                 }
             }
