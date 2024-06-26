@@ -32,6 +32,9 @@ impl GeoVector {
     /// Normalize and return a new vector.
     pub fn normalize(&self) -> Self {
         let mag = self.norm();
+        if mag == 0.0 {
+            panic!("Cannot normalize a zero vector.");
+        }
         GeoVector{
             x: self.x / mag,
             y: self.y / mag,

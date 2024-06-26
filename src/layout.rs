@@ -27,7 +27,7 @@ pub use methods::{
 /// Layout struct.
 /// This struct contains all the necessary results from the layout process.
 /// Returned from the layout process, used as input to the matching process.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[derive(Serialize, Deserialize)]
 pub struct Layout {
     pub coils: Vec<Coil>,

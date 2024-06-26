@@ -362,7 +362,6 @@ impl methods::LayoutMethodTrait for Method {
 
             // Generate step size -- linear decrease currently. TODO Probably should be exponential.
             if i > 0 { step_size *= 0.5_f32.powf(1.0 / self.step_halflife); }
-            println!("Step size: {:.2}", step_size);
 
             if let Some(symmetry_plane) = &self.symmetry_plane {
                 // Update positions
@@ -408,8 +407,7 @@ impl methods::LayoutMethodTrait for Method {
                     &neg_circles,
                     false
                 )?;
-
-
+                new_circles = concat(vec![sym_circles.clone(), pos_circles.clone(), neg_circles.clone()]);
             } else {
                 // Update positions
                 new_circles = self.update_positions(
@@ -443,8 +441,8 @@ impl methods::LayoutMethodTrait for Method {
                 println!("WARNING: Number of close coils changed! ({} -> {})", close_coils, new_close_coils);
             }
             println!();
+            println!("Step size: {:.2}", step_size);
             close_coils = new_close_coils;
-            new_circles = concat(vec![sym_circles.clone(), pos_circles.clone(), neg_circles.clone()]);
         }
 
 
@@ -772,8 +770,7 @@ impl Method {
             // Find the net force on the center
             let mut delta_c = GeoVector::zero();
             for force in coil_forces[coil_id].iter() {
-                let flat_force = force.rej_onto(&coil.normal).normalize() * force.norm();
-                delta_c = delta_c + flat_force;
+                delta_c = delta_c + force.rej_onto(&coil.normal);
             }
 
             // Check and update boundary condition
