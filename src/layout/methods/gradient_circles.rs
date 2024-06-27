@@ -90,7 +90,7 @@ impl Method {
     }
 
     pub fn default_epsilon() -> f32 {
-        0.15
+        1.5
     }
     pub fn default_pre_shift() -> bool {
         true

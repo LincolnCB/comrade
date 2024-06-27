@@ -614,8 +614,8 @@ pub fn k_means_initialized(points: &Vec<Point>, starting_centers: &Vec<Point>, m
 
         centers = new_centers;
 
-        if verbose && it % 10 == 0 {
-            println!("K-means iteration {}: max change {}", it, max_change);
+        if verbose && (it + 1) % (max_iter as f32 / 20.0) as usize == 0 {
+            println!("Iteration: {} / {}: max change {:.4}", it + 1, max_iter, max_change);
         }
     }
 

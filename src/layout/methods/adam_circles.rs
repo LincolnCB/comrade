@@ -93,7 +93,7 @@ impl Method {
     }
 
     pub fn default_epsilon() -> f32 {
-        0.15
+        1.5
     }
     pub fn default_pre_shift() -> bool {
         true
@@ -119,7 +119,7 @@ impl Method {
         5
     }
     pub fn default_step_size() -> f32 {
-        64.0
+        0.2
     }
     pub fn default_first_moment_decay() -> f32 {
         0.9
@@ -134,10 +134,10 @@ impl Method {
         0.15
     }
     pub fn default_close_cutoff() -> f32 {
-        1.1
+        0.95
     }
     pub fn default_radius_reg() -> f32 {
-        1.0
+        0.1
     }
 
     pub fn default_verbose() -> bool {

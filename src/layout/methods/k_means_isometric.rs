@@ -7,8 +7,8 @@
 use crate::layout;
 use crate::geo_3d::*;
 use layout::methods;
-use methods::alternating_circles::Method as AlternatingCirclesMethod;
-use methods::alternating_circles::CircleArgs as Circle;
+use methods::adam_circles::Method as AdamCirclesMethod;
+use methods::adam_circles::CircleArgs as Circle;
 use methods::helper::{
     k_means,
     k_means_initialized,
@@ -17,69 +17,77 @@ use methods::helper::{
 
 use serde::{Serialize, Deserialize};
 
-/// Alternating Circles Method struct.
-/// This struct contains all the parameters for the Alternating Circles layout method.
+/// K Means Isometric Circles Method
+/// Includes the parameters for the Adam Circles method, as well as additional parameters for the k-means algorithm.
 #[derive(Debug)]
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Method {
     // K-means parameters
+    // --------------------------------
     #[serde(default = "Method::default_circles")]
     circles: usize,
     #[serde(default = "Method::default_symmetry_plane", alias = "plane")]
     symmetry_plane: Option<Plane>,
     #[serde(default = "Method::default_initial_centers")]
     initial_centers: Option<Vec<Point>>,
-
-    // Circle intersection parameters
-    #[serde(default = "Method::default_epsilon")]
-    epsilon: f32,
-    #[serde(default = "Method::default_pre_shift")]
-    pre_shift: bool,
-    
-    // Overlap handling parameters
-    #[serde(default = "Method::default_clearance")]
-    clearance: f32,
-    #[serde(default = "Method::default_wire_radius")]
-    wire_radius: f32,
-    #[serde(default = "Method::default_zero_angle_vector")]
-    zero_angle_vector: GeoVector,
-    #[serde(default = "Method::default_backup_zero_angle_vector")]
-    backup_zero_angle_vector: GeoVector,
-    
-    // Iteration parameters
-    #[serde(default = "Method::default_iterations")]
-    iterations: usize,
-    #[serde(default = "Method::default_initial_step")]
-    initial_step: f32,
-    #[serde(default = "Method::default_step_decrease")]
-    step_decrease: f32,
-    #[serde(default = "Method::default_radius_freedom")]
-    radius_freedom: f32,
-    #[serde(default = "Method::default_center_freedom")]
-    center_freedom: f32,
-    #[serde(default = "Method::default_close_cutoff")]
-    close_cutoff: f32,
-    #[serde(default = "Method::default_radial_stiffness", alias = "stiffness")]
-    radial_stiffness: f32,
-    
-    // Verbosity
-    #[serde(default = "Method::default_verbose")]
-    verbose: bool,
-    #[serde(default = "Method::default_statistics")]
-    statistics: bool,
     
     // Visualization (no optimization, just display the centers as small loops)
     #[serde(default = "Method::default_visualize")]
     visualize: bool,
-
+    
     // Save final centers output
     #[serde(default = "Method::default_centers_output")]
     centers_output: Option<String>,
-    
+    // --------------------------------
+
+    // Optimization parameters
+    // --------------------------------
+    // Circle intersection parameters
+    #[serde(default = "Method::default_epsilon")]
+    pub epsilon: f32,
+    #[serde(default = "Method::default_pre_shift")]
+    pub pre_shift: bool,
+
+    // Overlap handling parameters
+    #[serde(default = "Method::default_clearance")]
+    pub clearance: f32,
+    #[serde(default = "Method::default_wire_radius")]
+    pub wire_radius: f32,
+    #[serde(default = "Method::default_zero_angle_vector")]
+    pub zero_angle_vector: GeoVector,
+    #[serde(default = "Method::default_backup_zero_angle_vector")]
+    pub backup_zero_angle_vector: GeoVector,
+
+    // Iteration parameters
+    #[serde(default = "Method::default_iterations")]
+    pub iterations: usize,
+    #[serde(default = "Method::default_step_size")]
+    pub step_size: f32,
+    #[serde(default = "Method::default_first_moment_decay", alias = "b1")]
+    pub first_moment_decay: f32,
+    #[serde(default = "Method::default_second_moment_decay", alias = "b2")]
+    pub second_moment_decay: f32,
+    #[serde(default = "Method::default_radius_reg", alias = "radius_regularization")]
+    pub radius_reg: f32,
+    #[serde(default = "Method::default_radius_freedom")]
+    pub radius_freedom: f32,
+    #[serde(default = "Method::default_center_freedom")]
+    pub center_freedom: f32,
+    #[serde(default = "Method::default_close_cutoff")]
+    pub close_cutoff: f32,
+
+    // Verbosity
+    #[serde(default = "Method::default_verbose")]
+    pub verbose: bool,
+    #[serde(default = "Method::default_warn_on_shift")]
+    pub warn_on_shift: bool,
+    #[serde(default = "Method::default_statistics_level", alias = "statistics")]
+    pub statistics_level: u32,
+
     // Save final cfg output
     #[serde(default = "Method::default_final_cfg_output")]
-    final_cfg_output: Option<String>,
+    pub final_cfg_output: Option<String>,
 }
 impl Method {
     pub fn default_circles() -> usize {
@@ -102,9 +110,18 @@ impl Method {
     pub fn default_initial_centers() -> Option<Vec<Point>> {
         None
     }
+    pub fn default_visualize() -> bool {
+        false
+    }
+    pub fn example_centers_output() -> Option<String> {
+        Some("PATH/TO/OUTPUT/centers.[json|yaml|toml]".to_string())
+    }
+    pub fn default_centers_output() -> Option<String> {
+        None
+    }
     
     pub fn default_epsilon() -> f32 {
-        0.15
+        1.5
     }
     pub fn default_pre_shift() -> bool {
         true
@@ -124,45 +141,45 @@ impl Method {
     }
 
     pub fn default_iterations() -> usize {
-        1
+        0
     }
-    pub fn default_initial_step() -> f32 {
-        1.0
+    pub fn example_iterations() -> usize {
+        5
     }
-    pub fn default_step_decrease() -> f32 {
-        0.5
+    pub fn default_step_size() -> f32 {
+        0.2
+    }
+    pub fn default_first_moment_decay() -> f32 {
+        0.9
+    }
+    pub fn default_second_moment_decay() -> f32 {
+        0.999
     }
     pub fn default_center_freedom() -> f32 {
-        0.5
+        0.95
     }
     pub fn default_radius_freedom() -> f32 {
-        0.15
+        0.65
     }
     pub fn default_close_cutoff() -> f32 {
-        1.1
+        0.95
     }
-    pub fn default_radial_stiffness() -> f32 {
-        1.0
+    pub fn default_radius_reg() -> f32 {
+        0.1
     }
 
     pub fn default_verbose() -> bool {
         false
     }
-    pub fn default_statistics() -> bool {
-        false
+    pub fn default_warn_on_shift() -> bool {
+        true
     }
-    
-    pub fn default_visualize() -> bool {
-        false
+    pub fn default_statistics_level() -> u32 {
+        0
     }
-    pub fn example_centers_output() -> Option<String> {
-        Some("PATH/TO/OUTPUT/centers.[json|yaml|toml]".to_string())
-    }
-    pub fn default_centers_output() -> Option<String> {
-        None
-    }
+
     pub fn example_final_cfg_output() -> Option<String> {
-        Some("PATH/TO/OUTPUT/cinal_cfg.[json|yaml|toml]".to_string())
+        Some("PATH/TO/FINAL/CFG.[json|yaml|toml]".to_string())
     }
     pub fn default_final_cfg_output() -> Option<String> {
         None
@@ -174,6 +191,8 @@ impl Default for Method{
             circles: Self::default_circles(),
             symmetry_plane: Self::example_symmetry_plane(),
             initial_centers: Self::example_initial_centers(),
+            visualize: Self::default_visualize(),
+            centers_output: Self::example_centers_output(),
 
             epsilon: Self::default_epsilon(),
             pre_shift: Self::default_pre_shift(),
@@ -183,19 +202,19 @@ impl Default for Method{
             zero_angle_vector: Self::default_zero_angle_vector(),
             backup_zero_angle_vector: Self::default_backup_zero_angle_vector(),
 
-            iterations: Self::default_iterations(),
-            initial_step: Self::default_initial_step(),
-            step_decrease: Self::default_step_decrease(),
+            iterations: Self::example_iterations(),
+            step_size: Self::default_step_size(),
+            first_moment_decay: Self::default_first_moment_decay(),
+            second_moment_decay: Self::default_second_moment_decay(),
             center_freedom: Self::default_center_freedom(),
             radius_freedom: Self::default_radius_freedom(),
             close_cutoff: Self::default_close_cutoff(),
-            radial_stiffness: Self::default_radial_stiffness(),
+            radius_reg: Self::default_radius_reg(),
 
             verbose: Self::default_verbose(),
-            statistics: Self::default_statistics(),
-            
-            visualize: Self::default_visualize(),
-            centers_output: Self::example_centers_output(),
+            warn_on_shift: Self::default_warn_on_shift(),
+            statistics_level: Self::default_statistics_level(),
+
             final_cfg_output: Self::example_final_cfg_output(),
         }
     }
@@ -218,19 +237,25 @@ impl methods::LayoutMethodTrait for Method {
         let mut temp_points = surface.vertices.iter().map(|v| v.point).collect::<Vec<Point>>();
         let mut boundary_trim = 0.0;
 
-        if self.verbose {
-            println!("Selecting centers...");
-        }
-        for _ in 0..5 {
+        for it in 0..5 {
+
+            if self.verbose {
+                println!("Trim pass: {}/5", it + 1);
+                println!();
+            }
+
             // Generate centers
-            if self.symmetry_plane.is_none() {
-                if let Some(initial_centers) = &self.initial_centers {
-                    centers = k_means_initialized(&temp_points, initial_centers, 1000, false);
-                } else {
-                    centers = k_means(&temp_points, self.circles, 1000, false);
-                }
+            let initial_centers = if let Some(initial_centers) = &self.initial_centers {
+                Some(initial_centers.clone())
+            } else if it > 0 {
+                Some(centers.clone())
             } else {
-                centers = self.k_means_symmetric(&temp_points, 1000);
+                None
+            };
+            if self.symmetry_plane.is_none() {
+                centers = self.k_means(&temp_points, &initial_centers, 1000);
+            } else {
+                centers = self.k_means_symmetric(&temp_points, &initial_centers, 1000);
             }
 
             // Calculate radius
@@ -277,7 +302,7 @@ impl methods::LayoutMethodTrait for Method {
             if boundary_dist < radius {
                 println!("Trimming boundary...");
                 println!();
-                boundary_trim += 0.9 * (radius - boundary_dist);
+                boundary_trim += 1.1 * (radius - boundary_dist);
 
                 // Trim the points
                 temp_points = temp_points.iter().filter(|p| {
@@ -331,8 +356,9 @@ impl methods::LayoutMethodTrait for Method {
         }
 
         // Create method
-        let method = AlternatingCirclesMethod{
+        let method = AdamCirclesMethod{
             symmetry_plane: self.symmetry_plane,
+            layout_in_path: None,
 
             circles,
             epsilon: self.epsilon,
@@ -343,17 +369,18 @@ impl methods::LayoutMethodTrait for Method {
             zero_angle_vector: self.zero_angle_vector,
             backup_zero_angle_vector: self.backup_zero_angle_vector,
 
-            iterations: iterations,
-            initial_step: self.initial_step,
-            step_decrease: self.step_decrease,
+            iterations: self.iterations,
+            step_size: self.step_size,
+            first_moment_decay: self.first_moment_decay,
+            second_moment_decay: self.second_moment_decay,
             center_freedom: self.center_freedom,
             radius_freedom: self.radius_freedom,
             close_cutoff: self.close_cutoff,
-            radial_stiffness: self.radial_stiffness,
+            radius_reg: self.radius_reg,
 
             verbose: self.verbose,
-            warn_on_shift: false,
-            statistics: self.statistics,
+            warn_on_shift: self.warn_on_shift,
+            statistics_level: self.statistics_level,
 
             final_cfg_output: self.final_cfg_output.clone(),
         };
@@ -364,21 +391,30 @@ impl methods::LayoutMethodTrait for Method {
 }
 
 impl Method {
-    fn k_means_symmetric(&self, points: &Vec<Point>, max_iter: usize) -> Vec<Point> {
+    fn k_means(&self, points: &Vec<Point>, initial_centers_option: &Option<Vec<Point>>, max_iter: usize) -> Vec<Point> {
+        if let Some(initial_centers) = initial_centers_option.as_ref() {
+            k_means_initialized(points, initial_centers, max_iter, false)
+        } else {
+            k_means(points, self.circles, max_iter, false)
+        }
+    }
+
+    fn k_means_symmetric(&self, points: &Vec<Point>, initial_centers_option: &Option<Vec<Point>>, max_iter: usize)
+     -> Vec<Point> {
 
         assert!(self.symmetry_plane.is_some(), "Symmetry plane must be defined for symmetric k-means.");
 
         // Initialize the centers
-        let centers = if let Some(initial_centers) = &self.initial_centers {
+        let centers = if let Some(initial_centers) = initial_centers_option.as_ref() {
             if self.verbose {
                 println!("Using initial centers...");
             }
-            k_means_initialized(points, &initial_centers, max_iter, false)
+            initial_centers.clone()
         } else {
             if self.verbose {
                 println!("Initializing centers...");
             }
-            k_means(points, self.circles, max_iter, false)
+            k_means(points, self.circles, max_iter, self.verbose)
         };
 
         // Symmetrize the centers
@@ -409,6 +445,9 @@ impl Method {
             println!();
         }
 
+        if self.verbose {
+            println!("Starting k-means iterations...");
+        }
         for it in 0..max_iter {
             if self.verbose && (it + 1) % (max_iter as f32 / 10.0) as usize == 0 {
                 println!("Iteration: {} / {}", it + 1, max_iter);
